@@ -1,0 +1,54 @@
+# Python 缓存与编译文件
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# 打包 / 分发
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# 虚拟环境
+venv/
+.venv/
+
+# 环境配置与敏感信息
+.env
+.env.*
+.flaskenv
+.python-version
+
+# Flask / 数据库
+instance/
+migrations/
+*.sqlite3
+*.db
+*.db-journal
+
+# 测试与覆盖率
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# IDE / 编辑器配置
+.vscode/
+.idea/
+*.code-workspace
+
+# 工具与本地设置
+.cursor/
+.claude/
+
+# 日志文件
+*.log
+
+# 操作系统生成文件
+.DS_Store
+Thumbs.db
+
+uploads/*.*

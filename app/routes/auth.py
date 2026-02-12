@@ -1,0 +1,51 @@
+from flask import Blueprint, request, jsonify
+from flask_login import login_user, logout_user, login_required, current_user
+from app.extensions import db
+from app.models import User
+
+auth_bp = Blueprint('auth', __name__)
+
+@auth_bp.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({'error': '用户名和密码不能为空'}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({'error': '用户名已存在'}), 400
+
+    user = User(username=username)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+
+    login_user(user)
+    return jsonify({'message': '注册成功', 'user': {'id': user.id, 'username': user.username}})
+
+@auth_bp.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+
+    user = User.query.filter_by(username=username).first()
+    if user and user.check_password(password):
+        login_user(user)
+        return jsonify({'message': '登录成功', 'user': {'id': user.id, 'username': user.username}})
+
+    return jsonify({'error': '用户名或密码错误'}), 401
+
+@auth_bp.route('/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': '已退出登录'})
+
+@auth_bp.route('/status', methods=['GET'])
+def auth_status():
+    if current_user.is_authenticated:
+        return jsonify({'is_authenticated': True, 'user': {'id': current_user.id, 'username': current_user.username}})
+    return jsonify({'is_authenticated': False})

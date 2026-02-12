@@ -1,0 +1,3 @@
+SECRET_KEY=generated-secret-key-30000000000000
+FLASK_APP=run.py
+FLASK_ENV=development

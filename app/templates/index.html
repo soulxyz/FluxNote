@@ -1,0 +1,192 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轻笔记 - 记录生活</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Markdown Support -->
+    <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/marked/12.0.1/marked.min.js"></script>
+    <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/dompurify/3.0.9/purify.min.js"></script>
+    <!-- Syntax Highlighting -->
+    <link rel="stylesheet" href="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>hljs.highlightAll();</script>
+
+    <!-- Viewer.js for Image Zoom -->
+    <link rel="stylesheet" href="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/viewerjs/1.11.6/viewer.min.css">
+    <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/viewerjs/1.11.6/viewer.min.js"></script>
+</head>
+<body>
+    <div class="app-layout" id="appLayout">
+        <div class="app-container">
+            <!-- 侧边栏 -->
+            <aside class="sidebar" id="sidebar">
+                <!-- 折叠按钮 (Hover显示) -->
+                <button class="sidebar-toggle-btn" id="sidebarToggle" title="收起侧边栏">
+                    <i class="fas fa-bars"></i>
+                </button>
+
+                <!-- 1. 用户信息区 (改为极简) -->
+            <div class="user-profile-compact" id="userProfile" style="display:none;">
+                <div class="user-meta">
+                    <span class="username-large" id="userName">User</span>
+                    <span class="pro-badge">PRO</span>
+                </div>
+                <div class="user-actions-mini">
+                     <a href="/settings" title="设置"><i class="fas fa-cog"></i></a>
+                     <a href="#" id="logoutBtn" title="退出"><i class="fas fa-sign-out-alt"></i></a>
+                </div>
+            </div>
+
+            <!-- 登录未登录状态处理 -->
+            <div id="authActions" class="auth-section">
+                <button id="showLoginBtn" class="btn btn-primary btn-block">登录 / 注册</button>
+            </div>
+
+            <!-- 2. 核心统计 & 热力图 (仿竞品) -->
+            <div class="stats-panel" id="statsSection" style="display:none;">
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <span class="stat-num" id="statNoteCount">0</span>
+                        <span class="stat-label">笔记</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-num" id="statTagCount">0</span>
+                        <span class="stat-label">标签</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-num" id="statDayCount">0</span>
+                        <span class="stat-label">记录天数</span>
+                    </div>
+                </div>
+                <!-- 热力图 -->
+                <div id="heatmapGrid" class="heatmap-grid-compact"></div>
+            </div>
+
+            <!-- 3. 主导航 -->
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" id="navAllNotes" onclick="switchView('all'); return false;">
+                    <i class="fas fa-layer-group"></i> 全部笔记
+                </a>
+                <a href="#" class="nav-item" onclick="return false;">
+                    <i class="fab fa-weixin"></i> 微信输入
+                </a>
+                <a href="#" class="nav-item" onclick="return false;">
+                    <i class="fas fa-history"></i> 每日回顾
+                </a>
+                <a href="#" class="nav-item" id="navTrash" onclick="switchView('trash'); return false;">
+                    <i class="fas fa-trash"></i> 回收站
+                </a>
+            </nav>
+
+            <!-- 4. 标签列表 -->
+            <div class="sidebar-section tags-section">
+                <h3 class="section-title">全部标签</h3>
+                <div class="filter-tags-list">
+                    <!-- 动态加载 -->
+                </div>
+            </div>
+            </aside>
+
+            <!-- 主内容区 -->
+            <main class="main-stream">
+            <!-- 顶部栏 (New) -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button id="mobileMenuBtn" class="mobile-menu-btn" title="菜单"><i class="fas fa-bars"></i></button>
+                    <i class="fas fa-home"></i> <span class="divider">/</span> <span id="currentDateDisplay">2026-02-12</span>
+                </div>
+                <div class="header-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索内容 (Ctrl+K)">
+                </div>
+            </header>
+
+            <!-- 笔记输入框 -->
+            <div id="loginPrompt" class="login-prompt" style="display:none;">
+                <i class="fas fa-lock"></i> 登录后开始记录
+            </div>
+
+            <div class="memo-editor" id="noteInputSection" style="display: none;">
+                <textarea id="noteContent" placeholder="现在的想法是..."></textarea>
+
+                <div class="editor-footer">
+                    <div class="editor-tools">
+                        <button class="tool-btn" id="toggleTagInputBtn" title="插入标签 (Ctrl+#)"><i class="fas fa-hashtag"></i></button>
+                        <input type="text" id="tagInput" class="tag-input-inline" placeholder="输入标签按回车..." style="display:none;">
+                        <button class="tool-btn" title="上传图片"><i class="far fa-image"></i></button>
+                        <!-- AI 按钮由 JS 插入 -->
+                        <div class="input-controls" style="display:inline-block;"></div>
+                    </div>
+                    <div class="editor-actions">
+                         <div class="public-switch">
+                            <input type="checkbox" id="noteIsPublic">
+                            <label for="noteIsPublic" title="设为公开"><i class="fas fa-globe-americas"></i></label>
+                        </div>
+                        <button id="saveNote" class="btn-send">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 快捷标签选择区 -->
+                <div id="tagsList" class="tags-bar"></div>
+            </div>
+
+            <!-- 笔记流 -->
+            <div id="notesList" class="notes-stream">
+                <!-- 动态加载 -->
+            </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 模态框保持不变 -->
+    <div id="authModal" class="modal">
+        <div class="modal-content auth-modal-content">
+            <div class="modal-header">
+                <h2 id="authModalTitle">登录</h2>
+                <span class="close-auth">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="authUsername" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="authPassword" placeholder="请输入密码">
+                </div>
+            </div>
+            <div class="modal-footer" style="flex-direction: column; gap: 10px;">
+                <button id="authSubmitBtn" class="btn btn-primary btn-block">登录</button>
+                <div class="auth-switch" style="text-align: center; font-size: 13px; color: #666;">
+                    <span id="authSwitchText">没有账号？</span>
+                    <a href="#" id="authSwitchBtn" style="color: var(--primary); font-weight: 600;">去注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Version History Modal -->
+    <div id="versionModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>历史版本</h2>
+                <span class="close-version">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="versionList" class="version-list"></div>
+                <div id="versionPreview" class="version-preview markdown-body" style="display:none; margin-top:20px; padding:15px; border:1px solid #eee; border-radius:8px; max-height:300px; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

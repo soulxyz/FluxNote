@@ -1,38 +1,15 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ site_desc }}">
-    {% block meta %}{% endblock %}
-    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+{% extends "base.html" %}
 
-    <!-- 主题样式 -->
-    <link rel="stylesheet" href="{{ theme_css }}">
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
+{% block highlight_theme %}
+<link rel="stylesheet" href="/static/lib/highlightjs/atom-one-light.min.css">
+{% endblock %}
 
-    <!-- Markdown Support -->
-    <script src="/static/lib/marked/marked.min.js"></script>
-    <script src="/static/lib/dompurify/purify.min.js"></script>
+{% block body_class %}theme-next{% endblock %}
+{% block content_selector %}.next-main{% endblock %}
+{% block nav_selector %}.next-nav .next-nav-item{% endblock %}
+{% block auto_reset_selectors %}['body']{% endblock %}
 
-    <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="/static/lib/highlightjs/atom-one-light.min.css">
-    <script src="/static/lib/highlightjs/highlight.min.js"></script>
-
-    <!-- Mermaid Diagrams -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
-
-    <!-- Viewer.js for Image Zoom -->
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
-    <script src="/static/lib/viewerjs/viewer.min.js"></script>
-
-    {% block head %}{% endblock %}
-</head>
-<body class="theme-next">
-    <!-- Top Progress Bar -->
-    <div id="nprogress"><div class="nprogress-bar"></div></div>
-
+{% block body %}
     <!-- 侧边栏 -->
     <aside class="next-sidebar">
         <div class="next-sidebar-inner">
@@ -61,11 +38,11 @@
                 <a href="{{ url_for('blog.index', theme='spa') }}" class="next-login-link" title="进入管理/写作模式">
                     <i class="fas fa-pen-fancy"></i> 创作
                 </a>
-                <a href="#" id="nextLogoutBtn" class="next-login-link">
+                <a href="#" data-auth-action="logout" class="next-login-link">
                     <i class="fas fa-sign-out-alt"></i> 退出
                 </a>
                 {% else %}
-                <a href="{{ url_for('main.login_page') }}" id="nextLoginBtn" class="next-login-link">
+                <a href="{{ url_for('main.login_page') }}" data-auth-action="login" class="next-login-link">
                     <i class="fas fa-user"></i> 登录
                 </a>
                 {% endif %}
@@ -85,88 +62,8 @@
         </div>
     </footer>
 
-    <!-- 移动端菜单按钮 -->
-    <button class="next-menu-toggle" onclick="toggleNextMenu()">
+    <!-- 移动端菜单按钮 (声明式) -->
+    <button class="next-menu-toggle" data-toggle-menu data-target="body" data-class="next-sidebar-open">
         <i class="fas fa-bars"></i>
     </button>
-
-    <!-- Markdown Renderer Module -->
-    <script type="module">
-        import { renderContent, initMarkdownRenderer, renderMermaidBlocks } from '/static/js/markdown-renderer.js';
-        import auth from '/static/js/auth-module.js';
-        import spaLoader from '/static/js/spa-loader.js';
-
-        initMarkdownRenderer();
-        window.renderContent = renderContent;
-        window._markdownRendererReady = true;
-        window.dispatchEvent(new Event('markdown-renderer-ready'));
-
-        // 初始化登录模块
-        auth.init({ onSuccess: () => window.location.reload() });
-
-        function bindAuthEvents() {
-            const logoutBtn = document.getElementById('nextLogoutBtn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    auth.logout();
-                });
-            }
-            const loginBtn = document.getElementById('nextLoginBtn');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    auth.smartLogin();
-                });
-            }
-        }
-        bindAuthEvents();
-
-        // SPA 页面切换后重新初始化插件
-        window.addEventListener('spa-loaded', async () => {
-            bindAuthEvents();
-            // ...
-            const container = document.querySelector('.next-main');
-            if (!container) return;
-
-            // 1. 代码高亮
-            if (window.hljs) {
-                container.querySelectorAll('pre code').forEach(block => {
-                    const isDiagram = block.classList.contains('language-mermaid') ||
-                                      block.classList.contains('language-mindmap');
-                    if (!isDiagram) {
-                        window.hljs.highlightElement(block);
-                    }
-                });
-            }
-
-            // 2. Mermaid 图表
-            if (window.mermaid) {
-                await renderMermaidBlocks(container);
-            }
-
-            // 3. 图片查看器
-            if (window.Viewer) {
-                new window.Viewer(container, {
-                    button: true, navbar: false, title: false,
-                    toolbar: { zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1 }
-                });
-            }
-
-            // 4. 移动端菜单重置
-            document.body.classList.remove('next-sidebar-open');
-        });
-
-        // 如果 URL 带有 show_login 参数，自动触发登录
-        {% if request.args.get('show_login') %}
-        auth.smartLogin();
-        {% endif %}
-    </script>
-    <script>
-        function toggleNextMenu() {
-            document.body.classList.toggle('next-sidebar-open');
-        }
-    </script>
-    {% block scripts %}{% endblock %}
-</body>
-</html>
+{% endblock %}

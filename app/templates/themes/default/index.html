@@ -1,4 +1,10 @@
 {% extends "themes/default/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block meta %}
+{{ seo_meta(site_title, site_desc, 'website') }}
+{% endblock %}
 
 {% block title %}{{ site_title }} - {{ site_desc }}{% endblock %}
 
@@ -52,21 +58,7 @@
 
     <!-- Pagination -->
     {% if total_pages > 1 %}
-    <nav class="blog-pagination">
-        {% if page > 1 %}
-        <a href="{{ url_for('blog.index', page=page-1) }}" class="blog-pagination-prev">
-            <i class="fas fa-chevron-left"></i> 上一页
-        </a>
-        {% endif %}
-
-        <span class="blog-pagination-info">第 {{ page }} / {{ total_pages }} 页</span>
-
-        {% if page < total_pages %}
-        <a href="{{ url_for('blog.index', page=page+1) }}" class="blog-pagination-next">
-            下一页 <i class="fas fa-chevron-right"></i>
-        </a>
-        {% endif %}
-    </nav>
+    {{ render_pagination(page, total_pages, 'blog.index', nav_class='blog-pagination', btn_class='blog-pagination-btn', info_class='blog-pagination-info') }}
     {% endif %}
 </div>
 {% endblock %}

@@ -12,7 +12,33 @@ class SPALoader {
         this.trickleInterval = null;
         this.currentProgress = 0;
 
+        // Default selectors (Fallback for legacy themes)
+        this.selectors = {
+            content: ['.main-stream', '.blog-main', '.next-main'],
+            nav: ['.sidebar-nav .nav-item', '.blog-nav .blog-nav-item', '.next-nav .next-nav-item'],
+            activeClass: 'active'
+        };
+
         this.init();
+    }
+
+    /**
+     * Configure selectors for the current theme
+     * @param {Object} options
+     * @param {string} options.contentSelector - Selector for the main content container
+     * @param {string} options.navSelector - Selector for navigation items
+     * @param {string} options.activeClass - CSS class for active nav items
+     */
+    setConfig(options = {}) {
+        if (options.contentSelector) {
+            this.selectors.content = [options.contentSelector];
+        }
+        if (options.navSelector) {
+            this.selectors.nav = [options.navSelector];
+        }
+        if (options.activeClass) {
+            this.selectors.activeClass = options.activeClass;
+        }
     }
 
     init() {
@@ -101,13 +127,14 @@ class SPALoader {
             const href = link.getAttribute('href');
             const target = link.getAttribute('target');
 
-            // 跳过外部链接、锚点、新窗口、特殊协议
+            // 跳过外部链接、锚点、新窗口、特殊协议、带有 data-spa-ignore 的链接
             if (!href ||
                 href.startsWith('#') ||
                 href.startsWith('javascript:') ||
                 href.startsWith('mailto:') ||
                 href.startsWith('tel:') ||
                 target === '_blank' ||
+                link.hasAttribute('data-spa-ignore') ||
                 e.ctrlKey ||
                 e.metaKey ||
                 e.shiftKey) {
@@ -226,12 +253,11 @@ class SPALoader {
         const parser = new DOMParser();
         const newDoc = parser.parseFromString(html, 'text/html');
 
-        // 提取主要内容区域 (Support multiple theme containers)
-        const selectors = ['.main-stream', '.blog-main', '.next-main'];
+        // 提取主要内容区域 (Support dynamic theme containers)
         let selector = null;
         let newMain = null;
 
-        for (const s of selectors) {
+        for (const s of this.selectors.content) {
             newMain = newDoc.querySelector(s);
             if (newMain) {
                 selector = s;
@@ -282,24 +308,19 @@ class SPALoader {
     }
 
     updateSidebarActive(url, newDoc) {
-        // Support multiple navigation structures
-        const selectors = [
-            '.sidebar-nav .nav-item', // SPA theme
-            '.blog-nav .blog-nav-item', // Default theme
-            '.next-nav .next-nav-item'  // Next theme
-        ];
-
-        for (const selector of selectors) {
+        const activeClass = this.selectors.activeClass;
+        // Support dynamic navigation structures
+        for (const selector of this.selectors.nav) {
             const currentNav = document.querySelectorAll(selector);
             if (currentNav.length > 0) {
-                currentNav.forEach(item => item.classList.remove('active'));
+                currentNav.forEach(item => item.classList.remove(activeClass));
                 
                 // Find active in new doc
-                const newActive = newDoc.querySelector(`${selector}.active`);
+                const newActive = newDoc.querySelector(`${selector}.${activeClass}`);
                 if (newActive) {
                     const href = newActive.getAttribute('href');
                     const match = document.querySelector(`${selector}[href="${href}"]`);
-                    if (match) match.classList.add('active');
+                    if (match) match.classList.add(activeClass);
                 }
                 return; // Found the matching nav structure
             }

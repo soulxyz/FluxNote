@@ -41,6 +41,8 @@ body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Helvetica Neue", sans-serif;
     background-color: var(--bg-body);
+    background-image: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 50%, #E8ECF0 100%);
+    background-attachment: fixed;
     color: var(--text-main);
     line-height: 1.6;
     font-size: 15px;
@@ -116,22 +118,22 @@ button { font-family: inherit; }
 /* Floating Expand Button (Outside Sidebar) */
 .floating-menu-btn {
     position: fixed;
-    top: 40px;
-    left: calc(50% - var(--content-width)/2 - 60px); /* Position to left of content */
+    top: 20px;
+    left: 20px;
     background: white;
     border: 1px solid var(--border);
     width: 36px; height: 36px;
     border-radius: 8px;
     cursor: pointer;
     display: none; /* JS toggles this */
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     z-index: 20;
     color: var(--slate-500);
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
 }
-.floating-menu-btn:hover { color: var(--primary); transform: translateX(-2px); }
+.floating-menu-btn:hover { color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
 
 /* === Sidebar Components === */
 
@@ -522,13 +524,20 @@ button { font-family: inherit; }
 .notes-stream { display: flex; flex-direction: column; gap: 20px; }
 .note-card {
     background: white; border-radius: var(--radius); padding: 24px;
-    border: 1px solid var(--border); transition: transform 0.2s, box-shadow 0.2s; position: relative;
+    border: 1px solid var(--slate-200);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    position: relative;
     animation: fadeIn 0.4s ease-out backwards; /* Fade in effect */
 }
-.note-card:hover { border-color: var(--slate-300); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.note-card:hover {
+    border-color: var(--slate-300);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 8px 20px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
 
 .note-header { font-size: 12px; color: var(--slate-400); margin-bottom: 12px; font-weight: 600; display: flex; justify-content: space-between; }
-.note-content { font-size: 15px; color: var(--slate-700); line-height: 1.6; white-space: pre-wrap; margin-bottom: 16px; word-break: break-word; }
+.note-content { font-size: 15px; color: var(--slate-700); line-height: 1.6; white-space: normal; margin-bottom: 16px; word-break: break-word; }
 .note-content.editing { margin-bottom: 0 !important; }
 .note-content img {
     border-radius: 8px;
@@ -1176,6 +1185,16 @@ input:checked + .slider:before {
 .markdown-body ul, .markdown-body ol {
     padding-left: 1.5rem;
     margin-bottom: 1rem;
+    /* 列表内部不受 pre-wrap 影响，避免多余空白 */
+    white-space: normal;
+}
+
+/* 列表内的代码块恢复 pre-wrap */
+.markdown-body ul pre,
+.markdown-body ol pre,
+.markdown-body ul code,
+.markdown-body ol code {
+    white-space: pre-wrap;
 }
 
 .markdown-body li {
@@ -1536,6 +1555,55 @@ input:checked + .slider:before {
     color: var(--slate-400);
     margin-top: auto;
     padding-top: 8px;
+}
+
+/* === Loading Placeholder === */
+.loading-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 12px;
+    color: var(--slate-500);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.loading-placeholder i {
+    font-size: 28px;
+    color: var(--primary);
+    opacity: 0.8;
+}
+
+/* Pulse dots loading animation (alternative) */
+.loading-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.loading-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    animation: pulse-dot 1.4s ease-in-out infinite both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes pulse-dot {
+    0%, 80%, 100% {
+        transform: scale(0.6);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 /* === Global Progress Bar === */

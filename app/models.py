@@ -197,12 +197,6 @@ class Note(db.Model):
         if max_length and len(text) > max_length:
             text = text[:max_length]
 
-        # 移除代码块（在列表页不需要显示完整代码）
-        text = re.sub(r'```[\s\S]*?```', '', text)
-
-        # 移除图片（在列表页可能不需要）
-        # text = re.sub(r'!\[[^\]]*\]\([^)]+\)', '', text)
-
         try:
             html = markdown.markdown(text, extensions=['fenced_code', 'tables', 'toc'])
         except:

@@ -1,4 +1,9 @@
 {% extends "themes/spa/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+
+{% block meta %}
+{{ seo_meta('标签 - ' + site_title, '浏览所有话题标签', 'website') }}
+{% endblock %}
 
 {% block title %}标签 - {{ site_title }}{% endblock %}
 
@@ -53,37 +58,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module">
-import spaLoader from '/static/js/spa-loader.js';
-
-function initPage() {
-    // 搜索功能
-    const searchInput = document.getElementById('searchInput');
-    searchInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const query = e.target.value.trim();
-            spaLoader.navigate('{{ url_for("blog.index") }}' + (query ? '?search=' + encodeURIComponent(query) : ''));
-        }
-    });
-
-    // 标签 Hover 效果
-    document.querySelectorAll('.tags-cloud .note-tag').forEach(tag => {
-        tag.addEventListener('mouseenter', () => {
-            tag.style.borderColor = 'var(--primary)';
-            tag.style.color = 'var(--primary)';
-            tag.style.transform = 'translateY(-2px)';
-            tag.style.boxShadow = '0 4px 10px rgba(0,0,0,0.05)';
-        });
-        tag.addEventListener('mouseleave', () => {
-            tag.style.borderColor = 'var(--slate-200)';
-            tag.style.color = 'var(--slate-600)';
-            tag.style.transform = 'translateY(0)';
-            tag.style.boxShadow = 'none';
-        });
-    });
-}
-
-document.addEventListener('DOMContentLoaded', initPage);
-window.addEventListener('page-ready', initPage);
-</script>
 {% endblock %}

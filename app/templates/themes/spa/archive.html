@@ -1,4 +1,9 @@
 {% extends "themes/spa/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+
+{% block meta %}
+{{ seo_meta('归档 - ' + site_title, '查看所有历史文章归档', 'website') }}
+{% endblock %}
 
 {% block title %}归档 - {{ site_title }}{% endblock %}
 
@@ -61,20 +66,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module">
-import spaLoader from '/static/js/spa-loader.js';
-
-function initPage() {
-    const searchInput = document.getElementById('searchInput');
-    searchInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const query = e.target.value.trim();
-            spaLoader.navigate('{{ url_for("blog.index") }}' + (query ? '?search=' + encodeURIComponent(query) : ''));
-        }
-    });
-}
-
-document.addEventListener('DOMContentLoaded', initPage);
-window.addEventListener('page-ready', initPage);
-</script>
 {% endblock %}

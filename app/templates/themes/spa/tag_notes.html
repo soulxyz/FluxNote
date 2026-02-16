@@ -1,4 +1,9 @@
 {% extends "themes/spa/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+
+{% block meta %}
+{{ seo_meta('#' + tag_name + ' - ' + site_title, '查看标签为 #' + tag_name + ' 的所有文章', 'website') }}
+{% endblock %}
 
 {% block title %}#{{ tag_name }} - {{ site_title }}{% endblock %}
 
@@ -81,7 +86,6 @@
 {% block scripts %}
 <script type="module">
 import { renderContent } from '/static/js/markdown-renderer.js';
-import spaLoader from '/static/js/spa-loader.js';
 
 // 渲染所有笔记内容
 async function renderAllNotes() {
@@ -100,7 +104,7 @@ async function renderAllNotes() {
         await renderContent(targetContainer, content, {
             skipFirstH1: true,
             enableViewer: true,
-            enableMermaid: false,
+            enableMermaid: true,
             enableHighlight: true
         });
 
@@ -132,37 +136,11 @@ window.toggleNote = function(id) {
     }
 }
 
-function initSearch() {
-    const searchInput = document.getElementById('searchInput');
-    searchInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const query = e.target.value.trim();
-            spaLoader.navigate('{{ url_for("blog.index") }}' + (query ? '?search=' + encodeURIComponent(query) : ''));
-        }
-    });
-}
-
-function initTagClicks() {
-    document.querySelectorAll('.note-tag[data-tag]').forEach(tag => {
-        tag.replaceWith(tag.cloneNode(true));
-    });
-    document.querySelectorAll('.note-tag[data-tag]').forEach(tag => {
-        tag.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const tagName = tag.dataset.tag;
-            spaLoader.navigate('{{ url_for("blog.tags") }}/' + encodeURIComponent(tagName));
-        });
-    });
-}
-
 function initPage() {
     renderAllNotes();
-    initSearch();
-    initTagClicks();
 }
 
-document.addEventListener('DOMContentLoaded', initPage);
 window.addEventListener('page-ready', initPage);
+initPage();
 </script>
 {% endblock %}

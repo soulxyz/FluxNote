@@ -1,0 +1,15 @@
+{% macro seo_meta(title, description, og_type='website', url='') %}
+    {# 基础 Meta 标签 #}
+    <meta name="description" content="{{ description }}">
+    
+    {# Open Graph / Facebook 标签 #}
+    <meta property="og:title" content="{{ title }}">
+    <meta property="og:description" content="{{ description }}">
+    <meta property="og:type" content="{{ og_type }}">
+    {% if url %}<meta property="og:url" content="{{ url }}">{% endif %}
+    
+    {# Twitter 标签 #}
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ title }}">
+    <meta name="twitter:description" content="{{ description }}">
+{% endmacro %}

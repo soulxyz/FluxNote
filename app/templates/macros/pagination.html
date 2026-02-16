@@ -1,0 +1,21 @@
+{% macro render_pagination(page, total_pages, endpoint, search='', date='', nav_class='pagination', btn_class='pagination-btn', info_class='pagination-info', prev_text='上一页', next_text='下一页', prev_icon='fas fa-chevron-left', next_icon='fas fa-chevron-right') %}
+<nav class="{{ nav_class }}">
+    {% if page > 1 %}
+    <a href="{{ url_for(endpoint, page=page-1, search=search, date=date) }}" class="{{ btn_class }} prev">
+        <i class="{{ prev_icon }}"></i> {{ prev_text }}
+    </a>
+    {% else %}
+    <span class="{{ btn_class }} disabled prev"><i class="{{ prev_icon }}"></i> {{ prev_text }}</span>
+    {% endif %}
+
+    <span class="{{ info_class }}">{{ page }} / {{ total_pages }}</span>
+
+    {% if page < total_pages %}
+    <a href="{{ url_for(endpoint, page=page+1, search=search, date=date) }}" class="{{ btn_class }} next">
+        {{ next_text }} <i class="{{ next_icon }}"></i>
+    </a>
+    {% else %}
+    <span class="{{ btn_class }} disabled next">{{ next_text }} <i class="{{ next_icon }}"></i></span>
+    {% endif %}
+</nav>
+{% endmacro %}

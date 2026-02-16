@@ -458,11 +458,28 @@ export const editor = {
                 btn.onclick = () => {
                     const cleanOutput = text.trim().replace(/\n{3,}/g, '\n\n');
                     if (type === 'tags') {
-                        const tags = cleanOutput.split(/[\s,，#]+/).filter(t => t.trim() !== '');
+                        let tags = [];
+                        try {
+                            // Attempt to parse as JSON if it looks like an array
+                            if (cleanOutput.startsWith('[') && cleanOutput.endsWith(']')) {
+                                tags = JSON.parse(cleanOutput);
+                            } else {
+                                throw new Error('Not a JSON array');
+                            }
+                        } catch (e) {
+                            // Fallback to splitting by common separators
+                            tags = cleanOutput.split(/[\s,，#]+/).filter(t => t.trim() !== '');
+                        }
+
+                        if (!Array.isArray(tags)) tags = [tags];
+
                         const currentTarget = textarea.classList.contains('inline-editor-textarea') ? 'edit' : 'input';
                         tags.forEach(t => {
-                            if (currentTarget === 'input' && !state.currentTags.includes(t)) state.currentTags.push(t);
-                            else if (currentTarget === 'edit' && !state.editTags.includes(t)) state.editTags.push(t);
+                            const cleanTag = String(t).trim().replace(/^#/, '');
+                            if (cleanTag) {
+                                if (currentTarget === 'input' && !state.currentTags.includes(cleanTag)) state.currentTags.push(cleanTag);
+                                else if (currentTarget === 'edit' && !state.editTags.includes(cleanTag)) state.editTags.push(cleanTag);
+                            }
                         });
                         if (currentTarget === 'input') ui.renderTags('input');
                         else ui.renderInlineTags(textarea.parentElement.querySelector('.inline-tags-area'), textarea.parentElement.querySelector('.inline-tag-input'));

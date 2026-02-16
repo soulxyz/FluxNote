@@ -1,4 +1,9 @@
 {% extends "themes/default/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+
+{% block meta %}
+{{ seo_meta('标签 - ' + site_title, '浏览所有话题标签', 'website') }}
+{% endblock %}
 
 {% block title %}标签 - {{ site_title }}{% endblock %}
 

@@ -251,6 +251,51 @@
     border-color: var(--primary-light);
 }
 
+/* === 行云主题：极致紧凑排版优化 === */
+.theme-spa .markdown-body {
+    line-height: 1.6; /* 维持 1.6 黄金行高 */
+    font-size: 15px;
+}
+
+/* 消除所有块级元素的过度间距 */
+.theme-spa .markdown-body p,
+.theme-spa .markdown-body ul,
+.theme-spa .markdown-body ol,
+.theme-spa .markdown-body blockquote,
+.theme-spa .markdown-body pre,
+.theme-spa .mermaid {
+    margin-top: 0 !important;
+    margin-bottom: 6px !important; /* 核心：将默认的 16px 压缩至 6px */
+}
+
+/* 列表内部优化 */
+.theme-spa .markdown-body li {
+    margin-bottom: 2px !important; /* 列表项之间的间距 */
+}
+
+/* 消除列表项内嵌套段落导致的空行感 */
+.theme-spa .markdown-body li p {
+    margin: 0 !important;
+    display: inline; /* 强制行内显示，防止段落换行 */
+}
+
+/* 任务列表复选框精准对齐 (适配 1.6 行高) */
+.theme-spa .markdown-body input[type="checkbox"] {
+    margin-top: 4px !important; 
+    margin-right: 8px !important;
+}
+
+/* 最后一个元素不应有下边距 */
+.theme-spa .markdown-body > *:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* 针对 Mermaid 标题（通常是加粗行）的特殊处理 */
+.theme-spa .markdown-body p strong {
+    display: inline-block;
+    margin-top: 4px;
+}
+
 /* 笔记头部 */
 .theme-spa .note-header-row {
     display: flex;

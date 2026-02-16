@@ -1,4 +1,10 @@
 {% extends "themes/spa/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
+{% from "macros/pagination.html" import render_pagination %}
+
+{% block meta %}
+{{ seo_meta(site_title, site_desc, 'website') }}
+{% endblock %}
 
 {% block title %}{{ site_title }} - {{ site_desc }}{% endblock %}
 
@@ -90,37 +96,18 @@
 
 <!-- 分页 -->
 {% if total_pages > 1 %}
-<nav class="pagination-nav">
-    {% if page > 1 %}
-    <a href="{{ url_for('blog.index', page=page-1, search=search, date=current_date) }}" class="pagination-btn">
-        <i class="fas fa-chevron-left"></i> 上一页
-    </a>
-    {% else %}
-    <span class="pagination-btn disabled"><i class="fas fa-chevron-left"></i> 上一页</span>
-    {% endif %}
-
-    <span class="pagination-info">{{ page }} / {{ total_pages }}</span>
-
-    {% if page < total_pages %}
-    <a href="{{ url_for('blog.index', page=page+1, search=search, date=current_date) }}" class="pagination-btn">
-        下一页 <i class="fas fa-chevron-right"></i>
-    </a>
-    {% else %}
-    <span class="pagination-btn disabled">下一页 <i class="fas fa-chevron-right"></i></span>
-    {% endif %}
-</nav>
+{{ render_pagination(page, total_pages, 'blog.index', search=search, date=current_date, nav_class='pagination-nav', btn_class='pagination-btn', info_class='pagination-info') }}
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script type="module">
 import { renderContent } from '/static/js/markdown-renderer.js';
-import spaLoader from '/static/js/spa-loader.js';
 
 // 热力图数据
 const heatmapData = {{ heatmap_data | tojson }};
 
-// 渲染所有笔记内容
+// 渲染所有笔记内容 (SPA 特有的前端异步加载渲染)
 async function renderAllNotes() {
     const notes = document.querySelectorAll('.note-card[data-note-id]');
     for (const note of notes) {
@@ -137,11 +124,10 @@ async function renderAllNotes() {
         await renderContent(targetContainer, content, {
             skipFirstH1: true,
             enableViewer: true,
-            enableMermaid: false,
+            enableMermaid: true,
             enableHighlight: true
         });
 
-        // 检查高度是否超过限制
         if (targetContainer.scrollHeight > 400) {
             wrapper.classList.add('collapsed');
             overlay.style.display = 'flex';
@@ -151,7 +137,7 @@ async function renderAllNotes() {
     }
 }
 
-// 暴露 toggleNote 到全局
+// 暴露 toggleNote 到全局 (UI 展现逻辑)
 window.toggleNote = function(id) {
     const wrapper = document.getElementById(`note-render-${id}`).parentElement;
     const overlay = document.getElementById(`overlay-${id}`);
@@ -171,34 +157,7 @@ window.toggleNote = function(id) {
     }
 }
 
-// 搜索功能
-function initSearch() {
-    const searchInput = document.getElementById('searchInput');
-    searchInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const query = e.target.value.trim();
-            spaLoader.navigate('{{ url_for("blog.index") }}' + (query ? '?search=' + encodeURIComponent(query) : ''));
-        }
-    });
-}
-
-// 标签点击筛选
-function initTagClicks() {
-    document.querySelectorAll('.note-tag[data-tag]').forEach(tag => {
-        // 移除旧事件监听器（避免重复）
-        tag.replaceWith(tag.cloneNode(true));
-    });
-    document.querySelectorAll('.note-tag[data-tag]').forEach(tag => {
-        tag.addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const tagName = tag.dataset.tag;
-            spaLoader.navigate('{{ url_for("blog.tags") }}/' + encodeURIComponent(tagName));
-        });
-    });
-}
-
-// 生成热力图
+// 生成热力图 (SPA 特有组件逻辑)
 function generateHeatmap() {
     const grid = document.getElementById('heatmapGrid');
     const tooltip = document.getElementById('customTooltip');
@@ -228,7 +187,7 @@ function generateHeatmap() {
             cell.setAttribute('data-level', level);
 
             cell.addEventListener('click', () => {
-                spaLoader.navigate(`{{ url_for('blog.index') }}?date=${dateStr}`);
+                window.themeSDK.navigate(`{{ url_for('blog.index') }}?date=${dateStr}`);
             });
 
             cell.addEventListener('mouseenter', (e) => {
@@ -250,7 +209,6 @@ function generateHeatmap() {
         }
     }
 
-    // 高亮当前选中的日期
     const currentDate = "{{ current_date }}";
     if (currentDate) {
         const activeCell = document.querySelector(`.heatmap-cell[data-date="${currentDate}"]`);
@@ -258,18 +216,14 @@ function generateHeatmap() {
     }
 }
 
-// 页面初始化函数
+// 页面初始化
 function initPage() {
     renderAllNotes();
     generateHeatmap();
-    initSearch();
-    initTagClicks();
 }
 
-// 首次加载
-document.addEventListener('DOMContentLoaded', initPage);
-
-// SPA 页面切换后重新初始化
+// 监听 SDK 触发的页面就绪事件
 window.addEventListener('page-ready', initPage);
+initPage();
 </script>
 {% endblock %}

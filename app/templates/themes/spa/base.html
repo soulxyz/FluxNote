@@ -1,50 +1,23 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ site_desc }}">
-    {% block meta %}{% endblock %}
-    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+{% extends "base.html" %}
 
-    <!-- 主题样式 -->
-    <link rel="stylesheet" href="{{ theme_css }}">
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
+{% block body_class %}theme-spa{% endblock %}
+{% block content_selector %}.main-stream{% endblock %}
+{% block nav_selector %}.sidebar-nav .nav-item{% endblock %}
+{% block auto_reset_selectors %}['#sidebar']{% endblock %}
 
-    <!-- Markdown Support -->
-    <script src="/static/lib/marked/marked.min.js"></script>
-    <script src="/static/lib/dompurify/purify.min.js"></script>
-
-    <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
-    <script src="/static/lib/highlightjs/highlight.min.js"></script>
-
-    <!-- Mermaid Diagrams -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
-
-    <!-- Viewer.js for Image Zoom -->
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
-    <script src="/static/lib/viewerjs/viewer.min.js"></script>
-
-    {% block head %}{% endblock %}
-</head>
-<body class="theme-spa">
-    <!-- Top Progress Bar -->
-    <div id="nprogress"><div class="nprogress-bar"></div></div>
-
+{% block body %}
     <div class="app-layout" id="appLayout">
         <div class="app-container">
             <!-- 侧边栏 -->
             <aside class="sidebar" id="sidebar">
-                <!-- Toggle Button -->
-                <button class="sidebar-toggle-btn" id="sidebarToggle" title="收起侧边栏">
+                <!-- Toggle Button (声明式切换) -->
+                <button class="sidebar-toggle-btn" data-toggle-menu data-target="#sidebar" data-class="collapsed" title="收起侧边栏">
                     <i class="fas fa-chevron-left"></i>
                 </button>
 
                 <!-- 顶部：博客标题 -->
                 <div class="sidebar-header">
-                    <div class="blog-brand" id="blogBrand">
+                    <div class="blog-brand">
                         <h1 class="blog-title">{{ site_title }}</h1>
                         <p class="blog-desc">{{ site_desc }}</p>
                     </div>
@@ -54,25 +27,25 @@
                 <div class="stats-panel" id="statsSection">
                     <div class="stats-row">
                         <div class="stat-item">
-                            <span class="stat-num" id="statNoteCount">{{ stats.notes if stats else 0 }}</span>
+                            <span class="stat-num">{{ stats.notes if stats else 0 }}</span>
                             <span class="stat-label">笔记</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-num" id="statTagCount">{{ stats.tags if stats else 0 }}</span>
+                            <span class="stat-num">{{ stats.tags if stats else 0 }}</span>
                             <span class="stat-label">标签</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-num" id="statDayCount">{{ stats.active_days if stats else 0 }}</span>
+                            <span class="stat-num">{{ stats.active_days if stats else 0 }}</span>
                             <span class="stat-label">活跃天</span>
                         </div>
                     </div>
-                    <!-- 热力图 -->
+                    <!-- 热力图容器 -->
                     <div id="heatmapGrid" class="heatmap-grid-compact"></div>
                 </div>
 
                 <!-- 导航菜单 -->
                 <nav class="sidebar-nav">
-                    <a href="{{ url_for('blog.index') }}" class="nav-item{% if request.endpoint == 'blog.index' %} active{% endif %}" id="navAllNotes">
+                    <a href="{{ url_for('blog.index') }}" class="nav-item{% if request.endpoint == 'blog.index' %} active{% endif %}">
                         <i class="fas fa-layer-group"></i> 全部内容
                     </a>
                     <a href="{{ url_for('blog.archive') }}" class="nav-item{% if request.endpoint == 'blog.archive' %} active{% endif %}">
@@ -86,7 +59,7 @@
                 <!-- 标签列表 -->
                 <div class="sidebar-section tags-section">
                     <h3 class="section-title">话题 / 标签</h3>
-                    <div class="filter-tags-list" id="filterTagsList">
+                    <div class="filter-tags-list">
                         {% if popular_tags %}
                         {% for tag in popular_tags[:15] %}
                         <a href="{{ url_for('blog.tag_notes', tag_name=tag.name) }}" class="sidebar-tag">#{{ tag.name }}</a>
@@ -95,9 +68,9 @@
                     </div>
                 </div>
 
-                <!-- 底部登录入口 -->
-                <div class="sidebar-footer" id="guestFooter" style="margin-top: auto; padding: 20px 0 0 0;">
-                    <a href="#" class="nav-item guest-login-btn" id="showLoginBtn">
+                <!-- 底部登录入口 (声明式认证) -->
+                <div class="sidebar-footer" style="margin-top: auto; padding: 20px 0 0 0;">
+                    <a href="#" class="nav-item guest-login-btn" data-auth-action="login">
                         <i class="fas fa-fingerprint"></i> 博主登录
                     </a>
                 </div>
@@ -110,64 +83,10 @@
         </div>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast 容器 (SDK 会自动查找，但主题可以自定义样式) -->
     <div id="toast" class="toast"></div>
-
-    <!-- Custom Tooltip -->
     <div id="customTooltip" class="custom-tooltip"></div>
+{% endblock %}
 
-    <!-- SPA Loader & Markdown Renderer -->
-    <script type="module">
-        import { renderContent, initMarkdownRenderer } from '/static/js/markdown-renderer.js';
-        import auth from '/static/js/auth-module.js';
-        import spaLoader from '/static/js/spa-loader.js';
-
-        // 初始化 Markdown 渲染器
-        initMarkdownRenderer();
-        window.renderContent = renderContent;
-        window._markdownRendererReady = true;
-        window.dispatchEvent(new Event('markdown-renderer-ready'));
-
-        // 初始化登录模块
-        auth.init({
-            onSuccess: () => window.location.reload()
-        });
-
-        // 页面初始化函数（首次加载和 SPA 切换后都会调用）
-        function initPage() {
-            // 绑定登录按钮
-            document.getElementById('showLoginBtn')?.addEventListener('click', (e) => {
-                e.preventDefault();
-                auth.smartLogin();
-            });
-
-            // 侧边栏切换
-            document.getElementById('sidebarToggle')?.addEventListener('click', () => {
-                document.getElementById('sidebar').classList.toggle('collapsed');
-            });
-
-            // 移动端菜单
-            document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
-                document.getElementById('sidebar').classList.toggle('mobile-open');
-            });
-
-            // 触发页面加载完成事件，让子页面的脚本有机会重新初始化
-            window.dispatchEvent(new CustomEvent('page-ready'));
-        }
-
-        // 首次加载初始化
-        initPage();
-
-        // SPA 页面切换后重新初始化
-        window.addEventListener('spa-loaded', () => {
-            initPage();
-        });
-
-        // 如果 URL 带有 show_login 参数，自动触发登录
-        {% if request.args.get('show_login') %}
-        auth.smartLogin();
-        {% endif %}
-    </script>
-    {% block scripts %}{% endblock %}
-</body>
-</html>
+{% block scripts %}
+{% endblock %}

@@ -1,38 +1,11 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="{{ site_desc }}">
-    {% block meta %}{% endblock %}
-    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+{% extends "base.html" %}
 
-    <!-- 主题样式 -->
-    <link rel="stylesheet" href="{{ theme_css }}">
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
+{% block body_class %}theme-default{% endblock %}
+{% block content_selector %}.blog-main{% endblock %}
+{% block nav_selector %}.blog-nav .blog-nav-item{% endblock %}
+{% block auto_reset_selectors %}['#mobileNav']{% endblock %}
 
-    <!-- Markdown Support -->
-    <script src="/static/lib/marked/marked.min.js"></script>
-    <script src="/static/lib/dompurify/purify.min.js"></script>
-
-    <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
-    <script src="/static/lib/highlightjs/highlight.min.js"></script>
-
-    <!-- Mermaid Diagrams -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
-
-    <!-- Viewer.js for Image Zoom -->
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
-    <script src="/static/lib/viewerjs/viewer.min.js"></script>
-
-    {% block head %}{% endblock %}
-</head>
-<body class="theme-default">
-    <!-- Top Progress Bar -->
-    <div id="nprogress"><div class="nprogress-bar"></div></div>
-
+{% block body %}
     <div class="blog-layout">
         <!-- Header -->
         <header class="blog-header">
@@ -52,16 +25,17 @@
                     <a href="{{ url_for('blog.index', theme='spa') }}" class="blog-nav-item" title="管理/写作">
                         <i class="fas fa-pen-nib"></i> 创作
                     </a>
-                    <a href="#" id="navLogoutBtn" class="blog-nav-item">
+                    <a href="#" data-auth-action="logout" class="blog-nav-item">
                         <i class="fas fa-sign-out-alt"></i> 退出
                     </a>
                     {% else %}
-                    <a href="{{ url_for('main.login_page') }}" class="blog-nav-item blog-login-link" id="navLoginBtn">
+                    <a href="{{ url_for('main.login_page') }}" class="blog-nav-item blog-login-link" data-auth-action="login">
                         <i class="fas fa-sign-in-alt"></i> 登录
                     </a>
                     {% endif %}
                 </nav>
-                <button class="blog-mobile-menu-btn" onclick="toggleMobileMenu()">
+                <!-- 移动端菜单按钮 (声明式) -->
+                <button class="blog-mobile-menu-btn" data-toggle-menu data-target="#mobileNav">
                     <i class="fas fa-bars"></i>
                 </button>
             </div>
@@ -72,7 +46,11 @@
             <a href="{{ url_for('blog.index') }}" class="blog-nav-item">首页</a>
             <a href="{{ url_for('blog.archive') }}" class="blog-nav-item">归档</a>
             <a href="{{ url_for('blog.tags') }}" class="blog-nav-item">标签</a>
-            <a href="{{ url_for('main.login_page') }}" class="blog-nav-item">登录</a>
+            {% if current_user.is_authenticated %}
+            <a href="#" data-auth-action="logout" class="blog-nav-item">退出</a>
+            {% else %}
+            <a href="#" data-auth-action="login" class="blog-nav-item">登录</a>
+            {% endif %}
         </nav>
 
         <!-- Main Content -->
@@ -87,93 +65,4 @@
             </div>
         </footer>
     </div>
-
-    <!-- Markdown Renderer Module -->
-    <script type="module">
-        import { renderContent, initMarkdownRenderer, renderMermaidBlocks } from '/static/js/markdown-renderer.js';
-        import auth from '/static/js/auth-module.js';
-        import spaLoader from '/static/js/spa-loader.js';
-
-        initMarkdownRenderer();
-        window.renderContent = renderContent;
-        window._markdownRendererReady = true;
-        window.dispatchEvent(new Event('markdown-renderer-ready'));
-
-        // 初始化登录模块
-        auth.init({ onSuccess: () => window.location.reload() });
-
-        function bindAuthEvents() {
-            const logoutBtn = document.getElementById('navLogoutBtn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    auth.logout();
-                });
-            }
-            // Bind login button if it opens modal (though auth-module handles this if we use its classes?)
-            // actually auth-module usually binds to a specific ID if configured?
-            // checking auth-module.js: it binds to nothing by default unless we call openModal.
-            // The default link goes to main.login_page which might be a separate page or trigger modal?
-            // In the template, href is url_for('main.login_page').
-            // If we want modal, we should intercept.
-            const loginBtn = document.getElementById('navLoginBtn');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    auth.smartLogin();
-                });
-            }
-        }
-        
-        bindAuthEvents();
-
-        // SPA 页面切换后重新初始化插件
-        window.addEventListener('spa-loaded', async () => {
-            bindAuthEvents();
-            // ... (rest of the code)
-            const container = document.querySelector('.blog-main');
-            if (!container) return;
-
-            // 1. 代码高亮
-            if (window.hljs) {
-                container.querySelectorAll('pre code').forEach(block => {
-                    const isDiagram = block.classList.contains('language-mermaid') ||
-                                      block.classList.contains('language-mindmap');
-                    if (!isDiagram) {
-                        window.hljs.highlightElement(block);
-                    }
-                });
-            }
-
-            // 2. Mermaid 图表
-            if (window.mermaid) {
-                await renderMermaidBlocks(container);
-            }
-
-            // 3. 图片查看器
-            if (window.Viewer) {
-                new window.Viewer(container, {
-                    button: true, navbar: false, title: false,
-                    toolbar: { zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1 }
-                });
-            }
-            
-            // 4. 移动端菜单重置
-            const nav = document.getElementById('mobileNav');
-            if (nav) nav.classList.remove('open');
-        });
-
-        // 如果 URL 带有 show_login 参数，自动触发登录
-        {% if request.args.get('show_login') %}
-        auth.smartLogin();
-        {% endif %}
-    </script>
-    <script>
-        function toggleMobileMenu() {
-            const nav = document.getElementById('mobileNav');
-            nav.classList.toggle('open');
-        }
-    </script>
-    {% block scripts %}{% endblock %}
-</body>
-</html>
+{% endblock %}

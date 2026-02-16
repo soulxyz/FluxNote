@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 from app.models import Config, User
 from app.extensions import db
-from app.utils.theme import get_all_themes, set_theme, get_current_theme
+from app.utils.theme import get_all_themes, set_theme, get_current_theme, get_writer_theme
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -56,7 +56,8 @@ def get_themes():
     """获取所有可用主题"""
     return jsonify({
         'themes': get_all_themes(),
-        'current': get_current_theme()
+        'current': get_current_theme(),
+        'writer_current': get_writer_theme()
     })
 
 @settings_bp.route('/api/themes', methods=['POST'])
@@ -65,8 +66,9 @@ def update_theme():
     """切换主题"""
     data = request.json
     theme_name = data.get('theme')
+    role = data.get('role', 'blog')
     try:
-        set_theme(theme_name)
-        return jsonify({'success': True, 'theme': theme_name})
+        set_theme(theme_name, role)
+        return jsonify({'success': True, 'theme': theme_name, 'role': role})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400

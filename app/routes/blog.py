@@ -4,7 +4,7 @@ from app.models import Note, Tag, Config
 from sqlalchemy import func
 from collections import OrderedDict
 from datetime import datetime, timedelta
-from app.utils.theme import render_theme_template, get_current_theme, get_theme_css_url
+from app.utils.theme import render_theme_template, get_current_theme, get_theme_css_url, get_writer_theme
 
 blog_bp = Blueprint('blog', __name__)
 
@@ -34,21 +34,23 @@ def get_heatmap_data():
     return {str(row.date): row.count for row in daily_counts}
 
 
-def get_site_config():
+def get_site_config(theme_override=None):
     """获取站点配置"""
     return {
         'site_title': Config.get('site_title', '轻笔记'),
         'site_desc': Config.get('site_desc', '记录思维的碎片'),
         'blog_footer': Config.get('blog_footer', '由 <a href="/">轻笔记</a> 提供支持'),
-        'theme': get_current_theme(),
-        'theme_css': get_theme_css_url()
+        'theme': theme_override or get_current_theme(),
+        'writer_theme_id': get_writer_theme(),
+        'theme_css': get_theme_css_url(theme_override)
     }
 
 
 @blog_bp.route('/blog')
 def index():
     """博客首页 - 显示公开笔记列表"""
-    config = get_site_config()
+    theme_override = request.args.get('theme')
+    config = get_site_config(theme_override)
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
     date_str = request.args.get('date', '')
@@ -116,6 +118,7 @@ def index():
         today=datetime.now().strftime('%Y年%m月%d日'),
         search=search,
         current_date=date_str,
+        theme_override=theme_override,
         **config
     )
 
@@ -123,7 +126,8 @@ def index():
 @blog_bp.route('/p/<note_id>')
 def post(note_id):
     """文章详情页"""
-    config = get_site_config()
+    theme_override = request.args.get('theme')
+    config = get_site_config(theme_override)
 
     note = db.session.get(Note, note_id)
 
@@ -131,11 +135,13 @@ def post(note_id):
         return render_theme_template('post.html',
             note=None,
             error='文章不存在或已被删除',
+            theme_override=theme_override,
             **config
         ), 404
 
     return render_theme_template('post.html',
         note=note,
+        theme_override=theme_override,
         **config
     )
 
@@ -143,7 +149,8 @@ def post(note_id):
 @blog_bp.route('/archive')
 def archive():
     """归档页 - 按年月分组"""
-    config = get_site_config()
+    theme_override = request.args.get('theme')
+    config = get_site_config(theme_override)
 
     # 查询所有公开且未删除的笔记
     notes = Note.query.filter_by(
@@ -168,6 +175,7 @@ def archive():
     return render_theme_template('archive.html',
         archives=archives,
         total_count=len(notes),
+        theme_override=theme_override,
         **config
     )
 
@@ -175,7 +183,8 @@ def archive():
 @blog_bp.route('/tags')
 def tags():
     """标签云"""
-    config = get_site_config()
+    theme_override = request.args.get('theme')
+    config = get_site_config(theme_override)
 
     # 查询所有标签及其公开笔记数量
     tag_counts = db.session.query(
@@ -196,6 +205,7 @@ def tags():
 
     return render_theme_template('tags.html',
         tags=tags_list,
+        theme_override=theme_override,
         **config
     )
 
@@ -203,13 +213,15 @@ def tags():
 @blog_bp.route('/tags/<tag_name>')
 def tag_notes(tag_name):
     """标签筛选 - 显示指定标签下的笔记"""
-    config = get_site_config()
+    theme_override = request.args.get('theme')
+    config = get_site_config(theme_override)
 
     tag = Tag.query.filter_by(name=tag_name).first()
     if not tag:
         return render_theme_template('tag_notes.html',
             tag_name=tag_name,
             notes=[],
+            theme_override=theme_override,
             **config
         )
 
@@ -225,5 +237,6 @@ def tag_notes(tag_name):
     return render_theme_template('tag_notes.html',
         tag_name=tag_name,
         notes=notes,
+        theme_override=theme_override,
         **config
     )

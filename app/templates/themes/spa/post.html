@@ -1,10 +1,8 @@
 {% extends "themes/spa/base.html" %}
+{% from "macros/meta.html" import seo_meta %}
 
 {% block meta %}
-<meta name="description" content="{{ note.get_excerpt(160) }}">
-<meta property="og:title" content="{{ note.title or '无标题' }}">
-<meta property="og:description" content="{{ note.get_excerpt(160) }}">
-<meta property="og:type" content="article">
+{{ seo_meta(note.title or '无标题', note.get_excerpt(160), 'article') }}
 {% endblock %}
 
 {% block title %}{{ note.title or '无标题' }} - {{ site_title }}{% endblock %}

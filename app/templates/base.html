@@ -3,11 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% block meta %}{% endblock %}
-    <title>{% block title %}{% endblock %}</title>
+    {% block meta %}
+    <meta name="description" content="{{ site_desc }}">
+    {% endblock %}
+    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+
+    <!-- 公共资源：所有主题共用 -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
+    
+    <!-- 第三方库：由 SDK 统一调度，但需在 Head 引入样式 -->
+    {% block highlight_theme %}
+    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
+    {% endblock %}
+    
+    {% block viewer_css %}
+    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
+    {% endblock %}
+
+    <!-- 主题自定义样式 -->
+    <link rel="stylesheet" href="{{ theme_css }}">
     {% block head %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+    
+    <!-- 全局进度条 (由 SDK 控制) -->
+    {% block progress_bar %}
+    <div id="nprogress"><div class="nprogress-bar"></div></div>
+    {% endblock %}
+
     {% block body %}{% endblock %}
+
+    <!-- 基础依赖库 -->
+    <script src="/static/lib/marked/marked.min.js"></script>
+    <script src="/static/lib/dompurify/purify.min.js"></script>
+    <script src="/static/lib/highlightjs/highlight.min.js"></script>
+    <script src="/static/lib/viewerjs/viewer.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+
+    <!-- Theme SDK 入口 -->
+    <script type="module">
+        import themeSDK from '/static/js/theme-sdk.js';
+        window.themeSDK = themeSDK; // 暴露给全局，方便调试或特殊调用
+        
+        // 自动初始化 (子模板可以通过 block 覆盖配置)
+        themeSDK.init({
+            contentSelector: '{% block content_selector %}.main-stream{% endblock %}',
+            navSelector: '{% block nav_selector %}{% endblock %}',
+            autoResetSelectors: {% block auto_reset_selectors %}[]{% endblock %}
+        });
+
+        {% block sdk_bindings %}
+        // 统一绑定搜索和标签行为 (按约定选择器)
+        themeSDK.bindSearch('#searchInput', '{{ url_for("blog.index") }}');
+        themeSDK.bindTagClicks('.note-tag[data-tag]', '{{ url_for("blog.tags") }}/');
+        {% endblock %}
+    </script>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>

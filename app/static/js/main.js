@@ -3,7 +3,7 @@ import { state, setState } from './modules/state.js';
 import { ui } from './modules/ui.js';
 import { auth, initAuthEvents } from './modules/auth.js';
 import { editor } from './modules/editor.js';
-import { showToast, debounce } from './modules/utils.js';
+import { showToast, debounce, parseWikiLinks, escapeHtml } from './modules/utils.js';
 
 // === Main Logic ===
 
@@ -122,6 +122,7 @@ function initGlobalEvents() {
     document.getElementById('navDailyReview')?.addEventListener('click', async (e) => {
         e.preventDefault();
         const modal = document.getElementById('reviewModal');
+        // ... (existing review logic)
         const list = document.getElementById('reviewList');
         
         if (modal) {
@@ -142,14 +143,92 @@ function initGlobalEvents() {
                 
                 notes.forEach(note => {
                     const card = ui.createNoteCard(note);
-                    // Disable actions in review mode to keep it simple, or keep them? 
-                    // Let's keep them but maybe hide edit/delete to focus on reading
                     const actions = card.querySelector('.note-actions');
                     if(actions) actions.style.display = 'none';
                     list.appendChild(card);
                 });
                 
                 if (window.hljs) hljs.highlightAll();
+            }
+        }
+    });
+
+    // My Shares Modal
+    document.getElementById('navShares')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const modal = document.getElementById('sharesModal');
+        const list = document.getElementById('sharesList');
+
+        if (modal) {
+            modal.style.display = 'block';
+            list.innerHTML = '<div style="text-align:center; padding:20px;">加载中...</div>';
+
+            // Close logic
+            const closeBtn = modal.querySelector('.close-shares');
+            if (closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
+            window.onclick = (ev) => { if(ev.target === modal) modal.style.display = 'none'; };
+
+            try {
+                // Fetch shares (Assume API exists, need to ensure api.js has share.list or similar if distinct)
+                // Actually api.js might not have a dedicated method for user shares list yet.
+                // We'll use fetch directly or add to api object if needed.
+                // Let's assume we can fetch '/api/shares' directly here for simplicity or update api.js later.
+                const response = await fetch('/api/shares');
+                if (response.ok) {
+                    const shares = await response.json();
+                    if (shares.length === 0) {
+                        list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">暂无活跃分享</div>';
+                        return;
+                    }
+
+                    list.innerHTML = shares.map(s => `
+                        <div class="version-item" id="share-item-${s.id}">
+                            <div class="version-info" style="flex:1;">
+                                <div style="font-weight:600; color:var(--slate-800); margin-bottom:4px;">
+                                    ${escapeHtml(s.note_title || '无标题')}
+                                </div>
+                                <div style="font-size:12px; color:var(--slate-500);">
+                                    <span style="margin-right:10px;"><i class="far fa-clock"></i> 创建于 ${new Date(s.created_at).toLocaleDateString()}</span>
+                                    <span style="margin-right:10px;"><i class="far fa-eye"></i> 浏览 ${s.view_count}</span>
+                                    <span><i class="fas fa-hourglass-half"></i> ${s.expires_at ? new Date(s.expires_at).toLocaleDateString() + ' 过期' : '永久有效'}</span>
+                                </div>
+                                <div style="font-size:12px; color:var(--primary); margin-top:4px; word-break:break-all;">
+                                    ${s.url}
+                                </div>
+                            </div>
+                            <div class="version-actions">
+                                <button class="btn btn-secondary btn-sm copy-share-btn" data-url="${s.url}">复制</button>
+                                <button class="btn btn-danger btn-sm delete-share-btn" data-id="${s.id}">取消分享</button>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    // Bind events
+                    list.querySelectorAll('.copy-share-btn').forEach(btn => {
+                        btn.onclick = () => {
+                            navigator.clipboard.writeText(btn.dataset.url).then(() => showToast('链接已复制'));
+                        };
+                    });
+
+                    list.querySelectorAll('.delete-share-btn').forEach(btn => {
+                        btn.onclick = async () => {
+                            if (!confirm('确定要取消此分享吗？链接将失效。')) return;
+                            const shareId = btn.dataset.id.trim();
+                            const res = await api.share.delete(shareId);
+                            if (res && res.ok) {
+                                document.getElementById(`share-item-${shareId}`).remove();
+                                showToast('分享已取消');
+                            } else {
+                                showToast('操作失败');
+                            }
+                        };
+                    });
+                } else {
+                    list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">加载失败</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">网络错误</div>';
             }
         }
     });
@@ -442,6 +521,207 @@ function initGlobalEvents() {
                     };
                 });
             }
+        }
+    });
+
+    // 分享功能
+    window.addEventListener('note:share', async (e) => {
+        const noteId = e.detail;
+        const note = state.notes.find(n => n.id == noteId);
+        if (!note) return;
+
+        const modal = document.getElementById('shareModal');
+        if (!modal) return;
+
+        // 填充预览卡片
+        const cardTitle = document.getElementById('shareCardTitle');
+        const cardContent = document.getElementById('shareCardContent');
+        const cardDate = document.getElementById('shareCardDate');
+        const cardTags = document.getElementById('shareCardTags');
+
+        if (cardTitle) {
+            // Optimize title display: Always try to clean the title, whether from DB or content
+            let titleText = note.title;
+            
+            // If no title, extract from content
+            if (!titleText) {
+                titleText = note.content.split('\n')[0].trim();
+            }
+            
+            // Apply cleaning to titleText (whether from DB or extracted)
+            if (titleText) {
+                // Strip common markdown markers (#, ##, - [ ], - [x], *, -, 1.)
+                titleText = titleText.replace(/^(#+\s+|[-*]\s+(\[[ xX]?\]\s+)?|\d+\.\s+|>\s+)/, '');
+                // Truncate if too long
+                if (titleText.length > 50) titleText = titleText.substring(0, 50) + '...';
+            }
+            
+            cardTitle.textContent = titleText || '无标题';
+        }
+
+        // 生成分享链接
+        const res = await api.share.create({
+            note_id: noteId,
+            expires_in: 0  // 默认永久
+        });
+
+        if (res && res.ok) {
+            const data = await res.json();
+            const shareUrl = document.getElementById('shareUrl');
+            shareUrl.value = window.location.origin + data.share.url;
+            shareUrl.dataset.shareId = data.share.id;
+            shareUrl.dataset.noteId = noteId;  // 保存 noteId
+        } else {
+            showToast('创建分享失败');
+            return;
+        }
+
+        // 先显示模态框，确保 Mermaid 能正确计算尺寸
+        modal.style.display = 'block';
+
+        // 渲染 Markdown 内容 (Moved logic here to run after modal is visible)
+        if (cardContent) {
+            let content = note.content;
+            
+            // 解析 Markdown
+            try {
+                if (typeof marked !== 'undefined') {
+                    // 处理 wiki 链接
+                    if (typeof parseWikiLinks !== 'undefined') {
+                        content = parseWikiLinks(content);
+                    }
+                    let html = marked.parse(content);
+                    if (typeof DOMPurify !== 'undefined') {
+                        html = DOMPurify.sanitize(html);
+                    }
+                    cardContent.innerHTML = html;
+                    cardContent.classList.add('markdown-body');
+
+                    // 渲染 Mermaid (now that container is visible)
+                    if (ui && ui.renderMermaid) {
+                        await ui.renderMermaid(cardContent);
+                    }
+
+                    // 高亮代码
+                    if (typeof hljs !== 'undefined') {
+                        cardContent.querySelectorAll('pre code').forEach(block => {
+                            const isMermaid = block.classList.contains('language-mermaid') || 
+                                             block.classList.contains('language-mindmap');
+                            if (!isMermaid) {
+                                hljs.highlightElement(block);
+                            }
+                        });
+                    }
+
+                } else {
+                    // 降级为纯文本
+                    cardContent.textContent = content.replace(/[#*`\[\]]/g, '');
+                }
+            } catch (err) {
+                console.error(err);
+                cardContent.textContent = content;
+            }
+        }
+
+        if (cardDate) cardDate.textContent = new Date(note.created_at).toLocaleDateString('zh-CN');
+
+        // 显示标签
+        if (cardTags && note.tags && note.tags.length > 0) {
+            cardTags.innerHTML = note.tags.map(t => `<span class="share-card-tag">#${t}</span>`).join('');
+            cardTags.style.display = 'flex';
+        } else if (cardTags) {
+            cardTags.style.display = 'none';
+        }
+
+        // 重置表单
+        document.getElementById('sharePassword').value = '';
+        document.getElementById('sharePassword').disabled = true;
+        document.getElementById('sharePasswordEnabled').checked = false;
+        document.getElementById('shareExpires').value = '0';
+
+        // 关闭按钮
+        modal.querySelector('.close-share').onclick = () => modal.style.display = 'none';
+        window.onclick = (ev) => { if(ev.target === modal) modal.style.display = 'none'; };
+
+        // 密码开关
+        document.getElementById('sharePasswordEnabled').onchange = (ev) => {
+            document.getElementById('sharePassword').disabled = !ev.target.checked;
+        };
+    });
+
+    // 复制分享链接
+    document.getElementById('copyShareUrl')?.addEventListener('click', () => {
+        const input = document.getElementById('shareUrl');
+        input.select();
+        document.execCommand('copy');
+        showToast('链接已复制');
+    });
+
+    // 下载分享卡片
+    document.getElementById('downloadShareCard')?.addEventListener('click', async () => {
+        const card = document.getElementById('shareCard');
+        if (!card) return;
+
+        try {
+            // 动态加载 html2canvas
+            if (typeof html2canvas === 'undefined') {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                document.head.appendChild(script);
+                await new Promise((resolve, reject) => {
+                    script.onload = resolve;
+                    script.onerror = reject;
+                });
+            }
+
+            const canvas = await html2canvas(card, {
+                backgroundColor: '#ffffff',
+                scale: 2
+            });
+
+            const link = document.createElement('a');
+            link.download = 'share-card.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast('卡片已下载');
+        } catch (err) {
+            console.error('生成卡片失败', err);
+            showToast('生成卡片失败');
+        }
+    });
+
+    // 更新分享设置
+    document.getElementById('updateShare')?.addEventListener('click', async () => {
+        const shareUrl = document.getElementById('shareUrl');
+        const shareId = shareUrl?.dataset.shareId;
+        const noteId = shareUrl?.dataset.noteId;
+        if (!shareId || !noteId) return;
+
+        const password = document.getElementById('sharePassword').value.trim();
+        const expires = document.getElementById('shareExpires').value;
+
+        // 目前简单实现：删除旧分享，创建新分享
+        await api.share.delete(shareId);
+
+        let expiresIn = null;
+        if (expires === '24') expiresIn = 24;
+        else if (expires === '168') expiresIn = 168;
+        else if (expires === '720') expiresIn = 720;
+
+        // 重新创建分享
+        const res = await api.share.create({
+            note_id: noteId,
+            password: document.getElementById('sharePasswordEnabled').checked ? password : '',
+            expires_in: expiresIn
+        });
+
+        if (res && res.ok) {
+            const data = await res.json();
+            shareUrl.value = window.location.origin + data.share.url;
+            shareUrl.dataset.shareId = data.share.id;
+            showToast('设置已更新');
+        } else {
+            showToast('更新失败');
         }
     });
 }

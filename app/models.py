@@ -126,3 +126,45 @@ class Config(db.Model):
             if description:
                 conf.description = description
         db.session.commit()
+
+
+class Share(db.Model):
+    """分享链接模型"""
+    __tablename__ = 'share'
+
+    id = db.Column(db.String(8), primary_key=True)  # 短链接ID，8位随机字符
+    note_id = db.Column(db.String(36), db.ForeignKey('note.id'), nullable=False)
+    password = db.Column(db.String(128), nullable=True)  # 可选密码，存储hash
+    expires_at = db.Column(db.DateTime, nullable=True)  # 可选过期时间
+    view_count = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    # 关联
+    note = db.relationship('Note', backref=db.backref('shares', cascade='all, delete-orphan'))
+
+    def set_password(self, password):
+        """设置分享密码"""
+        self.password = generate_password_hash(password)
+
+    def check_password(self, password):
+        """验证分享密码"""
+        if not self.password:
+            return True  # 无密码时直接通过
+        return check_password_hash(self.password, password)
+
+    def is_expired(self):
+        """检查是否已过期"""
+        if not self.expires_at:
+            return False
+        return datetime.now() > self.expires_at
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'note_id': self.note_id,
+            'has_password': bool(self.password),
+            'expires_at': self.expires_at.strftime('%Y-%m-%d %H:%M:%S') if self.expires_at else None,
+            'view_count': self.view_count,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'is_expired': self.is_expired()
+        }

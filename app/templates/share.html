@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ site_desc }}">
+    <title>{{ note.title if note else '分享' }} - {{ site_title }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
+    <!-- Markdown Support -->
+    <script src="/static/lib/marked/marked.min.js"></script>
+    <script src="/static/lib/dompurify/purify.min.js"></script>
+    <!-- Syntax Highlighting -->
+    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
+    <script src="/static/lib/highlightjs/highlight.min.js"></script>
+    
+    <!-- Mermaid Diagrams -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
+
+    <!-- Viewer.js for Image Zoom -->
+    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
+    <script src="/static/lib/viewerjs/viewer.min.js"></script>
+
+    <link rel="stylesheet" href="/static/css/share.css">
+    <script>
+        marked.use({ gfm: true, breaks: true });
+        hljs.configure({ ignoreUnescapedHTML: true });
+        
+        // Initialize Mermaid
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof mermaid !== 'undefined') {
+                mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            }
+        });
+        
+        // Helper: Parse WikiLinks
+        function parseWikiLinks(content) {
+            if (!content) return '';
+            return content.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, title, display) => {
+                return `<span class="wiki-link" title="${title.trim()}">${(display || title).trim()}</span>`;
+            });
+        }
+        
+        // Helper: Render Content Pipeline
+        async function renderContent(container, content) {
+            if (!container || !content) return;
+            
+            try {
+                // 1. Wiki Links
+                let processed = parseWikiLinks(content);
+                
+                // 2. Markdown
+                let html = marked.parse(processed);
+                
+                // 3. Sanitize
+                if (typeof DOMPurify !== 'undefined') {
+                    html = DOMPurify.sanitize(html);
+                }
+                
+                container.innerHTML = html;
+                
+                // 4. Render Mermaid
+                if (typeof mermaid !== 'undefined') {
+                    const blocks = container.querySelectorAll('pre code.language-mermaid, pre code.language-mindmap');
+                    const nodesToRender = [];
+                    
+                    blocks.forEach(block => {
+                        const isMindmap = block.classList.contains('language-mindmap');
+                        let rawCode = block.textContent;
+                        if (isMindmap && !rawCode.trim().startsWith('mindmap')) {
+                            rawCode = 'mindmap\n' + rawCode;
+                        }
+                        
+                        const pre = block.parentElement;
+                        const div = document.createElement('div');
+                        div.className = 'mermaid';
+                        div.textContent = rawCode;
+                        
+                        if (pre && pre.parentNode) {
+                            pre.parentNode.replaceChild(div, pre);
+                            nodesToRender.push(div);
+                        }
+                    });
+                    
+                    if (nodesToRender.length > 0) {
+                        try {
+                            await mermaid.run({ nodes: nodesToRender });
+                        } catch (e) {
+                            console.error('Mermaid error:', e);
+                        }
+                    }
+                }
+                
+                // 5. Highlight Code
+                container.querySelectorAll('pre code').forEach(block => {
+                    if (!block.classList.contains('language-mermaid') && !block.classList.contains('language-mindmap')) {
+                        hljs.highlightElement(block);
+                    }
+                });
+                
+                // 6. Viewer.js for Images
+                if (typeof Viewer !== 'undefined') {
+                    new Viewer(container, {
+                        button: true, navbar: false, title: false,
+                        toolbar: { zoomIn:1, zoomOut:1, oneToOne:1, reset:1 }
+                    });
+                }
+                
+            } catch (e) {
+                console.error('Rendering failed:', e);
+                container.textContent = content;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="share-layout">
+        <!-- Brand Header -->
+        <header class="share-brand-header">
+            <a href="/" class="share-brand-title">{{ site_title }}</a>
+            <div class="share-brand-subtitle">记录思维的碎片</div>
+        </header>
+
+        <main class="share-card-container">
+            {% if error %}
+            <!-- Error State -->
+            <div class="share-error-box">
+                <i class="fas fa-link" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 20px;"></i>
+                <h2 style="color: #475569; margin-bottom: 10px;">{{ error }}</h2>
+                <p style="color: #94a3b8;">该分享链接可能已被删除或已过期</p>
+                <a href="/" class="btn btn-primary" style="margin-top: 20px; display: inline-block;">返回首页</a>
+            </div>
+
+            {% elif need_password %}
+            <!-- Password Form -->
+            <div class="share-password-box">
+                <i class="fas fa-lock password-icon"></i>
+                <h3 style="color: #334155; margin-bottom: 20px;">需要密码访问</h3>
+                <div class="share-password-form">
+                    <div class="form-group">
+                        <input type="password" id="sharePassword" placeholder="请输入访问密码" autofocus 
+                               style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 16px;">
+                        <button onclick="verifyPassword()" class="btn btn-primary" style="width: 100%; padding: 12px;">验证访问</button>
+                    </div>
+                    <div id="passwordError" class="error-msg" style="display: none; color: #ef4444; margin-top: 10px;"></div>
+                </div>
+            </div>
+
+            {% elif note %}
+            <!-- Note Content -->
+            <article class="share-note">
+                <header class="share-note-header">
+                    <h1 style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin: 0;">
+                        {{ note.title or '无标题' }}
+                    </h1>
+                    <div class="share-note-date">
+                        <i class="far fa-calendar-alt"></i>
+                        {{ note.created_at.strftime('%Y/%m/%d') }}
+                    </div>
+                </header>
+                
+                <div class="share-note-content markdown-body" id="noteContent">
+                    <!-- Content rendered via JS -->
+                </div>
+
+                {% if note.tags_list %}
+                <div class="share-note-tags">
+                    {% for tag in note.tags_list %}
+                    <span class="share-note-tag">#{{ tag.name }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </article>
+            {% endif %}
+        </main>
+
+        <footer class="share-footer">
+            <p>由 <a href="/">{{ site_title }}</a> 提供支持</p>
+        </footer>
+    </div>
+
+    {% if need_password %}
+    <script>
+        async function verifyPassword() {
+            const password = document.getElementById('sharePassword').value;
+            const errorEl = document.getElementById('passwordError');
+
+            if (!password) {
+                errorEl.textContent = '请输入密码';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/share/{{ share_id }}/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Render Note Content logic
+                    // We need to reload or replace content. 
+                    // Since we refactored the HTML structure, replacing innerHTML of a specific container is cleaner.
+                    // But simpler here is to reload the page with a token or just handle it purely in JS by replacing the card content.
+                    
+                    const cardContainer = document.querySelector('.share-card-container');
+                    const note = data.note;
+                    const dateStr = new Date(note.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+                    cardContainer.innerHTML = `
+                        <article class="share-note">
+                            <header class="share-note-header">
+                                <h1 style="font-size: 1.25rem; font-weight: 700; color: #1e293b; margin: 0;">
+                                    ${note.title || '无标题'}
+                                </h1>
+                                <div class="share-note-date">
+                                    <i class="far fa-calendar-alt"></i>
+                                    ${dateStr}
+                                </div>
+                            </header>
+                            
+                            <div class="share-note-content markdown-body" id="noteContent"></div>
+
+                            ${note.tags && note.tags.length > 0 ? `
+                            <div class="share-note-tags">
+                                ${note.tags.map(t => `<span class="share-note-tag">#${t}</span>`).join('')}
+                            </div>
+                            ` : ''}
+                        </article>
+                    `;
+
+                    // Async render content
+                    await renderContent(document.getElementById('noteContent'), note.content);
+
+                } else {
+                    errorEl.textContent = data.error || '密码错误';
+                    errorEl.style.display = 'block';
+                }
+            } catch(e) {
+                console.error(e);
+                errorEl.textContent = '网络错误，请重试';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        // Enter key
+        document.getElementById('sharePassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verifyPassword();
+        });
+    </script>
+    {% endif %}
+
+    {% if note %}
+    <!-- Use a script tag to store raw content safely -->
+    <script id="raw-content" type="text/template">{{ note.content }}</script>
+    <script>
+        // Render Markdown
+        document.addEventListener('DOMContentLoaded', () => {
+            const contentEl = document.getElementById('noteContent');
+            const rawContentEl = document.getElementById('raw-content');
+            
+            if (contentEl && rawContentEl) {
+                const rawContent = rawContentEl.textContent;
+                contentEl.innerHTML = ''; 
+                renderContent(contentEl, rawContent);
+            }
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

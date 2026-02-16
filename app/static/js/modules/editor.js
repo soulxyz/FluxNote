@@ -10,6 +10,7 @@ export const editor = {
 
         this.setupAutoSave(textarea);
         this.setupAutocomplete(textarea);
+        this.setupSlashCommands(textarea);
         this.setupPasteImage(textarea);
         this.setupAITools(textarea);
     },
@@ -163,6 +164,123 @@ export const editor = {
                 dropdown.style.display = 'none';
             }
         });
+    },
+
+    setupSlashCommands(textarea) {
+        let dropdown = null;
+
+        const commands = [
+            { label: '一级标题', value: '# ', icon: 'fas fa-heading', match: 'h1' },
+            { label: '二级标题', value: '## ', icon: 'fas fa-heading', match: 'h2' },
+            { label: '三级标题', value: '### ', icon: 'fas fa-heading', match: 'h3' },
+            { label: '待办列表', value: '- [ ] ', icon: 'fas fa-check-square', match: 'todo' },
+            { label: '无序列表', value: '- ', icon: 'fas fa-list-ul', match: 'list' },
+            { label: '代码块', value: '```\n\n```', icon: 'fas fa-code', match: 'code' },
+            { label: '当前日期', value: () => new Date().toLocaleDateString(), icon: 'far fa-calendar-alt', match: 'date' },
+            { label: 'AI 助手', action: 'ai', icon: 'fas fa-magic', match: 'ai' }
+        ];
+
+        textarea.addEventListener('input', debounce((e) => {
+            const cursor = textarea.selectionStart;
+            const textBefore = textarea.value.substring(0, cursor);
+            
+            // Check for slash command at end (preceded by start or whitespace)
+            const match = textBefore.match(/(?:^|[\s\n])(\/([a-z0-9]*))$/i);
+
+            if (match) {
+                const slashCmd = match[1]; // e.g. "/todo"
+                const query = match[2].toLowerCase(); // e.g. "todo"
+                
+                if (!dropdown) {
+                    dropdown = document.createElement('div');
+                    dropdown.className = 'autocomplete-dropdown slash-dropdown';
+                    document.body.appendChild(dropdown);
+                }
+
+                const filtered = commands.filter(c => 
+                    c.match.startsWith(query) || c.label.includes(query)
+                );
+
+                if (filtered.length > 0) {
+                    dropdown.innerHTML = filtered.map((c, i) => `
+                        <div class="ac-item" data-idx="${i}">
+                            <i class="${c.icon}" style="width:20px; color:#888;"></i> 
+                            <span style="font-weight:600; margin-right:8px;">/${c.match}</span> 
+                            <span style="font-size:12px; color:#aaa;">${c.label}</span>
+                        </div>
+                    `).join('');
+
+                    dropdown.querySelectorAll('.ac-item').forEach(item => {
+                        item.onclick = () => {
+                            const cmd = filtered[item.dataset.idx];
+                            this.executeSlashCommand(textarea, cmd, slashCmd, cursor);
+                            dropdown.style.display = 'none';
+                        };
+                    });
+
+                    const coords = getCaretCoordinates(textarea, cursor);
+                    const rect = textarea.getBoundingClientRect();
+                    dropdown.style.left = `${rect.left + coords.left}px`;
+                    dropdown.style.top = `${rect.top + coords.top + 24}px`;
+                    dropdown.style.display = 'block';
+                } else {
+                    dropdown.style.display = 'none';
+                }
+            } else {
+                if (dropdown) dropdown.style.display = 'none';
+            }
+        }, 100));
+
+        // Close on click out
+        document.addEventListener('click', (e) => {
+            if (dropdown && e.target !== textarea && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        // Handle Tab/Enter key navigation in dropdown? 
+        // For simplicity, sticking to click or exact match handling could be added later.
+    },
+
+    executeSlashCommand(textarea, cmd, matchStr, cursor) {
+        let replacement = typeof cmd.value === 'function' ? cmd.value() : cmd.value;
+        
+        if (cmd.action === 'ai') {
+            replacement = ''; 
+            // Trigger AI menu logic
+            // Assuming the AI button logic is available via existing click handler
+            // We need to find the AI button for THIS textarea context
+            // Reuse logic from setupAITools to find controls
+            let controls = null;
+            const memoEditor = textarea.closest('.memo-editor');
+            if (memoEditor) controls = memoEditor.querySelector('.editor-footer .input-controls');
+            if (!controls) {
+                const inlineContainer = textarea.closest('.inline-editor-container');
+                if (inlineContainer) controls = inlineContainer.querySelector('.inline-tools-left');
+            }
+            if (controls) {
+                const btn = controls.querySelector('.ai-trigger');
+                if (btn) setTimeout(() => btn.click(), 50); // Small delay to let UI settle
+            }
+        }
+
+        const text = textarea.value;
+        const start = cursor - matchStr.length;
+        const end = cursor;
+        
+        if (textarea.setRangeText) {
+            textarea.setRangeText(replacement, start, end, 'end');
+        } else {
+            textarea.value = text.substring(0, start) + replacement + text.substring(end);
+        }
+        
+        textarea.focus();
+        
+        // Special case for code block: move cursor inside
+        if (cmd.match === 'code') {
+            const newCursor = start + 4; // after ```\n
+            textarea.setSelectionRange(newCursor, newCursor);
+        }
     },
 
     setupAITools(textarea) {

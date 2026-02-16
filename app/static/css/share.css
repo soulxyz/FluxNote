@@ -1,0 +1,149 @@
+body {
+    background-color: #f1f5f9; /* Slate-100 */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.share-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+}
+
+.share-card-container {
+    width: 100%;
+    max-width: 680px; /* Match content width */
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+    margin-bottom: 40px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.share-brand-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.share-brand-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary, #10b981);
+    text-decoration: none;
+    letter-spacing: -0.025em;
+}
+
+.share-brand-subtitle {
+    color: #64748b; /* Slate-500 */
+    font-size: 0.875rem;
+    margin-top: 4px;
+}
+
+.share-note-header {
+    padding: 30px 40px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+}
+
+.share-note-date {
+    color: #94a3b8; /* Slate-400 */
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.share-note-content {
+    padding: 40px;
+    line-height: 1.8;
+    color: #334155; /* Slate-700 */
+    font-size: 16px;
+}
+
+.share-note-tags {
+    padding: 20px 40px;
+    background: #f8fafc; /* Slate-50 */
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.share-note-tag {
+    padding: 4px 12px;
+    background: white;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.share-footer {
+    text-align: center;
+    padding-bottom: 40px;
+    color: #94a3b8;
+    font-size: 0.875rem;
+}
+
+.share-footer a {
+    color: var(--primary, #10b981);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.share-password-box {
+    padding: 60px 40px;
+    text-align: center;
+}
+
+.share-password-form {
+    max-width: 320px;
+    margin: 0 auto;
+}
+
+.password-icon {
+    font-size: 3rem;
+    color: #cbd5e1;
+    margin-bottom: 20px;
+}
+
+/* Error State */
+.share-error-box {
+    padding: 80px 20px;
+    text-align: center;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+    .share-note-header, .share-note-content, .share-note-tags {
+        padding: 20px;
+    }
+}
+
+/* Mermaid styling */
+.mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0;
+}
+
+/* Wiki Links */
+.wiki-link {
+    color: var(--primary, #10b981);
+    text-decoration: none;
+    border-bottom: 1px dashed;
+}

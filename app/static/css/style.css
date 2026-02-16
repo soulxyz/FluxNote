@@ -791,10 +791,36 @@ button { font-family: inherit; }
 .ac-item:last-child { border-bottom: none; }
 .ac-item:hover { background: var(--slate-50); color: var(--primary); }
 
+/* Slash Command Dropdown */
+.slash-dropdown {
+    width: 240px;
+    padding: 6px 0;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.slash-dropdown .ac-item {
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    border-bottom: none; /* Cleaner look */
+    gap: 0;
+}
+
+.slash-dropdown .ac-item:hover {
+    background: var(--slate-100);
+}
+
+.slash-dropdown i {
+    width: 24px;
+    text-align: center;
+    margin-right: 8px;
+}
+
 
 /* Auth / Modal */
-.modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-.modal-content { background-color: #fefefe; margin: 15vh auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: modalIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+.modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(4px); overflow-y: auto; }
+.modal-content { background-color: #fefefe; margin: 50px auto; padding: 30px; border-radius: 12px; width: 90%; max-width: 380px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: modalIn 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
 @keyframes modalIn { from { opacity: 0; transform: translateY(20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 .modal-header {
@@ -1260,4 +1286,180 @@ input:checked + .slider:before {
     margin: 1.5rem 0;
     display: flex;
     justify-content: center;
+}
+
+/* Share Card Styles */
+.share-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.share-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.share-card-content {
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.7;
+    margin-bottom: 12px;
+    padding-right: 10px;
+}
+
+/* 分享卡片内的 Markdown 样式 */
+.share-card-content.markdown-body {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.share-card-content.markdown-body p {
+    margin: 0 0 8px 0;
+}
+
+.share-card-content.markdown-body p:last-child {
+    margin-bottom: 0;
+}
+
+.share-card-content.markdown-body code {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #e11d48;
+}
+
+.share-card-content.markdown-body pre {
+    background: #1e293b;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.share-card-content.markdown-body pre code {
+    background: transparent;
+    color: #e2e8f0;
+    padding: 0;
+}
+
+.share-card-content.markdown-body ul,
+.share-card-content.markdown-body ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.share-card-content.markdown-body li {
+    margin: 4px 0;
+}
+
+.share-card-content.markdown-body strong {
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.share-card-content.markdown-body em {
+    color: #475569;
+}
+
+.share-card-content.markdown-body blockquote {
+    border-left: 3px solid #10b981;
+    margin: 8px 0;
+    padding-left: 12px;
+    color: #64748b;
+}
+
+.share-card-content.markdown-body h1,
+.share-card-content.markdown-body h2,
+.share-card-content.markdown-body h3,
+.share-card-content.markdown-body h4 {
+    color: #1e293b;
+    margin: 12px 0 8px 0;
+}
+
+.share-card-content.markdown-body h1 { font-size: 18px; }
+.share-card-content.markdown-body h2 { font-size: 16px; }
+.share-card-content.markdown-body h3 { font-size: 15px; }
+
+.share-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.share-card-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.share-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.share-card-date {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.share-card-brand {
+    font-size: 12px;
+    color: #10b981;
+    font-weight: 500;
+}
+
+/* Share Modal Styles */
+.share-section {
+    margin-bottom: 16px;
+}
+
+.close-share {
+    color: #aaa;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.close-share:hover {
+    color: #475569;
+}
+
+
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }

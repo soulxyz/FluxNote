@@ -104,6 +104,9 @@
                         <a href="#" class="nav-item" id="navDailyReview" onclick="return false;">
                             <i class="fas fa-history"></i> 每日回顾
                         </a>
+                        <a href="#" class="nav-item" id="navShares" onclick="return false;">
+                            <i class="fas fa-share-alt"></i> 我的分享
+                        </a>
                         <a href="#" class="nav-item" id="navTrash" onclick="return false;">
                             <i class="fas fa-trash"></i> 回收站
                         </a>
@@ -259,6 +262,84 @@
             </div>
             <div class="modal-body">
                 <div id="reviewList" class="notes-stream"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h2>分享笔记</h2>
+                <span class="close-share">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- 分享链接 -->
+                <div class="share-section">
+                    <label style="font-size: 13px; color: #666; margin-bottom: 8px; display: block;">分享链接</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="shareUrl" class="share-url-input" readonly style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; background: #f8fafc;">
+                        <button id="copyShareUrl" class="btn btn-primary" style="padding: 10px 14px;">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 访问设置 -->
+                <div class="share-section" style="margin-top: 20px;">
+                    <label style="font-size: 13px; color: #666; margin-bottom: 12px; display: block;">访问设置</label>
+
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <input type="checkbox" id="sharePasswordEnabled" style="width: 16px; height: 16px;">
+                        <label for="sharePasswordEnabled" style="font-size: 14px; cursor: pointer;">设置密码</label>
+                        <input type="password" id="sharePassword" placeholder="输入密码" disabled style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;">
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="font-size: 14px;">有效期</label>
+                        <select id="shareExpires" style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; background: white;">
+                            <option value="0">永久有效</option>
+                            <option value="24">1天后过期</option>
+                            <option value="168">7天后过期</option>
+                            <option value="720">30天后过期</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 预览卡片 -->
+                <div class="share-section" style="margin-top: 24px;">
+                    <label style="font-size: 13px; color: #666; margin-bottom: 12px; display: block;">分享卡片预览</label>
+                    <div id="shareCard" class="share-card">
+                        <div class="share-card-title" id="shareCardTitle">笔记标题</div>
+                        <div class="share-card-content markdown-body" id="shareCardContent">笔记内容摘要...</div>
+                        <div class="share-card-tags" id="shareCardTags" style="display: none;"></div>
+                        <div class="share-card-footer">
+                            <span class="share-card-date" id="shareCardDate">2024年1月1日</span>
+                            <span class="share-card-brand">📝 轻笔记</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+                <button id="downloadShareCard" class="btn btn-secondary" style="flex: 1;">
+                    <i class="fas fa-download" style="margin-right: 6px;"></i>下载卡片
+                </button>
+                <button id="updateShare" class="btn btn-primary" style="flex: 1;">
+                    <i class="fas fa-check" style="margin-right: 6px;"></i>保存设置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shares Management Modal -->
+    <div id="sharesModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>我的分享</h2>
+                <span class="close-shares">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="sharesList" class="version-list"></div>
             </div>
         </div>
     </div>

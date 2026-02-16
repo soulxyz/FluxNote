@@ -73,6 +73,11 @@ export const ui = {
         blocks.forEach(block => {
             const isMindmap = block.classList.contains('language-mindmap');
             let rawCode = block.textContent;
+
+            // Decode HTML entities (e.g., &gt; -> >) to prevent Mermaid syntax errors
+            const txt = document.createElement("textarea");
+            txt.innerHTML = rawCode;
+            rawCode = txt.value;
             
             // If it's a mindmap block and doesn't start with the keyword, prepend it
             if (isMindmap && !rawCode.trim().startsWith('mindmap')) {
@@ -186,6 +191,7 @@ export const ui = {
             </div>
             ` : `
             <div class="note-actions">
+                <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
                 <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
                 <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
                 <span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>

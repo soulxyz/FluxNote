@@ -80,7 +80,8 @@ export const api = {
         restoreVersion: (noteId, versionId) => fetchJson(`/api/notes/${noteId}/versions/${versionId}/restore`, { method: 'POST' }),
         backlinks: (id) => fetchJson(`/api/notes/${id}/backlinks`),
         titles: () => fetchJson('/api/notes/titles'),
-        review: () => fetchJson('/api/notes/review')
+        review: () => fetchJson('/api/notes/review'),
+        shares: (noteId) => fetchJson(`/api/notes/${noteId}/shares`)
     },
     tags: {
         list: () => fetchJson('/api/tags')
@@ -96,6 +97,20 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         })
+    },
+    share: {
+        create: (data) => fetchJson('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }),
+        get: (shareId) => fetchJson(`/api/share/${shareId}`),
+        verify: (shareId, password) => fetchJson(`/api/share/${shareId}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        }),
+        delete: (shareId) => fetchJson(`/api/share/${shareId}`, { method: 'DELETE' })
     },
     upload: (formData) => fetchJson('/api/upload', {
         method: 'POST',

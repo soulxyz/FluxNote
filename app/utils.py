@@ -39,8 +39,8 @@ def extract_title_and_links(content):
 
     lines = content.split('\n')
     title = lines[0].strip()
-    # Remove markdown header characters
-    title = re.sub(r'^#+\s+', '', title)
+    # Remove markdown header characters and list markers
+    title = re.sub(r'^(#+\s+|[-*]\s+(\[[ xX]?\]\s+)?|\d+\.\s+)', '', title)
     if not title:
         title = "Untitled"
     if len(title) > 200:

@@ -328,7 +328,20 @@ class SPALoader {
     }
 
     executeScripts(container) {
-        // 执行内联脚本
+        // 1. 处理外部脚本 (External Scripts)
+        const externalScripts = container.querySelectorAll('script[src]');
+        externalScripts.forEach(script => {
+            // Check if already loaded
+            if (!document.querySelector(`script[src="${script.src}"]`)) {
+                const newScript = document.createElement('script');
+                newScript.src = script.src;
+                // Optional: async/defer copy
+                newScript.async = false; // Execute in order if possible
+                document.body.appendChild(newScript);
+            }
+        });
+
+        // 2. 处理内联脚本 (Inline Scripts)
         const scripts = container.querySelectorAll('script:not([src])');
         scripts.forEach(script => {
             try {

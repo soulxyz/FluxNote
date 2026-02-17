@@ -36,6 +36,143 @@
             </div>
         </div>
 
+        <!-- 评论设置 -->
+        <div class="settings-section">
+            <div class="section-title"><i class="fas fa-comments"></i> 评论设置</div>
+
+            <div class="form-row">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">开启评论审核</div>
+                        <p class="help-text" style="margin-top:4px;">开启后，访客评论需要后台审核通过后才会显示。</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="commentAudit">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>头像源 (Avatar Source)</label>
+                <select id="avatarSource" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    <option value="cravatar">Cravatar (国内推荐)</option>
+                    <option value="gravatar">Gravatar (官方)</option>
+                    <option value="weavatar">WeAvatar</option>
+                </select>
+                <p class="help-text">选择访客头像的镜像源，Cravatar 在国内访问速度较快。</p>
+            </div>
+
+            <div class="form-row">
+                <label>博主头像 URL</label>
+                <input type="text" id="bloggerAvatar" placeholder="https://example.com/avatar.jpg">
+                <p class="help-text">设置后，博主评论将使用此图片作为头像，覆盖默认的 Gravatar。</p>
+            </div>
+
+            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
+
+            <div class="form-row">
+                <p class="help-text" style="margin-bottom: 15px;">配置 SMTP 以启用邮件通知功能 (有人评论时通知你)。</p>
+                <label>SMTP 服务器</label>
+                <input type="text" id="smtpServer" placeholder="smtp.example.com">
+            </div>
+            <div class="form-row">
+                <label>SMTP 端口</label>
+                <input type="text" id="smtpPort" placeholder="465 (SSL) or 587 (TLS)">
+            </div>
+            <div class="form-row">
+                <label>发送邮箱 (User)</label>
+                <input type="text" id="smtpUser" placeholder="noreply@example.com">
+            </div>
+            <div class="form-row">
+                <label>邮箱密码 (Password/App Key)</label>
+                <input type="password" id="smtpPassword" placeholder="Your Password">
+            </div>
+            <div class="form-row">
+                <label>发件人名称</label>
+                <input type="text" id="smtpSenderName" placeholder="轻笔记">
+                <p class="help-text">邮件中显示的发件人名称，如"轻笔记"、"我的博客"等。</p>
+            </div>
+             <div class="form-row">
+                <label>接收通知邮箱</label>
+                <input type="text" id="notifyEmail" placeholder="admin@example.com">
+            </div>
+
+            <div class="form-row" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="saveCommentSettings()">
+                    <i class="fas fa-save"></i> 保存评论配置
+                </button>
+                <button class="btn btn-secondary" onclick="testEmailSettings()" style="margin-left: 10px;">
+                    <i class="fas fa-paper-plane"></i> 发送测试邮件
+                </button>
+            </div>
+        </div>
+
+        <!-- 评论管理 -->
+        <div class="settings-section">
+            <div class="section-title" style="cursor: pointer; user-select: none; display: flex; align-items: center;" onclick="toggleCommentManagement()">
+                <i class="fas fa-comment-dots"></i> 评论管理
+                <i class="fas fa-chevron-down" id="comment-management-arrow" style="margin-left: auto; font-size: 14px; color: #9ca3af; transition: transform 0.2s;"></i>
+            </div>
+
+            <!-- 统计卡片（始终显示） -->
+            <div class="comment-stats" style="display: flex; gap: 16px; margin-top: 16px;">
+                <div class="stat-card stat-card-blue">
+                    <div class="stat-number" id="stat-total">0</div>
+                    <div class="stat-label">全部评论</div>
+                </div>
+                <div class="stat-card stat-card-yellow">
+                    <div class="stat-number" id="stat-pending">0</div>
+                    <div class="stat-label">待审核</div>
+                </div>
+                <div class="stat-card stat-card-green">
+                    <div class="stat-number" id="stat-approved">0</div>
+                    <div class="stat-label">已通过</div>
+                </div>
+                <div class="stat-card stat-card-red">
+                    <div class="stat-number" id="stat-spam">0</div>
+                    <div class="stat-label">垃圾评论</div>
+                </div>
+            </div>
+
+            <!-- 评论管理详情（可折叠） -->
+            <div id="comment-management-content" style="display: none; margin-top: 20px;">
+                <!-- 筛选标签 -->
+                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                    <button class="btn btn-sm btn-primary" id="filter-all" onclick="filterComments('all')">全部</button>
+                    <button class="btn btn-sm btn-outline" id="filter-pending" onclick="filterComments('pending')">待审核</button>
+                    <button class="btn btn-sm btn-outline" id="filter-approved" onclick="filterComments('approved')">已通过</button>
+                    <button class="btn btn-sm btn-outline" id="filter-spam" onclick="filterComments('spam')">垃圾</button>
+                </div>
+
+                <!-- 批量操作 -->
+                <div style="display: flex; gap: 10px; margin-bottom: 16px; align-items: center;">
+                    <input type="checkbox" id="selectAllComments" onchange="toggleSelectAll()" style="width: 18px; height: 18px;">
+                    <span style="font-size: 14px; color: #6b7280;">全选</span>
+                    <div style="flex:1;"></div>
+                    <button class="btn btn-sm btn-outline" onclick="batchAction('approve')" id="btn-batch-approve" disabled>
+                        <i class="fas fa-check"></i> 批量通过
+                    </button>
+                    <button class="btn btn-sm btn-secondary" onclick="batchAction('spam')" id="btn-batch-spam" disabled>
+                        <i class="fas fa-ban"></i> 标记垃圾
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="batchAction('delete')" id="btn-batch-delete" disabled>
+                        <i class="fas fa-trash"></i> 批量删除
+                    </button>
+                </div>
+
+                <!-- 评论列表 -->
+                <div id="admin-comments-list">
+                    <div style="text-align: center; color: #888; padding: 2rem;">
+                        <i class="fas fa-spinner fa-spin"></i> 加载中...
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div id="comments-pagination" style="display: flex; justify-content: center; gap: 8px; margin-top: 20px;"></div>
+            </div>
+        </div>
+
         <!-- 博客主题 -->
         <div class="settings-section">
             <div class="section-title"><i class="fas fa-palette"></i> 访客主题 (前台)</div>
@@ -125,6 +262,21 @@
                 <button class="btn btn-danger" onclick="changePassword()">
                     <i class="fas fa-key"></i> 修改密码
                 </button>
+            </div>
+
+            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
+
+            <div class="form-row">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <div style="font-weight:600; font-size:14px;">调试模式</div>
+                        <p class="help-text" style="margin-top:4px;">开启后，API错误将返回详细信息，便于排查问题。<strong style="color:#dc2626;">生产环境建议关闭！</strong></p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="debugModeToggle" onchange="toggleDebugMode()">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -239,6 +391,8 @@
             loadProviders();
             loadCustomPrompts();
             loadThemes();
+            loadCommentStats();
+            // 评论列表在展开时才加载
         });
 
         // ... existing loadSettings ...
@@ -306,7 +460,7 @@
             const model = document.getElementById('providerModel').value;
 
             if (!name || !baseUrl || !apiKey || !model) {
-                showToast('请填写完整信息');
+                showToast('请填写完整信息', 'warning');
                 return;
             }
 
@@ -318,25 +472,25 @@
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showToast('保存成功');
+                    showToast('保存成功', 'success');
                     closeProviderModal();
                     renderProviders(data.providers);
                 } else {
-                    showToast('保存失败');
+                    showToast('保存失败', 'error');
                 }
             } catch (error) {
-                showToast('保存失败');
+                showToast('保存失败', 'error');
             }
         }
 
         async function deleteProvider(id) {
-            if (!confirm('确定删除此模型配置吗？')) return;
+            if (!await showConfirm('删除模型', '确定要删除此模型配置吗？')) return;
             try {
                 await fetch(`/api/ai/providers/${id}`, { method: 'DELETE' });
                 loadProviders();
-                showToast('已删除');
+                showToast('已删除', 'success');
             } catch (error) {
-                showToast('删除失败');
+                showToast('删除失败', 'error');
             }
         }
 
@@ -348,9 +502,9 @@
                     body: JSON.stringify({ id })
                 });
                 loadProviders();
-                showToast('已切换模型');
+                showToast('已切换模型', 'success');
             } catch (error) {
-                showToast('切换失败');
+                showToast('切换失败', 'error');
             }
         }
 
@@ -410,7 +564,7 @@
             const template = document.getElementById('promptTemplate').value;
 
             if (!name || !template) {
-                showToast('请填写完整信息');
+                showToast('请填写完整信息', 'warning');
                 return;
             }
 
@@ -421,25 +575,25 @@
                     body: JSON.stringify({ id, name, system_prompt: system, template })
                 });
                 if (response.ok) {
-                    showToast('保存成功');
+                    showToast('保存成功', 'success');
                     closePromptModal();
                     loadCustomPrompts();
                 } else {
-                    showToast('保存失败');
+                    showToast('保存失败', 'error');
                 }
             } catch (error) {
-                showToast('保存失败');
+                showToast('保存失败', 'error');
             }
         }
 
         async function deletePrompt(id) {
-            if (!confirm('确定删除此指令吗？')) return;
+            if (!await showConfirm('删除指令', '确定要删除此自定义指令吗？')) return;
             try {
                 await fetch(`/api/ai/custom_prompts/${id}`, { method: 'DELETE' });
                 loadCustomPrompts();
-                showToast('已删除');
+                showToast('已删除', 'success');
             } catch (error) {
-                showToast('删除失败');
+                showToast('删除失败', 'error');
             }
         }
 
@@ -487,11 +641,82 @@
                 if (data.blog_footer) document.getElementById('blogFooter').value = data.blog_footer;
                 if (data.polish_styles) document.getElementById('polishStyles').value = data.polish_styles;
 
+                // Comment Settings（统一转小写比较，因为后端存储可能是 'True' 或 'true'）
+                document.getElementById('commentAudit').checked = data.comment_audit?.toLowerCase() === 'true';
+                if (data.avatar_source) document.getElementById('avatarSource').value = data.avatar_source;
+                if (data.blogger_avatar) document.getElementById('bloggerAvatar').value = data.blogger_avatar;
+                if (data.smtp_server) document.getElementById('smtpServer').value = data.smtp_server;
+                if (data.smtp_port) document.getElementById('smtpPort').value = data.smtp_port;
+                if (data.smtp_user) document.getElementById('smtpUser').value = data.smtp_user;
+                if (data.smtp_password) document.getElementById('smtpPassword').value = data.smtp_password;
+                if (data.smtp_sender_name) document.getElementById('smtpSenderName').value = data.smtp_sender_name;
+                if (data.notify_email) document.getElementById('notifyEmail').value = data.notify_email;
+
                 // History settings
-                const keepHistory = data.keep_history !== 'false'; // Default to true
+                const keepHistory = data.keep_history?.toLowerCase() !== 'false'; // Default to true
                 document.getElementById('keepHistoryToggle').checked = keepHistory;
+
+                // Debug mode
+                const debugMode = data.debug_mode?.toLowerCase() === 'true';
+                document.getElementById('debugModeToggle').checked = debugMode;
             } catch (error) {
                 console.error('Failed to load settings');
+            }
+        }
+
+        async function saveCommentSettings() {
+            const audit = document.getElementById('commentAudit').checked;
+            const avatarSource = document.getElementById('avatarSource').value;
+            const bloggerAvatar = document.getElementById('bloggerAvatar').value;
+            const server = document.getElementById('smtpServer').value;
+            const port = document.getElementById('smtpPort').value;
+            const user = document.getElementById('smtpUser').value;
+            const password = document.getElementById('smtpPassword').value;
+            const senderName = document.getElementById('smtpSenderName').value;
+            const notify = document.getElementById('notifyEmail').value;
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        comment_audit: audit,
+                        avatar_source: avatarSource,
+                        blogger_avatar: bloggerAvatar,
+                        smtp_server: server,
+                        smtp_port: port,
+                        smtp_user: user,
+                        smtp_password: password,
+                        smtp_sender_name: senderName,
+                        notify_email: notify
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('评论配置已保存', 'success');
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            } catch (error) {
+                showToast('保存失败', 'error');
+            }
+        }
+
+        async function testEmailSettings() {
+            try {
+                showToast('正在发送测试邮件...', 'info');
+                const response = await fetch('/api/settings/test-email', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    showToast('测试邮件已发送，请检查收件箱', 'success');
+                } else {
+                    showToast('发送失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                showToast('发送失败', 'error');
             }
         }
 
@@ -504,32 +729,52 @@
                     body: JSON.stringify({ keep_history: enabled })
                 });
                 if (response.ok) {
-                    showToast(enabled ? '历史版本功能已启用' : '历史版本功能已禁用');
+                    showToast(enabled ? '历史版本功能已启用' : '历史版本功能已禁用', 'success');
                 } else {
-                    showToast('设置失败');
+                    showToast('设置失败', 'error');
                     document.getElementById('keepHistoryToggle').checked = !enabled;
                 }
             } catch (e) {
-                showToast('网络错误');
+                showToast('网络错误', 'error');
                 document.getElementById('keepHistoryToggle').checked = !enabled;
             }
         }
 
+        async function toggleDebugMode() {
+            const enabled = document.getElementById('debugModeToggle').checked;
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ debug_mode: enabled })
+                });
+                if (response.ok) {
+                    showToast(enabled ? '调试模式已开启' : '调试模式已关闭', enabled ? 'warning' : 'success');
+                } else {
+                    showToast('设置失败', 'error');
+                    document.getElementById('debugModeToggle').checked = !enabled;
+                }
+            } catch (e) {
+                showToast('网络错误', 'error');
+                document.getElementById('debugModeToggle').checked = !enabled;
+            }
+        }
+
         async function clearAllHistory() {
-            if (!confirm('确定要清除所有笔记的历史版本吗？此操作无法撤销。')) return;
-            
+            if (!await showConfirm('清除历史版本', '确定要清除所有笔记的历史版本吗？<br><strong style="color:#dc2626;">此操作无法撤销！</strong>')) return;
+
             try {
                 const response = await fetch('/api/notes/history/clear_all', {
                     method: 'POST'
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    showToast(`清理成功，共删除 ${data.count} 条记录`);
+                    showToast(`清理成功，共删除 ${data.count} 条记录`, 'success');
                 } else {
-                    showToast('清理失败');
+                    showToast('清理失败', 'error');
                 }
             } catch (e) {
-                showToast('网络错误');
+                showToast('网络错误', 'error');
             }
         }
 
@@ -541,9 +786,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ polish_styles: styles })
                 });
-                if (response.ok) showToast('风格配置已保存');
-                else showToast('保存失败');
-            } catch(e) { showToast('保存失败'); }
+                if (response.ok) showToast('风格配置已保存', 'success');
+                else showToast('保存失败', 'error');
+            } catch(e) { showToast('保存失败', 'error'); }
         }
 
         async function saveBasicSettings() {
@@ -563,12 +808,12 @@
                 });
 
                 if (response.ok) {
-                    showToast('设置已保存');
+                    showToast('设置已保存', 'success');
                 } else {
-                    showToast('保存失败');
+                    showToast('保存失败', 'error');
                 }
             } catch (error) {
-                showToast('保存失败');
+                showToast('保存失败', 'error');
             }
         }
 
@@ -577,7 +822,7 @@
             const newPassword = document.getElementById('newPassword').value;
 
             if (!currentPassword || !newPassword) {
-                showToast('请填写完整');
+                showToast('请填写完整', 'warning');
                 return;
             }
 
@@ -590,14 +835,14 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showToast('密码修改成功');
+                    showToast('密码修改成功', 'success');
                     document.getElementById('currentPassword').value = '';
                     document.getElementById('newPassword').value = '';
                 } else {
-                    showToast(data.error || '修改失败');
+                    showToast(data.error || '修改失败', 'error');
                 }
             } catch (error) {
-                showToast('修改失败');
+                showToast('修改失败', 'error');
             }
         }
 
@@ -606,11 +851,55 @@
             window.location.href = '/api/notes?per_page=10000'; // Reuse existing API or make a dedicated one
         }
 
-        function showToast(message) {
+        function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
             toast.textContent = message;
-            toast.className = 'toast show';
+            toast.className = `toast show toast-${type}`;
             setTimeout(() => { toast.className = 'toast'; }, 3000);
+        }
+
+        // 统一确认对话框
+        function showConfirm(title, message) {
+            return new Promise((resolve) => {
+                const existing = document.getElementById('confirm-modal');
+                if (existing) existing.remove();
+
+                const modal = document.createElement('div');
+                modal.id = 'confirm-modal';
+                modal.className = 'confirm-modal';
+                modal.innerHTML = `
+                    <div class="confirm-modal-backdrop"></div>
+                    <div class="confirm-modal-content">
+                        <div class="confirm-modal-header">
+                            <i class="fas fa-exclamation-triangle confirm-modal-icon"></i>
+                            <h3>${title}</h3>
+                        </div>
+                        <div class="confirm-modal-body">${message}</div>
+                        <div class="confirm-modal-footer">
+                            <button class="btn btn-secondary" data-action="cancel">取消</button>
+                            <button class="btn btn-danger" data-action="confirm">确定</button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // 动画显示
+                requestAnimationFrame(() => modal.classList.add('show'));
+
+                // 事件处理
+                const close = (result) => {
+                    modal.classList.remove('show');
+                    setTimeout(() => {
+                        modal.remove();
+                        resolve(result);
+                    }, 200);
+                };
+
+                modal.querySelector('[data-action="confirm"]').onclick = () => close(true);
+                modal.querySelector('[data-action="cancel"]').onclick = () => close(false);
+                modal.querySelector('.confirm-modal-backdrop').onclick = () => close(false);
+            });
         }
 
         // === Theme Management ===
@@ -676,13 +965,246 @@
                     body: JSON.stringify({ theme: themeName, role: role })
                 });
                 if (response.ok) {
-                    showToast('主题已切换');
+                    showToast('主题已切换', 'success');
                     loadThemes();
                 } else {
-                    showToast('切换失败');
+                    showToast('切换失败', 'error');
                 }
             } catch (error) {
-                showToast('切换失败');
+                showToast('切换失败', 'error');
+            }
+        }
+
+        // === 评论管理 ===
+        let currentCommentFilter = 'all';
+        let currentCommentPage = 1;
+        let selectedComments = new Set();
+        let commentManagementExpanded = false;
+
+        function toggleCommentManagement() {
+            commentManagementExpanded = !commentManagementExpanded;
+            const content = document.getElementById('comment-management-content');
+            const arrow = document.getElementById('comment-management-arrow');
+
+            if (commentManagementExpanded) {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+                // 展开时加载评论列表
+                loadAdminComments();
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function loadCommentStats() {
+            try {
+                const response = await fetch('/api/admin/comments/stats');
+                const data = await response.json();
+                document.getElementById('stat-total').textContent = data.total;
+                document.getElementById('stat-pending').textContent = data.pending;
+                document.getElementById('stat-approved').textContent = data.approved;
+                document.getElementById('stat-spam').textContent = data.spam;
+            } catch (error) {
+                console.error('Failed to load comment stats');
+            }
+        }
+
+        async function loadAdminComments(page = 1, status = currentCommentFilter) {
+            currentCommentPage = page;
+            currentCommentFilter = status;
+            selectedComments.clear();
+            updateBatchButtons();
+
+            try {
+                const params = new URLSearchParams({ page, per_page: 10 });
+                if (status && status !== 'all') {
+                    params.append('status', status);
+                }
+
+                const response = await fetch(`/api/admin/comments?${params}`);
+                const data = await response.json();
+
+                const list = document.getElementById('admin-comments-list');
+                list.innerHTML = '';
+
+                if (data.comments.length === 0) {
+                    list.innerHTML = '<div style="text-align: center; color: #999; padding: 2rem;">暂无评论</div>';
+                    document.getElementById('comments-pagination').innerHTML = '';
+                    return;
+                }
+
+                data.comments.forEach(comment => {
+                    const item = createAdminCommentItem(comment);
+                    list.appendChild(item);
+                });
+
+                // 分页
+                renderCommentsPagination(data.pages, page);
+
+            } catch (error) {
+                console.error('Failed to load comments', error);
+            }
+        }
+
+        function createAdminCommentItem(comment) {
+            const item = document.createElement('div');
+            item.className = 'admin-comment-item';
+            item.dataset.id = comment.id;
+
+            const statusBadge = {
+                'pending': '<span class="badge badge-warning">待审核</span>',
+                'approved': '<span class="badge badge-success">已通过</span>',
+                'spam': '<span class="badge badge-danger">垃圾</span>'
+            }[comment.status] || '';
+
+            const isSelected = selectedComments.has(comment.id);
+
+            item.innerHTML = `
+                <input type="checkbox" class="comment-checkbox" data-id="${comment.id}"
+                    ${isSelected ? 'checked' : ''} onchange="toggleCommentSelect(${comment.id})">
+                <img src="${comment.avatar}" style="width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                        <span style="font-weight: 600; color: var(--slate-800);">${comment.author_name}</span>
+                        ${comment.is_admin ? '<span class="badge badge-primary">博主</span>' : ''}
+                        ${statusBadge}
+                        <span style="color: #9ca3af; font-size: 12px; margin-left: auto;">${comment.created_at}</span>
+                    </div>
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 8px;">
+                        文章：<a href="/p/${comment.post_id}" target="_blank" style="color: var(--primary);">${comment.note_title || '无标题'}</a>
+                    </div>
+                    <div style="color: var(--slate-700); font-size: 14px; line-height: 1.5;">${comment.html}</div>
+                    <div style="margin-top: 8px; display: flex; gap: 12px;">
+                        ${comment.status === 'pending' ? `<button class="btn-text" style="color:#059669;" onclick="updateCommentStatus(${comment.id}, 'approved')"><i class="fas fa-check"></i> 通过</button>` : ''}
+                        ${comment.status !== 'spam' ? `<button class="btn-text" style="color:#d97706;" onclick="updateCommentStatus(${comment.id}, 'spam')"><i class="fas fa-ban"></i> 垃圾</button>` : ''}
+                        <button class="btn-text" style="color:#dc2626;" onclick="deleteAdminComment(${comment.id})"><i class="fas fa-trash"></i> 删除</button>
+                    </div>
+                </div>
+            `;
+            return item;
+        }
+
+        function renderCommentsPagination(totalPages, currentPage) {
+            const container = document.getElementById('comments-pagination');
+            container.innerHTML = '';
+
+            if (totalPages <= 1) return;
+
+            for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = i === currentPage ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+                btn.onclick = () => loadAdminComments(i);
+                container.appendChild(btn);
+            }
+        }
+
+        function filterComments(status) {
+            // 更新筛选按钮状态
+            ['all', 'pending', 'approved', 'spam'].forEach(s => {
+                const btn = document.getElementById(`filter-${s}`);
+                if (btn) {
+                    btn.className = s === status ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+                }
+            });
+            loadAdminComments(1, status);
+        }
+
+        function toggleCommentSelect(id) {
+            if (selectedComments.has(id)) {
+                selectedComments.delete(id);
+            } else {
+                selectedComments.add(id);
+            }
+            updateBatchButtons();
+        }
+
+        function toggleSelectAll() {
+            const checkboxes = document.querySelectorAll('.comment-checkbox');
+            const selectAll = document.getElementById('selectAllComments').checked;
+
+            checkboxes.forEach(cb => {
+                const id = parseInt(cb.dataset.id);
+                if (selectAll) {
+                    selectedComments.add(id);
+                    cb.checked = true;
+                } else {
+                    selectedComments.delete(id);
+                    cb.checked = false;
+                }
+            });
+            updateBatchButtons();
+        }
+
+        function updateBatchButtons() {
+            const hasSelection = selectedComments.size > 0;
+            document.getElementById('btn-batch-approve').disabled = !hasSelection;
+            document.getElementById('btn-batch-spam').disabled = !hasSelection;
+            document.getElementById('btn-batch-delete').disabled = !hasSelection;
+        }
+
+        async function batchAction(action) {
+            if (selectedComments.size === 0) return;
+
+            const actionText = { approve: '通过', spam: '标记为垃圾', delete: '删除' }[action];
+            const warning = action === 'delete' ? '<br><strong style="color:#dc2626;">删除后无法恢复！</strong>' : '';
+            if (!await showConfirm('批量操作', `确定要批量${actionText} <strong>${selectedComments.size}</strong> 条评论吗？${warning}`)) return;
+
+            try {
+                const response = await fetch('/api/admin/comments/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ids: Array.from(selectedComments) })
+                });
+
+                if (response.ok) {
+                    showToast('操作成功', 'success');
+                    loadCommentStats();
+                    loadAdminComments(currentCommentPage);
+                } else {
+                    showToast('操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('网络错误', 'error');
+            }
+        }
+
+        async function updateCommentStatus(id, status) {
+            try {
+                const response = await fetch(`/api/admin/comments/${id}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+
+                if (response.ok) {
+                    showToast('状态已更新', 'success');
+                    loadCommentStats();
+                    loadAdminComments(currentCommentPage);
+                } else {
+                    showToast('操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('网络错误', 'error');
+            }
+        }
+
+        async function deleteAdminComment(id) {
+            if (!await showConfirm('删除评论', '确定要删除这条评论吗？<br><strong style="color:#dc2626;">此操作无法撤销！</strong>')) return;
+
+            try {
+                const response = await fetch(`/api/comments/${id}`, { method: 'DELETE' });
+
+                if (response.ok) {
+                    showToast('评论已删除', 'success');
+                    loadCommentStats();
+                    loadAdminComments(currentCommentPage);
+                } else {
+                    showToast('删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('网络错误', 'error');
             }
         }
     </script>

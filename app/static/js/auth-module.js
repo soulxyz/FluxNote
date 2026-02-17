@@ -9,6 +9,22 @@ class AuthModule {
         this.modal = null;
         this.isInitialized = false;
         this.onLoginSuccess = null;
+        this.canRegister = true; // 默认允许注册，后续会从API获取
+    }
+
+    /**
+     * 检查是否允许注册
+     */
+    async checkRegisterStatus() {
+        try {
+            const response = await fetch('/api/auth/can-register');
+            const data = await response.json();
+            this.canRegister = data.can_register;
+            return this.canRegister;
+        } catch (e) {
+            console.error('Failed to check register status:', e);
+            return false;
+        }
     }
 
     /**
@@ -108,16 +124,34 @@ class AuthModule {
      * 打开登录/注册模态框
      * @param {boolean} isLogin - true 为登录，false 为注册
      */
-    openModal(isLogin = true) {
+    async openModal(isLogin = true) {
         if (!this.isInitialized) this.init();
+
+        // 检查注册状态
+        await this.checkRegisterStatus();
+
+        // 如果不允许注册且尝试打开注册模式，强制切换到登录模式
+        if (!isLogin && !this.canRegister) {
+            isLogin = true;
+            this.showToast('系统已注册，请登录');
+        }
 
         this.modal.style.display = 'block';
         this.modal.dataset.mode = isLogin ? 'login' : 'register';
 
         document.getElementById('authModalTitle').textContent = isLogin ? '登录' : '注册';
         document.getElementById('authSubmitBtn').textContent = isLogin ? '登录' : '注册';
-        document.getElementById('authSwitchText').textContent = isLogin ? '没有账号？' : '已有账号？';
-        document.getElementById('authSwitchBtn').textContent = isLogin ? '去注册' : '去登录';
+
+        // 根据是否允许注册显示/隐藏注册切换
+        const switchContainer = this.modal.querySelector('.auth-switch');
+        if (switchContainer) {
+            switchContainer.style.display = this.canRegister ? 'block' : 'none';
+        }
+
+        if (this.canRegister) {
+            document.getElementById('authSwitchText').textContent = isLogin ? '没有账号？' : '已有账号？';
+            document.getElementById('authSwitchBtn').textContent = isLogin ? '去注册' : '去登录';
+        }
 
         document.getElementById('authUsername').focus();
     }
@@ -162,6 +196,15 @@ class AuthModule {
         if (!username || !password) {
             this.showToast('请输入用户名和密码');
             return;
+        }
+
+        // 如果是注册模式，再次检查是否允许注册
+        if (mode === 'register') {
+            await this.checkRegisterStatus();
+            if (!this.canRegister) {
+                this.showToast('系统已注册，不允许新用户注册');
+                return;
+            }
         }
 
         const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';

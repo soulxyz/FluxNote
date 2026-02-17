@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_login import login_required
 from app.services.ai_service import AIService
+from app.utils.error_handler import safe_error
 import uuid
 
 ai_bp = Blueprint('ai', __name__)
@@ -141,7 +142,7 @@ def chat():
         response = AIService.chat_completion(messages)
         return jsonify({'response': response})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, 'AI对话失败')), 500
 
 @ai_bp.route('/ai/tags', methods=['POST'])
 @login_required
@@ -153,7 +154,7 @@ def generate_tags():
         tags = AIService.generate_tags(content)
         return jsonify({'tags': tags})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '生成标签失败')), 500
 
 @ai_bp.route('/ai/summary', methods=['POST'])
 @login_required
@@ -165,7 +166,7 @@ def generate_summary():
         summary = AIService.generate_summary(content)
         return jsonify({'summary': summary})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '生成摘要失败')), 500
 
 @ai_bp.route('/ai/polish', methods=['POST'])
 @login_required
@@ -177,7 +178,7 @@ def polish_text():
         polished = AIService.polish_text(content)
         return jsonify({'polished': polished})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '润色文本失败')), 500
 
 @ai_bp.route('/ai/custom_prompts', methods=['GET'])
 @login_required

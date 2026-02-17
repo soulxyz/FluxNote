@@ -5,8 +5,22 @@ from app.models import User
 
 auth_bp = Blueprint('auth', __name__)
 
+@auth_bp.route('/can-register', methods=['GET'])
+def can_register():
+    """检查是否允许注册（系统中无用户时才允许）"""
+    user_count = User.query.count()
+    return jsonify({
+        'can_register': user_count == 0,
+        'user_count': user_count
+    })
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
+    # 检查是否已有用户存在
+    user_count = User.query.count()
+    if user_count > 0:
+        return jsonify({'error': '系统已注册，不允许新用户注册'}), 403
+
     data = request.json
     username = data.get('username')
     password = data.get('password')

@@ -1,0 +1,62 @@
+<!-- Comment Widget -->
+<div id="comments-section" class="comments-section">
+    <div class="comments-header">
+        <i class="fas fa-comments"></i> 评论 (<span id="comment-count">0</span>)
+    </div>
+
+    <!-- Comment Form -->
+    <div class="comment-form-container" id="comment-form-wrapper">
+        <div id="reply-preview" class="comment-reply-preview" style="display: none;">
+            <span>回复 <b id="reply-to-user"></b></span>
+            <button class="btn-text" onclick="cancelReply()"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <form id="comment-form" onsubmit="submitComment(event)">
+            <input type="hidden" id="comment-post-id" value="{{ note.id }}">
+            <input type="hidden" id="comment-parent-id" value="">
+            
+            {% if current_user.is_authenticated %}
+            <div class="comment-user-info">
+                以 <b>{{ current_user.username }}</b> 身份发表评论
+            </div>
+            {% else %}
+            <div class="comment-form-row">
+                <div class="comment-form-group">
+                    <input type="text" id="comment-author" class="comment-form-input" placeholder="昵称 *" required>
+                </div>
+                <div class="comment-form-group">
+                    <input type="email" id="comment-email" class="comment-form-input" placeholder="邮箱 (用于头像/通知) *" required>
+                </div>
+                <div class="comment-form-group">
+                    <input type="url" id="comment-website" class="comment-form-input" placeholder="网站 (http://...)">
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="comment-form-group">
+                <textarea id="comment-content" class="comment-form-textarea" placeholder="写下你的评论... (支持 Markdown)" required></textarea>
+            </div>
+
+            <div style="margin-top: 1rem; text-align: right;">
+                <button type="submit" class="comment-submit-btn" id="comment-submit-btn">发表评论</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Comment List -->
+    <div id="comments-list" class="comment-list">
+        <!-- Comments will be loaded here via JS -->
+        <div style="text-align: center; color: #888; padding: 2rem;">
+            <i class="fas fa-spinner fa-spin"></i> 加载评论中...
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/modules/comment-widget.js"></script>
+<script>
+    // SPA Compatibility: Trigger init if script is already loaded
+    if (window.initCommentWidget) {
+        window.initCommentWidget();
+    }
+</script>
+<link rel="stylesheet" href="/static/css/comments.css">

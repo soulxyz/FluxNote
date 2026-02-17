@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app.models import Config, User
 from app.extensions import db
 from app.utils.theme import get_all_themes, set_theme, get_current_theme, get_writer_theme
+from app.utils.email import send_email, render_test_email
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -11,6 +12,29 @@ settings_bp = Blueprint('settings', __name__)
 def index():
     """Render settings page"""
     return render_template('settings.html')
+
+@settings_bp.route('/api/settings/test-email', methods=['POST'])
+@login_required
+def test_email():
+    """测试邮件配置"""
+    recipient = Config.get('notify_email')
+    if not recipient:
+        return jsonify({'error': '请先保存"接收通知邮箱"配置'}), 400
+
+    site_title = Config.get('site_title', '轻笔记')
+    html_body, text_body = render_test_email(site_title)
+
+    success, msg = send_email(
+        subject=f"[{site_title}] 邮件配置测试",
+        recipient=recipient,
+        body=text_body,
+        html_body=html_body
+    )
+
+    if success:
+        return jsonify({'success': True, 'message': msg})
+    else:
+        return jsonify({'error': msg}), 500
 
 @settings_bp.route('/api/settings', methods=['GET'])
 @login_required

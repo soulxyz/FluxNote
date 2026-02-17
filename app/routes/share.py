@@ -1,17 +1,21 @@
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Note, Share, Config
+from app.models import Note, Share, ShareAttempt, Config
+from app.utils.error_handler import safe_error
 from datetime import datetime, timedelta
-import random
+import secrets
 import string
 
 share_bp = Blueprint('share', __name__)
 
 
 def generate_share_id():
-    """生成8位随机分享ID"""
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    """生成安全的随机分享ID（使用secrets模块）"""
+    # 使用secrets模块生成加密安全的随机ID
+    # 8位字符约62^8 ≈ 2^47种组合，配合安全随机足够防止枚举
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(8))
 
 
 def get_base_url():
@@ -110,11 +114,43 @@ def verify_share(share_id):
     if share.is_expired():
         return jsonify({'error': '分享链接已过期', 'expired': True}), 410
 
+    # 获取客户端IP
+    ip_address = request.remote_addr
+    if request.headers.get('X-Forwarded-For'):
+        # 代理情况下获取真实IP
+        ip_address = request.headers.get('X-Forwarded-For').split(',')[0].strip()
+
+    # 检查IP是否被锁定
+    attempt_record = ShareAttempt.get_or_create(share_id, ip_address)
+    if attempt_record.is_locked():
+        remaining = attempt_record.get_remaining_lock_minutes()
+        return jsonify({
+            'error': f'密码错误次数过多，请 {remaining} 分钟后再试',
+            'locked': True,
+            'remaining_minutes': remaining
+        }), 429
+
     # 验证密码
     if share.password:
         password = request.json.get('password', '')
         if not share.check_password(password):
-            return jsonify({'error': '密码错误'}), 403
+            # 记录失败尝试（基于IP）
+            attempt_record.record_failed_attempt()
+
+            remaining_attempts = attempt_record.get_remaining_attempts()
+            if remaining_attempts > 0:
+                return jsonify({
+                    'error': f'密码错误，还剩 {remaining_attempts} 次尝试机会',
+                    'remaining_attempts': remaining_attempts
+                }), 403
+            else:
+                return jsonify({
+                    'error': '密码错误次数过多，已被锁定30分钟',
+                    'locked': True
+                }), 429
+
+        # 密码正确，重置该IP的失败计数
+        attempt_record.reset()
 
     # 增加访问计数
     share.view_count += 1

@@ -10,13 +10,28 @@ const authSwitchText = document.getElementById('authSwitchText');
 const authSwitchBtn = document.getElementById('authSwitchBtn');
 const authUsernameInput = document.getElementById('authUsername');
 const authPasswordInput = document.getElementById('authPassword');
+const authSwitchContainer = document.querySelector('.auth-switch');
+
+// 状态：是否允许注册
+let canRegister = true;
 
 export const auth = {
     async checkStatus(callbacks = {}) {
         try {
-            const response = await api.auth.status();
-            if (!response) return;
-            const data = await response.json();
+            // 同时检查登录状态和注册状态
+            const [statusResp, registerResp] = await Promise.all([
+                api.auth.status(),
+                fetch('/api/auth/can-register')
+            ]);
+
+            if (!statusResp) return;
+            const data = await statusResp.json();
+
+            // 更新注册状态
+            if (registerResp && registerResp.ok) {
+                const registerData = await registerResp.json();
+                canRegister = registerData.can_register;
+            }
 
             if (data.is_authenticated) {
                 state.currentUser = data.user;
@@ -78,15 +93,28 @@ export const auth = {
 
     openModal(isLogin) {
         if (authModal) {
+            // 如果不允许注册且尝试打开注册模式，强制切换到登录模式
+            if (!isLogin && !canRegister) {
+                isLogin = true;
+                showToast('系统已注册，请登录');
+            }
+
             authModal.style.display = 'block';
             authModal.dataset.mode = isLogin ? 'login' : 'register';
             if (authTitle) authTitle.textContent = isLogin ? '登录' : '注册';
             if (authSubmitBtn) authSubmitBtn.textContent = isLogin ? '登录' : '注册';
 
-            if (authSwitchText && authSwitchBtn) {
+            // 根据是否允许注册显示/隐藏注册切换区域
+            if (authSwitchContainer) {
+                authSwitchContainer.style.display = canRegister ? 'block' : 'none';
+            }
+
+            if (canRegister && authSwitchText && authSwitchBtn) {
                 authSwitchText.textContent = isLogin ? '没有账号？' : '已有账号？';
                 authSwitchBtn.textContent = isLogin ? '去注册' : '去登录';
             }
+
+            if (authUsernameInput) authUsernameInput.focus();
         }
     },
 
@@ -204,6 +232,12 @@ export const auth = {
             return;
         }
 
+        // 如果是注册模式，再次检查是否允许注册
+        if (mode === 'register' && !canRegister) {
+            showToast('系统已注册，不允许新用户注册');
+            return;
+        }
+
         const action = mode === 'login' ? api.auth.login : api.auth.register;
         const response = await action(username, password);
 
@@ -215,6 +249,10 @@ export const auth = {
                 await this.checkStatus({ onLogin: onSuccess });
             } else {
                 showToast(data.error || '操作失败');
+                // 如果是注册失败（可能因为系统已有用户），更新 canRegister 状态
+                if (mode === 'register' && response.status === 403) {
+                    canRegister = false;
+                }
             }
         }
     },
@@ -280,6 +318,11 @@ export function initAuthEvents(onLoginSuccess) {
     if (authSwitchBtn) {
         authSwitchBtn.addEventListener('click', (e) => {
             e.preventDefault();
+            // 如果不允许注册，阻止切换到注册模式
+            if (!canRegister) {
+                showToast('系统已注册，不允许新用户注册');
+                return;
+            }
             const isLogin = authModal.dataset.mode === 'login';
             auth.openModal(!isLogin);
         });

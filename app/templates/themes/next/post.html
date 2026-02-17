@@ -47,6 +47,9 @@
         {% endif %}
     </article>
 
+    <!-- Comments -->
+    {% include "components/comment_widget.html" %}
+
     <nav class="next-article-nav">
         <a href="{{ url_for('blog.index') }}">
             <i class="fas fa-angle-left"></i> 返回首页

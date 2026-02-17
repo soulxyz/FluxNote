@@ -374,6 +374,17 @@
                     authModal.dataset.mode = 'login';
                     document.getElementById('authModalTitle').textContent = '登录';
                     document.getElementById('authSubmitBtn').textContent = '登录';
+
+                    // 检查是否允许注册，隐藏注册切换
+                    fetch('/api/auth/can-register')
+                        .then(r => r.json())
+                        .then(data => {
+                            const switchContainer = document.querySelector('.auth-switch');
+                            if (switchContainer && !data.can_register) {
+                                switchContainer.style.display = 'none';
+                            }
+                        });
+
                     document.getElementById('authUsername').focus();
                 }
             }, 300);

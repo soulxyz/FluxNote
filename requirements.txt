@@ -7,3 +7,5 @@ waitress==2.1.2
 openai
 webauthn
 Flask-Migrate
+markdown
+bleach

@@ -4,6 +4,7 @@ from sqlalchemy import func
 from app.extensions import db
 from app.models import Note, User, Tag, NoteReference, NoteVersion
 from app.utils import allowed_file, extract_title_and_links
+from app.utils.error_handler import safe_error
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
@@ -59,11 +60,11 @@ def daily_review():
             Note.user_id == current_user.id,
             Note.is_deleted == False
         ).order_by(func.random()).limit(5)
-        
+
         notes = query.all()
         return jsonify([note.to_dict() for note in notes])
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取回顾笔记失败')), 500
 
 @notes_bp.route('/notes', methods=['GET'])
 def get_notes():
@@ -104,7 +105,7 @@ def get_notes():
             'has_next': pagination.has_next
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取笔记列表失败')), 500
 
 @notes_bp.route('/notes/titles', methods=['GET'])
 def get_note_titles():
@@ -119,7 +120,7 @@ def get_note_titles():
         notes = query.with_entities(Note.id, Note.title).all()
         return jsonify([{'id': n.id, 'title': n.title} for n in notes])
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取笔记标题失败')), 500
 
 @notes_bp.route('/notes/<note_id>/backlinks', methods=['GET'])
 def get_backlinks(note_id):
@@ -149,7 +150,7 @@ def get_backlinks(note_id):
 
         return jsonify(backlinks)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取反向链接失败')), 500
 
 @notes_bp.route('/upload', methods=['POST'])
 @login_required
@@ -205,7 +206,7 @@ def create_note():
         return jsonify(new_note.to_dict()), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '创建笔记失败')), 500
 
 @notes_bp.route('/notes/<note_id>', methods=['GET'])
 @login_required
@@ -224,7 +225,7 @@ def get_note(note_id):
 
         return jsonify(note.to_dict())
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取笔记失败')), 500
 
 @notes_bp.route('/notes/<note_id>', methods=['PUT'])
 @login_required
@@ -276,7 +277,7 @@ def update_note(note_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '更新笔记失败')), 500
 
 @notes_bp.route('/notes/<note_id>/versions', methods=['GET'])
 @login_required
@@ -292,7 +293,7 @@ def get_note_versions(note_id):
         versions = [v.to_dict() for v in note.versions]
         return jsonify(versions)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取历史版本失败')), 500
 
 @notes_bp.route('/notes/<note_id>/versions/<int:version_id>/restore', methods=['POST'])
 @login_required
@@ -329,7 +330,7 @@ def restore_note_version(note_id, version_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '恢复版本失败')), 500
 
 @notes_bp.route('/notes/<note_id>', methods=['DELETE'])
 @login_required
@@ -347,7 +348,7 @@ def delete_note(note_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '删除笔记失败')), 500
 
 @notes_bp.route('/notes/<note_id>/restore', methods=['POST'])
 @login_required
@@ -367,7 +368,7 @@ def restore_note(note_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '恢复笔记失败')), 500
 
 @notes_bp.route('/notes/<note_id>/permanent', methods=['DELETE'])
 @login_required
@@ -383,7 +384,7 @@ def permanent_delete_note(note_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '永久删除笔记失败')), 500
 
 @notes_bp.route('/notes/trash', methods=['GET'])
 @login_required
@@ -407,7 +408,7 @@ def get_trash_notes():
             'has_next': pagination.has_next
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取回收站笔记失败')), 500
 
 @notes_bp.route('/notes/search', methods=['GET'])
 def search_notes():
@@ -497,7 +498,7 @@ def search_notes():
             })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '搜索笔记失败')), 500
 
 @notes_bp.route('/tags', methods=['GET'])
 def get_tags():
@@ -513,7 +514,7 @@ def get_tags():
         tags = [r[0] for r in query.distinct().order_by(Tag.name).all()]
         return jsonify(tags)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '获取标签失败')), 500
 
 @notes_bp.route('/notes/history/clear_all', methods=['POST'])
 @login_required
@@ -527,4 +528,4 @@ def clear_all_history():
         return jsonify({'success': True, 'count': num_deleted})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify(safe_error(e, '清除历史版本失败')), 500

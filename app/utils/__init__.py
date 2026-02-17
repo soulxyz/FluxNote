@@ -1,8 +1,48 @@
 # Utils package
 import re
 import markdown
+import bleach
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+# BLEACH 配置：允许的标签和属性
+ALLOWED_TAGS = [
+    'p', 'br', 'hr',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'strong', 'b', 'em', 'i', 'u', 's', 'del', 'ins',
+    'ul', 'ol', 'li',
+    'blockquote', 'pre', 'code',
+    'a', 'img',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'div', 'span',
+    'sup', 'sub',
+]
+
+ALLOWED_ATTRIBUTES = {
+    '*': ['class', 'id'],
+    'a': ['href', 'title', 'target', 'rel'],
+    'img': ['src', 'alt', 'title', 'width', 'height'],
+    'td': ['align'],
+    'th': ['align'],
+    'ol': ['start'],
+    'code': ['class'],
+    'pre': ['class'],
+    'div': ['class'],
+    'span': ['class'],
+}
+
+ALLOWED_PROTOCOLS = ['http', 'https', 'mailto', 'ftp']
+
+
+def sanitize_html(html_content):
+    """清洗HTML内容，防止XSS攻击"""
+    return bleach.clean(
+        html_content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        protocols=ALLOWED_PROTOCOLS,
+        strip=False
+    )
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -60,6 +100,7 @@ def render_markdown(content, max_length=None):
     """
     渲染Markdown内容为HTML
     用于服务端渲染博客内容
+    已添加XSS防护
     """
     if not content:
         return ''
@@ -79,6 +120,8 @@ def render_markdown(content, max_length=None):
     # 使用markdown库渲染
     try:
         html = markdown.markdown(text, extensions=['fenced_code', 'tables', 'toc'])
+        # XSS清洗
+        html = sanitize_html(html)
     except:
         # 如果markdown库不可用，简单处理
         html = text.replace('\n', '<br>')

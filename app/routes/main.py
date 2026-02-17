@@ -29,7 +29,7 @@ def share_page(share_id):
     share = db.session.get(Share, share_id)
 
     # 获取站点信息
-    site_title = Config.get('site_title', '轻笔记')
+    site_title = Config.get('site_title', '流光笔记')
     site_desc = Config.get('site_desc', '记录思维的碎片')
 
     if not share:

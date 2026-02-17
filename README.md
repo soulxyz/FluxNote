@@ -1,70 +1,105 @@
-# 轻笔记 (Light Note Blog) - 个人知识库 & 灵感捕捉
+<div align="center">
+  <h1>FluxNote 流光笔记</h1>
+  <p>
+    <strong>捕捉灵感 · 连接思维</strong>
+  </p>
+  <p>
+    一款极简、私有化部署的个人知识库，融合了卡片笔记与现代 AI 能力。可以兼顾笔记和博客两个身份。
+  </p>
 
-一个受 Flomo 启发的轻量级、智能化的个人笔记应用。旨在提供极致的“零摩擦”记录体验，并结合 AI 技术辅助知识整理。
+  <p>
+    <a href="#-功能特性">功能特性</a> •
+    <a href="#-快速开始">快速开始</a> •
+    <a href="#-技术栈">技术栈</a> •
+    <a href="#-项目结构">项目结构</a>
+  </p>
 
-## 🌟 核心功能
+  <p>
+    <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python Version">
+    <img src="https://img.shields.io/badge/framework-Flask-green.svg" alt="Flask">
+    <img src="https://img.shields.io/badge/database-SQLite-lightgrey.svg" alt="SQLite">
+    <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
+  </p>
+</div>
 
-- 🚀 **快速捕捉**：极简的输入界面，支持快捷标签和图片粘贴。
-- 🧠 **双向链接**：支持 `[[Wiki链接]]` 语法，自动生成反向链接 (Backlinks)，构建个人知识网络。
-- 🤖 **AI 助手**：集成流式 AI 接口，支持自动生成标签、内容摘要、文本润色及自定义 Prompt。
-- 🔐 **生物识别登录**：支持 WebAuthn 登录，完美支持Windows Hello，兼顾安全与便捷。
-- 📜 **版本控制**：记录笔记的每一次修改，支持随时回滚历史版本。
-- 📊 **可视化统计**：支持贡献热力图 (Heatmap) 和全站数据概览。
-- 📱 **全平台适配**：响应式设计，完美适配 PC、平板和手机浏览器。
+---
 
-## 🛠️ 技术栈
+## 📖 简介
 
-- **后端**: Python (Flask) + SQLAlchemy
-- **数据库**: SQLite (支持通过 Alembic 进行数据库迁移)
-- **前端**: 原生 JavaScript (模块化设计) + CSS3 (变量化主题)
-- **外部依赖**: OpenAI API (或兼容接口), WebAuthn, Marked.js (Markdown渲染), Mermaid.js (图表)
+**FluxNote** (流光笔记) 它不像传统笔记软件那样厚重，而是专注于**极速捕捉**与**知识连接**。
+
+> *“笔记不仅仅是存储，而是思维的流淌。”*
+
+## ✨ 功能特性
+
+| 功能模块 | 描述 |
+| :--- | :--- |
+| ⚡ **零摩擦捕捉** | 极简输入框，支持 Markdown、图片粘贴、快捷标签，让记录像发推特一样简单。 |
+| 🔗 **双向链接** | 使用 `[[WikiLinks]]` 语法连接笔记，自动生成反向链接与知识图谱。 |
+| 🤖 **AI 深度集成** | 内置流式 AI 接口，支持自动打标、摘要生成、文本润色及自定义 Prompt。 |
+| 🔐 **无密码登录** | 原生支持 WebAuthn (Windows Hello, TouchID, FaceID)，安全且便捷。 |
+| 📊 **数据可视化** | 提供 GitHub 风格的贡献热力图与全站数据统计，直观展示学习轨迹。 |
+| 📜 **版本回溯** | 记录每一次思维的迭代，支持颗粒度极细的历史版本回滚。 |
+| 📱 **全端适配** | 响应式设计 (Responsive Design)，在桌面、平板与移动端均有完美体验。 |
 
 ## 🚀 快速开始
 
-### 1. 环境准备
-确保已安装 Python 3.8+。
+### 环境要求
 
-### 2. 安装依赖
-```bash
-pip install -r requirements.txt
+- Python 3.8+
+- Git
+
+### 安装步骤
+
+1. **克隆项目**
+   ```bash
+   git clone https://github.com/yourusername/fluxnote.git
+   cd fluxnote
+   ```
+
+2. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+
+3. **启动应用**
+   ```bash
+   # 开发模式
+   python run.py
+
+   # 生产模式
+   python server.py
+   ```
+
+   访问 `http://localhost:5001` 即可开启你的知识之旅。
+
+## 🛠 技术栈
+
+FluxNote 坚持 **KISS (Keep It Simple, Stupid)** 原则，保持架构的轻量与可维护性。
+
+- **Backend**: Python (Flask) + SQLAlchemy
+- **Database**: SQLite (无需额外部署数据库服务)
+- **Frontend**: Vanilla JS (ES6+) + CSS Variables (无繁重构建流程)
+- **Security**: WebAuthn + Flask-Login
+- **AI**: OpenAI API 标准接口兼容
+
+## 📂 项目结构
+
+```text
+FluxNote/
+├── app/
+│   ├── routes/           # 业务路由 (Auth, Notes, AI, Stats)
+│   ├── services/         # 核心服务 (AI Service)
+│   ├── models.py         # 数据模型定义
+│   ├── static/           # 静态资源 (CSS, JS)
+│   └── templates/        # Jinja2 模板
+├── data/                 # SQLite 数据库存储
+├── uploads/              # 用户上传资源
+├── run.py                # 开发启动入口
+└── server.py             # 生产启动入口 (Waitress)
 ```
 
-### 3. 配置环境
-创建 `.env` 文件并配置以下内容（可选）：
-```
-SECRET_KEY=你的密钥
-PORT=5001
-```
+## 📄 许可证
 
-### 4. 运行应用
-- **开发模式**:
-```bash
-python run.py
-```
-- **生产模式**:
-```bash
-python server.py
-```
-
-访问 `http://localhost:5001` 即可开始使用。
-
-## 📁 项目结构
-
-```
-轻笔记博客/
-├── app/                  # 应用核心代码
-│   ├── routes/           # 路由 (Auth, Notes, AI, Stats等)
-│   ├── services/         # 业务逻辑 (AI Service)
-│   ├── models.py         # 数据库模型
-│   ├── static/           # 静态资源 (CSS, JS Modules)
-│   └── templates/        # HTML 模板
-├── data/                 # 数据库文件 (notes.db)
-├── migrations/           # 数据库迁移脚本
-├── uploads/              # 用户上传的图片
-├── run.py                # 开发环境启动脚本
-└── server.py             # 生产环境启动脚本 (Waitress)
-```
-
-## 📝 许可证
-
-MIT License
+本项目基于 [MIT License](LICENSE) 开源。

@@ -38,9 +38,9 @@ def get_heatmap_data():
 def get_site_config(theme_override=None):
     """获取站点配置"""
     return {
-        'site_title': Config.get('site_title', '轻笔记'),
+        'site_title': Config.get('site_title', '流光笔记'),
         'site_desc': Config.get('site_desc', '记录思维的碎片'),
-        'blog_footer': Config.get('blog_footer', '由 <a href="/">轻笔记</a> 提供支持'),
+        'blog_footer': Config.get('blog_footer', '由 <a href="/">流光笔记</a> 提供支持'),
         'theme': theme_override or get_current_theme(),
         'writer_theme_id': get_writer_theme(),
         'theme_css': get_theme_css_url(theme_override)

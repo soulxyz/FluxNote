@@ -31,7 +31,7 @@ def get_webauthn_config():
     origin = current_app.config.get('WEBAUTHN_ORIGIN') or f"{request.scheme}://{request.host}"
     return rp_id, origin
 
-RP_NAME = "轻笔记博客"
+RP_NAME = "流光笔记 FluxNote"
 
 @webauthn_bp.route('/webauthn/register/begin', methods=['POST'])
 @login_required

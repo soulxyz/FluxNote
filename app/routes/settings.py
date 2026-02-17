@@ -25,7 +25,7 @@ def test_email():
     if not recipient:
         return api_response(code=400, message='请先保存"接收通知邮箱"配置')
 
-    site_title = Config.get('site_title', '轻笔记')
+    site_title = Config.get('site_title', '流光笔记')
     html_body, text_body = render_test_email(site_title)
 
     success, msg = send_email(
@@ -221,8 +221,7 @@ def get_theme_market():
             'version': '1.0.0',
             'downloadCount': 0,
             'rating': 0,
-            'isOfficial': theme_info.get('author') == '轻笔记',
-            'isActive': True,
+                            'isOfficial': theme_info.get('author') == '流光笔记',            'isActive': True,
             'is_current': theme_id == current,
             'is_installed': True,
             'createdAt': '',
@@ -268,8 +267,7 @@ def get_installed_themes():
             'version': '1.0.0',
             'downloadCount': 0,
             'rating': 0,
-            'isOfficial': theme_info.get('author') == '轻笔记',
-            'isActive': True,
+                            'isOfficial': theme_info.get('author') == '流光笔记',            'isActive': True,
             'is_current': theme_id == current or theme_id == writer_current,
             'is_installed': True,
             'createdAt': '',

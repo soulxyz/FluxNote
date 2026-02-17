@@ -32,7 +32,7 @@ def get_email_base_style():
     </style>
     """
 
-def render_new_comment_email(note_title, author_name, content, status, post_url, site_title="轻笔记"):
+def render_new_comment_email(note_title, author_name, content, status, post_url, site_title="流光笔记"):
     """渲染新评论通知邮件"""
     status_class = "status-pending" if status == "pending" else "status-approved"
     status_text = "待审核" if status == "pending" else "已通过"
@@ -92,7 +92,7 @@ def render_new_comment_email(note_title, author_name, content, status, post_url,
 """
     return html, text
 
-def render_reply_email(note_title, author_name, content, post_url, site_title="轻笔记"):
+def render_reply_email(note_title, author_name, content, post_url, site_title="流光笔记"):
     """渲染回复通知邮件"""
     html = f"""
     <!DOCTYPE html>
@@ -140,7 +140,7 @@ def render_reply_email(note_title, author_name, content, post_url, site_title="�
 """
     return html, text
 
-def render_test_email(site_title="轻笔记"):
+def render_test_email(site_title="流光笔记"):
     """渲染测试邮件"""
     html = f"""
     <!DOCTYPE html>
@@ -230,8 +230,8 @@ def send_email(subject, recipient, body, html_body=None):
     """
     # 获取发件人配置
     sender_email = Config.get('smtp_user')
-    sender_name = Config.get('smtp_sender_name', '轻笔记')  # 发件人名称
-    site_title = Config.get('site_title', '轻笔记')
+    sender_name = Config.get('smtp_sender_name', '流光笔记')  # 发件人名称
+    site_title = Config.get('site_title', '流光笔记')
 
     if not sender_email:
         return False, "SMTP user not configured"

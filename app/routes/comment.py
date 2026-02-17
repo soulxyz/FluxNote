@@ -158,7 +158,7 @@ def post_comment(post_id):
     # B. 通知被回复者：有人回复了你 (状态必须是 approved)
 
     notify_email = Config.get('notify_email')
-    site_title = Config.get('site_title', '轻笔记')
+    site_title = Config.get('site_title', '流光笔记')
     post_url = f"{request.host_url}p/{post_id}"
 
     # A. 通知博主

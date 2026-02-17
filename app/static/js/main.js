@@ -254,6 +254,7 @@ function initGlobalEvents() {
 
     if (toggleBtn) {
         toggleBtn.addEventListener('click', () => {
+            if (window.innerWidth <= 900) return; // Ignore on mobile/tablet
             sidebar.classList.add('collapsed');
             appContainer.classList.add('sidebar-closed');
             floatBtn.style.display = 'block';
@@ -263,12 +264,34 @@ function initGlobalEvents() {
     // Mobile Menu
     const mobileBtn = document.getElementById('mobileMenuBtn');
     if (mobileBtn) {
-        mobileBtn.addEventListener('click', () => sidebar.classList.toggle('mobile-open'));
+        mobileBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling to header-left
+            const isOpen = sidebar.classList.toggle('mobile-open');
+            document.body.classList.toggle('sidebar-open', isOpen);
+        });
+
+        // Close sidebar with animation
+        const closeMobileSidebar = () => {
+            sidebar.classList.add('mobile-closing');
+            sidebar.classList.remove('mobile-open');
+            // Add closing class for overlay fade out
+            document.body.classList.add('sidebar-closing');
+            document.body.classList.remove('sidebar-open');
+            // Remove closing classes after animation completes
+            setTimeout(() => {
+                sidebar.classList.remove('mobile-closing');
+                document.body.classList.remove('sidebar-closing');
+            }, 200);
+        };
+
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 900 && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !mobileBtn.contains(e.target)) {
-                sidebar.classList.remove('mobile-open');
+                closeMobileSidebar();
             }
         });
+
+        // Store close function for external use
+        window.closeMobileSidebar = closeMobileSidebar;
     }
 
     // Search

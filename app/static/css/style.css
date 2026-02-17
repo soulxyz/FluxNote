@@ -644,45 +644,8 @@ button { font-family: inherit; }
 .auth-switch a:hover { text-decoration: underline; }
 
 /* Mobile */
-@media (max-width: 900px) {
-    .mobile-menu-btn { display: inline-block; }
-    
-    .app-layout { 
-        padding-top: 0; 
-        display: flex; /* Keep flex to allow centering */
-        justify-content: center;
-    }
-    
-    .app-container {
-        display: block; /* Switch to block to stack */
-        width: 100%;
-        padding: 20px; /* Add global padding */
-    }
+/* Old 900px block removed to unify mobile/tablet styles in the main block below */
 
-    .main-stream {
-        margin: 0 auto; /* Center the stream */
-        width: 100%;
-        max-width: 600px; /* Limit width for better readability on tablets */
-    }
-
-    .sidebar {
-        display: none;
-        position: fixed;
-        top: 60px; /* Below header */
-        left: 0;
-        width: 100%;
-        height: calc(100vh - 60px);
-        background: #fff;
-        z-index: 90;
-        overflow-y: auto;
-        padding: 20px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .sidebar.mobile-open {
-        display: flex;
-        animation: slideInLeft 0.3s ease;
-    }
-}
 
 @keyframes slideInLeft {
     from { transform: translateX(-100%); opacity: 0; }
@@ -1675,3 +1638,281 @@ input:checked + .slider:before {
     .admin-comment-item { flex-direction: column; }
     .admin-comment-item .comment-checkbox { margin-bottom: 8px; }
 }
+
+/* === Mobile & Tablet Optimization (Flomo Style) === */
+@media (max-width: 900px) {
+    /* Show Hamburger Menu */
+    .mobile-menu-btn { display: inline-block; }
+
+    /* Base Layout: Soft Gray Background with Padding */
+    .app-layout { 
+        padding: 0;
+        background-color: #F6F7F9; /* Softer gray */
+    }
+    
+    .app-container { 
+        padding: 0; 
+        gap: 0; 
+        display: block;
+    }
+    
+    .main-stream { 
+        width: 100%; 
+        max-width: 100%;
+        padding: 20px 5% 90px 5%; /* Updated padding as requested */
+    }
+
+    /* Header: Clean & Minimal */
+    .main-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: rgba(246, 247, 249, 0.95); /* Match bg */
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        margin: 0 -5% 20px -5%; /* Adjusted for 5% padding */
+        padding: 10px 5%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: none; /* Cleaner without border */
+    }
+
+    /* Header Elements */
+    .header-left {
+        flex-shrink: 0;
+        color: var(--slate-800);
+    }
+    
+    .header-left #mobileMenuBtn {
+        font-size: 18px;
+        color: #333;
+        padding: 8px;
+        margin: 0;
+    }
+    
+    #currentDateDisplay { display: none; }
+
+    .header-search {
+        flex: 1;
+        margin: 0;
+    }
+    
+    .header-search #searchInput {
+        background: #EAECEF; /* Darker input bg */
+        border: none;
+        border-radius: 20px; /* Pill shape */
+        padding: 8px 12px 8px 36px;
+        color: var(--slate-800);
+        font-size: 14px;
+        height: 36px;
+    }
+    .header-search i { color: #999; left: 12px; }
+
+    /* Cards: Rounded & Detached */
+    .memo-editor, .note-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.02);
+        margin-bottom: 16px;
+        padding: 16px;
+        position: relative;
+    }
+
+    /* Editor Redesign */
+    .memo-editor {
+        padding-bottom: 12px;
+    }
+    
+    #noteContent {
+        font-size: 16px;
+        min-height: 80px;
+    }
+
+    .editor-footer {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #f0f0f0; /* Subtle separator */
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-direction: row; /* Keep row layout */
+        gap: 0;
+    }
+
+    .editor-tools {
+        gap: 12px;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .tool-btn {
+        padding: 6px;
+        color: #999;
+        font-size: 16px;
+        background: transparent;
+    }
+    .tool-btn:hover { color: var(--primary); background: transparent; }
+
+    .editor-actions {
+        width: auto;
+        margin-top: 0;
+        gap: 12px;
+    }
+
+    .public-switch {
+        margin-right: 0;
+    }
+    
+    /* Send Button as Icon */
+    .btn-send {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 50%; /* Circle */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent; /* Transparent until hover/active */
+        color: var(--primary); /* Icon color */
+        box-shadow: none;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+    .btn-send:hover, .btn-send:active {
+        background: var(--primary-light);
+    }
+    .btn-send::after { content: none; } /* Remove text label */
+    .btn-send i { font-size: 18px; margin: 0; }
+
+    /* Note Card Layout */
+    .note-header {
+        margin-bottom: 8px;
+        padding-bottom: 0;
+        border-bottom: none;
+    }
+    
+    .note-content {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #333;
+        margin-bottom: 12px;
+    }
+
+    /* Tags */
+    .note-tags {
+        margin-bottom: 12px;
+    }
+    .note-tag {
+        font-size: 12px;
+        padding: 2px 8px;
+        background: #F6F7F9;
+        border: none;
+        color: #666;
+    }
+
+    /* Action Bar (Bottom of Card) */
+    .note-actions {
+        position: static; /* Flow naturally */
+        display: flex;
+        justify-content: flex-end; /* Right aligned */
+        background: transparent;
+        padding: 8px 0 0 0;
+        border-top: 1px solid #f5f5f5;
+        margin-top: 8px;
+        gap: 16px;
+        opacity: 1; /* Always visible */
+    }
+    
+    .note-action {
+        color: #ccc;
+        font-size: 16px; /* Larger hit area */
+        padding: 8px; /* Touch target */
+    }
+    .note-action:hover { color: var(--slate-600); }
+
+    /* Mermaid */
+    .mermaid {
+        margin: 10px 0;
+        overflow-x: auto;
+    }
+    
+    /* Hide Sidebars initially */
+    .sidebar {
+        display: none; /* Hidden by default */
+        top: 0;
+        height: 100vh;
+        z-index: 1001; /* Higher than overlay */
+        width: 310px; /* Increased width */
+        max-width: 85%;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease-out; /* Fast, direct open */
+        background: white;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.08);
+        position: fixed;
+        left: 0;
+        padding: 24px; /* Added internal padding for elements */
+        padding-top: 40px; /* More top room */
+    }
+
+    .sidebar.mobile-open {
+        display: flex;
+        transform: translateX(0);
+    }
+
+    /* Closing animation state */
+    .sidebar.mobile-closing {
+        display: flex;
+        transform: translateX(-100%);
+        transition: transform 0.2s ease-in; /* Faster close */
+    }
+
+    /* Disable ALL animations inside sidebar on mobile for consistency */
+    .sidebar *,
+    .sidebar .animate-fade-in {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    /* Better Overlay for sidebar - sync with sidebar animation */
+    body.sidebar-open::after {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
+        animation: fadeInOverlay 0.25s ease-out;
+    }
+
+    /* Overlay fade out on close */
+    body.sidebar-closing::after {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
+        animation: fadeOutOverlay 0.2s ease-in forwards;
+    }
+
+    @keyframes fadeInOverlay {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes fadeOutOverlay {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    
+    /* Hide Desktop-specific toggle buttons on Mobile to prevent logic conflict */
+    .sidebar-toggle-btn,
+    .floating-menu-btn {
+        display: none !important;
+    }
+}
+
+/* Tablet block merged into main mobile block */

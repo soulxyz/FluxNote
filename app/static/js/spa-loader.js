@@ -294,17 +294,91 @@ class SPALoader {
         window.scrollTo(0, 0);
         if (currentMain) currentMain.scrollTo(0, 0);
 
-        // 执行页面内联脚本
+        // 执行页面内联脚本 (在主内容区域内)
         this.executeScripts(newMain);
 
-        // 触发自定义事件 (Delay slightly to allow module scripts to init)
+        // 执行新页面中 body 末尾的脚本（通常是 {% block scripts %} 的内容）
+        // 这些脚本不在 .main-stream 内，但需要执行
+        this.executeBodyScripts(newDoc);
+
+        // 触发自定义事件 (延迟足够时间让模块脚本执行)
         setTimeout(() => {
             window.dispatchEvent(new CustomEvent('spa-loaded', {
                 detail: { url, title: newTitle }
             }));
-        }, 10);
+        }, 50);
 
         this.updateProgress(100);
+    }
+
+    /**
+     * 执行新页面 body 末尾的脚本（处理 {% block scripts %} 的内容）
+     */
+    executeBodyScripts(newDoc) {
+        const bodyScripts = newDoc.body.querySelectorAll('script');
+        const mainContentSelectors = this.selectors.content;
+        const baseUrl = window.location.origin;
+
+        bodyScripts.forEach(script => {
+            // 检查脚本是否在主内容区域内
+            let isInMainContent = false;
+            for (const selector of mainContentSelectors) {
+                const mainContent = newDoc.querySelector(selector);
+                if (mainContent && mainContent.contains(script)) {
+                    isInMainContent = true;
+                    break;
+                }
+            }
+
+            if (!isInMainContent) {
+                try {
+                    if (script.src) {
+                        if (!document.querySelector(`script[src="${script.src}"]`)) {
+                            const newScript = document.createElement('script');
+                            newScript.src = script.src;
+                            if (script.type === 'module') newScript.type = 'module';
+                            newScript.async = false;
+                            document.body.appendChild(newScript);
+                        }
+                    } else if (script.textContent.trim()) {
+                        if (script.type === 'module') {
+                            // ES 模块脚本：需要将相对路径转换为绝对路径
+                            let scriptContent = script.textContent;
+                            scriptContent = scriptContent.replace(
+                                /from\s+['"]((?:\.\/|\.\.\/|\/)[^'"]+)['"]/g,
+                                (match, path) => {
+                                    if (path.startsWith('/')) {
+                                        return `from '${baseUrl}${path}'`;
+                                    }
+                                    try {
+                                        const absoluteUrl = new URL(path, window.location.href).href;
+                                        return `from '${absoluteUrl}'`;
+                                    } catch (e) {
+                                        return match;
+                                    }
+                                }
+                            );
+
+                            const blob = new Blob([scriptContent], { type: 'application/javascript' });
+                            const blobUrl = URL.createObjectURL(blob);
+                            const newScript = document.createElement('script');
+                            newScript.type = 'module';
+                            newScript.src = blobUrl;
+                            document.body.appendChild(newScript);
+                            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                        } else {
+                            const newScript = document.createElement('script');
+                            newScript.textContent = script.textContent;
+                            if (script.type) newScript.type = script.type;
+                            document.body.appendChild(newScript);
+                            document.body.removeChild(newScript);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Script execution error:', e);
+                }
+            }
+        });
     }
 
     updateSidebarActive(url, newDoc) {
@@ -328,6 +402,8 @@ class SPALoader {
     }
 
     executeScripts(container) {
+        const baseUrl = window.location.origin;
+
         // 1. 处理外部脚本 (External Scripts)
         const externalScripts = container.querySelectorAll('script[src]');
         externalScripts.forEach(script => {
@@ -335,8 +411,9 @@ class SPALoader {
             if (!document.querySelector(`script[src="${script.src}"]`)) {
                 const newScript = document.createElement('script');
                 newScript.src = script.src;
-                // Optional: async/defer copy
-                newScript.async = false; // Execute in order if possible
+                // Copy module attribute
+                if (script.type === 'module') newScript.type = 'module';
+                newScript.async = false;
                 document.body.appendChild(newScript);
             }
         });
@@ -344,12 +421,46 @@ class SPALoader {
         // 2. 处理内联脚本 (Inline Scripts)
         const scripts = container.querySelectorAll('script:not([src])');
         scripts.forEach(script => {
+            // 跳过非 JavaScript 脚本（如 text/markdown）
+            if (script.type && script.type !== 'module' && !script.type.includes('javascript')) {
+                return;
+            }
+
             try {
-                const newScript = document.createElement('script');
-                newScript.textContent = script.textContent;
-                if (script.type) newScript.type = script.type;
-                document.body.appendChild(newScript);
-                document.body.removeChild(newScript);
+                // 特殊处理 ES 模块脚本
+                if (script.type === 'module') {
+                    // 将相对路径转换为绝对路径
+                    let scriptContent = script.textContent;
+                    scriptContent = scriptContent.replace(
+                        /from\s+['"]((?:\.\/|\.\.\/|\/)[^'"]+)['"]/g,
+                        (match, path) => {
+                            if (path.startsWith('/')) {
+                                return `from '${baseUrl}${path}'`;
+                            }
+                            try {
+                                const absoluteUrl = new URL(path, window.location.href).href;
+                                return `from '${absoluteUrl}'`;
+                            } catch (e) {
+                                return match;
+                            }
+                        }
+                    );
+
+                    const blob = new Blob([scriptContent], { type: 'application/javascript' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    const newScript = document.createElement('script');
+                    newScript.type = 'module';
+                    newScript.src = blobUrl;
+                    document.body.appendChild(newScript);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+                } else {
+                    // 普通内联脚本
+                    const newScript = document.createElement('script');
+                    newScript.textContent = script.textContent;
+                    if (script.type) newScript.type = script.type;
+                    document.body.appendChild(newScript);
+                    document.body.removeChild(newScript);
+                }
             } catch (e) {
                 console.error('Script execution error:', e);
             }

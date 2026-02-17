@@ -43,9 +43,7 @@
         <div class="note-card" data-note-id="{{ note.id }}">
             <div class="note-header-row">
                  <div class="note-meta-left">
-                    <span class="note-date-badge" data-timestamp="{{ note.created_at.isoformat() }}">
-                        {{ note.created_at.strftime('%m-%d') }}
-                    </span>
+                    <span class="note-date-badge" data-timestamp="{{ note.created_at.isoformat() }}">{{ note.created_at.strftime('%m-%d') }}</span>
                     <span class="note-time-label">{{ note.created_at.strftime('%H:%M') }}</span>
                  </div>
                  <div class="note-actions-right">
@@ -104,9 +102,6 @@
 <script type="module">
 import { renderContent } from '/static/js/markdown-renderer.js';
 
-// 热力图数据
-const heatmapData = {{ heatmap_data | tojson }};
-
 // 渲染所有笔记内容 (SPA 特有的前端异步加载渲染)
 async function renderAllNotes() {
     const notes = document.querySelectorAll('.note-card[data-note-id]');
@@ -116,23 +111,38 @@ async function renderAllNotes() {
         const targetContainer = document.getElementById(`note-render-${id}`);
         const overlay = document.getElementById(`overlay-${id}`);
 
-        if (!rawContainer || !targetContainer) continue;
+        // 检查所有必需元素是否存在
+        if (!rawContainer || !targetContainer || !overlay) continue;
+
+        // 检查元素是否仍在文档中（SPA 切换时可能已被移除）
+        if (!document.body.contains(rawContainer) || !document.body.contains(targetContainer)) {
+            continue;
+        }
 
         const wrapper = targetContainer.parentElement;
         const content = rawContainer.textContent;
 
-        await renderContent(targetContainer, content, {
-            skipFirstH1: true,
-            enableViewer: true,
-            enableMermaid: true,
-            enableHighlight: true
-        });
+        try {
+            await renderContent(targetContainer, content, {
+                skipFirstH1: true,
+                enableViewer: true,
+                enableMermaid: true,
+                enableHighlight: true
+            });
 
-        if (targetContainer.scrollHeight > 400) {
-            wrapper.classList.add('collapsed');
-            overlay.style.display = 'flex';
-        } else {
-            overlay.style.display = 'none';
+            // 再次检查元素是否仍在文档中（渲染后可能已被切换）
+            if (!document.body.contains(targetContainer) || !document.body.contains(overlay)) {
+                continue;
+            }
+
+            if (targetContainer.scrollHeight > 400) {
+                wrapper.classList.add('collapsed');
+                overlay.style.display = 'flex';
+            } else {
+                overlay.style.display = 'none';
+            }
+        } catch (e) {
+            console.error(`Failed to render note ${id}:`, e);
         }
     }
 }
@@ -157,69 +167,9 @@ window.toggleNote = function(id) {
     }
 }
 
-// 生成热力图 (SPA 特有组件逻辑)
-function generateHeatmap() {
-    const grid = document.getElementById('heatmapGrid');
-    const tooltip = document.getElementById('customTooltip');
-    if (!grid) return;
-
-    grid.innerHTML = '';
-    const today = new Date();
-    const weeks = 12;
-
-    for (let w = weeks - 1; w >= 0; w--) {
-        for (let d = 0; d < 7; d++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - (w * 7 + (6 - d)));
-            const dateStr = date.toISOString().split('T')[0];
-            const count = heatmapData[dateStr] || 0;
-
-            const cell = document.createElement('div');
-            cell.className = 'heatmap-cell';
-            cell.dataset.date = dateStr;
-
-            let level = 0;
-            if (count > 0) level = 1;
-            if (count >= 2) level = 2;
-            if (count >= 4) level = 3;
-            if (count >= 6) level = 4;
-
-            cell.setAttribute('data-level', level);
-
-            cell.addEventListener('click', () => {
-                window.themeSDK.navigate(`{{ url_for('blog.index') }}?date=${dateStr}`);
-            });
-
-            cell.addEventListener('mouseenter', (e) => {
-                if (tooltip) {
-                    tooltip.innerHTML = `<b>${dateStr}</b><br>${count} 篇笔记`;
-                    tooltip.style.opacity = '1';
-
-                    const rect = cell.getBoundingClientRect();
-                    tooltip.style.left = `${rect.left + (rect.width / 2)}px`;
-                    tooltip.style.top = `${rect.top}px`;
-                }
-            });
-
-            cell.addEventListener('mouseleave', () => {
-                if (tooltip) tooltip.style.opacity = '0';
-            });
-
-            grid.appendChild(cell);
-        }
-    }
-
-    const currentDate = "{{ current_date }}";
-    if (currentDate) {
-        const activeCell = document.querySelector(`.heatmap-cell[data-date="${currentDate}"]`);
-        if (activeCell) activeCell.classList.add('active-filter');
-    }
-}
-
 // 页面初始化
 function initPage() {
     renderAllNotes();
-    generateHeatmap();
 }
 
 // 监听 SDK 触发的页面就绪事件

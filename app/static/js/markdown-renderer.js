@@ -130,17 +130,20 @@ export async function renderContent(container, content, options = {}) {
 export async function renderMermaidBlocks(container) {
     // 增强选择器：支持 language-mermaid, language-mindmap 以及直接的 mermaid, mindmap 类名
     const blocks = container.querySelectorAll([
-        'pre code.language-mermaid', 
+        'pre code.language-mermaid',
         'pre code.mermaid',
         'pre code.language-mindmap',
         'pre code.mindmap'
     ].join(','));
-    
+
     if (blocks.length === 0) return;
 
     const nodesToRender = [];
 
     blocks.forEach(block => {
+        // 检查元素是否仍在文档中
+        if (!document.body.contains(block)) return;
+
         const isMindmap = block.classList.contains('language-mindmap');
 
         // 关键：解码 HTML 实体（修复 DOMPurify 转义问题）
@@ -152,22 +155,31 @@ export async function renderMermaidBlocks(container) {
         }
 
         const pre = block.parentElement;
+        if (!pre || !pre.parentNode || !document.body.contains(pre)) return;
+
         const div = document.createElement('div');
         div.className = 'mermaid';
         div.textContent = rawCode;
         div.style.textAlign = 'center';
 
-        if (pre && pre.parentNode) {
-            pre.parentNode.replaceChild(div, pre);
-            nodesToRender.push(div);
-        }
+        pre.parentNode.replaceChild(div, pre);
+        nodesToRender.push(div);
     });
 
     if (nodesToRender.length > 0) {
         try {
-            await mermaid.run({ nodes: nodesToRender });
+            // 过滤掉已不在文档中的节点
+            const validNodes = nodesToRender.filter(node => document.body.contains(node));
+            if (validNodes.length > 0) {
+                await mermaid.run({ nodes: validNodes });
+            }
         } catch (e) {
-            console.error('Mermaid rendering failed:', e);
+            // 忽略因 DOM 元素被移除导致的错误
+            if (e.message && e.message.includes('getBoundingClientRect')) {
+                console.warn('[Mermaid] Element removed during rendering, skipping');
+            } else {
+                console.error('Mermaid rendering failed:', e);
+            }
         }
     }
 }

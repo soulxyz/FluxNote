@@ -33,9 +33,7 @@
         <div class="note-card" data-note-id="{{ note.id }}">
             <div class="note-header-row">
                  <div class="note-meta-left">
-                    <span class="note-date-badge" data-timestamp="{{ note.created_at.isoformat() }}">
-                        {{ note.created_at.strftime('%m-%d') }}
-                    </span>
+                    <span class="note-date-badge" data-timestamp="{{ note.created_at.isoformat() }}">{{ note.created_at.strftime('%m-%d') }}</span>
                     <span class="note-time-label">{{ note.created_at.strftime('%H:%M') }}</span>
                  </div>
                  <div class="note-actions-right">
@@ -96,23 +94,38 @@ async function renderAllNotes() {
         const targetContainer = document.getElementById(`note-render-${id}`);
         const overlay = document.getElementById(`overlay-${id}`);
 
-        if (!rawContainer || !targetContainer) continue;
+        // 检查所有必需元素是否存在
+        if (!rawContainer || !targetContainer || !overlay) continue;
+
+        // 检查元素是否仍在文档中（SPA 切换时可能已被移除）
+        if (!document.body.contains(rawContainer) || !document.body.contains(targetContainer)) {
+            continue;
+        }
 
         const wrapper = targetContainer.parentElement;
         const content = rawContainer.textContent;
 
-        await renderContent(targetContainer, content, {
-            skipFirstH1: true,
-            enableViewer: true,
-            enableMermaid: true,
-            enableHighlight: true
-        });
+        try {
+            await renderContent(targetContainer, content, {
+                skipFirstH1: true,
+                enableViewer: true,
+                enableMermaid: true,
+                enableHighlight: true
+            });
 
-        if (targetContainer.scrollHeight > 400) {
-            wrapper.classList.add('collapsed');
-            overlay.style.display = 'flex';
-        } else {
-            overlay.style.display = 'none';
+            // 再次检查元素是否仍在文档中
+            if (!document.body.contains(targetContainer) || !document.body.contains(overlay)) {
+                continue;
+            }
+
+            if (targetContainer.scrollHeight > 400) {
+                wrapper.classList.add('collapsed');
+                overlay.style.display = 'flex';
+            } else {
+                overlay.style.display = 'none';
+            }
+        } catch (e) {
+            console.error(`Failed to render note ${id}:`, e);
         }
     }
 }

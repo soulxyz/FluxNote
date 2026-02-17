@@ -106,6 +106,10 @@
         {{ theme_config.custom_css if theme_config.custom_css else '' }}
     </style>
     {% endif %}
+
+    <!-- 热力图数据 (全局变量供 heatmap.js 使用) -->
+    <script>window.heatmapData = {{ heatmap_data | tojson }};</script>
+    <script type="module" src="/static/js/heatmap.js"></script>
 {% endblock %}
 
 {% block scripts %}

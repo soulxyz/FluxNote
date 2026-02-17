@@ -136,12 +136,48 @@ def post(note_id):
         return render_theme_template('post.html',
             note=None,
             error='文章不存在或已被删除',
+            stats={'notes': 0, 'tags': 0, 'active_days': 0},
+            heatmap_data={},
+            popular_tags=[],
+            today=datetime.now().strftime('%Y年%m月%d日'),
             theme_override=theme_override,
             **config
         ), 404
 
+    # 统计数据
+    notes_count = Note.query.filter_by(is_public=True, is_deleted=False).count()
+    tags_count = Tag.query.count()
+    active_days = db.session.query(func.count(func.distinct(func.date(Note.created_at)))).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).scalar() or 0
+    stats = {
+        'notes': notes_count,
+        'tags': tags_count,
+        'active_days': active_days
+    }
+
+    # 热门标签
+    popular_tags = db.session.query(Tag).join(
+        Note.tags_list
+    ).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).group_by(
+        Tag.id
+    ).order_by(
+        func.count(Note.id).desc()
+    ).limit(15).all()
+
+    # 热力图数据
+    heatmap_data = get_heatmap_data()
+
     return render_theme_template('post.html',
         note=note,
+        stats=stats,
+        heatmap_data=heatmap_data,
+        popular_tags=popular_tags,
+        today=datetime.now().strftime('%Y年%m月%d日'),
         theme_override=theme_override,
         **config
     )
@@ -176,10 +212,42 @@ def archive():
         archives[year][month].append(note)
         year_notes[year] += 1
 
+    # 统计数据
+    notes_count = len(notes)
+    tags_count = Tag.query.count()
+    active_days = db.session.query(func.count(func.distinct(func.date(Note.created_at)))).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).scalar() or 0
+    stats = {
+        'notes': notes_count,
+        'tags': tags_count,
+        'active_days': active_days
+    }
+
+    # 热门标签
+    popular_tags = db.session.query(Tag).join(
+        Note.tags_list
+    ).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).group_by(
+        Tag.id
+    ).order_by(
+        func.count(Note.id).desc()
+    ).limit(15).all()
+
+    # 热力图数据
+    heatmap_data = get_heatmap_data()
+
     return render_theme_template('archive.html',
         archives=archives,
         year_notes=year_notes,
         total_notes=len(notes),
+        stats=stats,
+        heatmap_data=heatmap_data,
+        popular_tags=popular_tags,
+        today=datetime.now().strftime('%Y年%m月%d日'),
         theme_override=theme_override,
         **config
     )
@@ -208,8 +276,40 @@ def tags():
 
     tags_list = [{'name': name, 'count': count} for name, count in tag_counts]
 
+    # 统计数据
+    notes_count = Note.query.filter_by(is_public=True, is_deleted=False).count()
+    tags_count = Tag.query.count()
+    active_days = db.session.query(func.count(func.distinct(func.date(Note.created_at)))).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).scalar() or 0
+    stats = {
+        'notes': notes_count,
+        'tags': tags_count,
+        'active_days': active_days
+    }
+
+    # 热门标签
+    popular_tags = db.session.query(Tag).join(
+        Note.tags_list
+    ).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).group_by(
+        Tag.id
+    ).order_by(
+        func.count(Note.id).desc()
+    ).limit(15).all()
+
+    # 热力图数据
+    heatmap_data = get_heatmap_data()
+
     return render_theme_template('tags.html',
         tags=tags_list,
+        stats=stats,
+        heatmap_data=heatmap_data,
+        popular_tags=popular_tags,
+        today=datetime.now().strftime('%Y年%m月%d日'),
         theme_override=theme_override,
         **config
     )
@@ -226,6 +326,10 @@ def tag_notes(tag_name):
         return render_theme_template('tag_notes.html',
             tag_name=tag_name,
             notes=[],
+            stats={'notes': 0, 'tags': 0, 'active_days': 0},
+            heatmap_data={},
+            popular_tags=[],
+            today=datetime.now().strftime('%Y年%m月%d日'),
             theme_override=theme_override,
             **config
         )
@@ -239,9 +343,41 @@ def tag_notes(tag_name):
         Note.created_at.desc()
     ).all()
 
+    # 统计数据
+    notes_count = Note.query.filter_by(is_public=True, is_deleted=False).count()
+    tags_count = Tag.query.count()
+    active_days = db.session.query(func.count(func.distinct(func.date(Note.created_at)))).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).scalar() or 0
+    stats = {
+        'notes': notes_count,
+        'tags': tags_count,
+        'active_days': active_days
+    }
+
+    # 热门标签
+    popular_tags = db.session.query(Tag).join(
+        Note.tags_list
+    ).filter(
+        Note.is_public == True,
+        Note.is_deleted == False
+    ).group_by(
+        Tag.id
+    ).order_by(
+        func.count(Note.id).desc()
+    ).limit(15).all()
+
+    # 热力图数据
+    heatmap_data = get_heatmap_data()
+
     return render_theme_template('tag_notes.html',
         tag_name=tag_name,
         notes=notes,
+        stats=stats,
+        heatmap_data=heatmap_data,
+        popular_tags=popular_tags,
+        today=datetime.now().strftime('%Y年%m月%d日'),
         theme_override=theme_override,
         **config
     )

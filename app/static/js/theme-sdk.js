@@ -212,10 +212,73 @@ class ThemeSDK {
                 // 侧边栏收起/展开时，更新浮动按钮状态
                 this.updateFloatingMenuBtn();
             }
+
+            // 移动端菜单按钮: #mobileMenuBtn
+            const mobileMenuBtn = e.target.closest('#mobileMenuBtn');
+            if (mobileMenuBtn) {
+                e.preventDefault();
+                this.toggleMobileSidebar();
+            }
+
+            // 移动端侧边栏关闭按钮
+            const mobileCloseBtn = e.target.closest('#sidebarMobileClose');
+            if (mobileCloseBtn) {
+                e.preventDefault();
+                this.closeMobileSidebar();
+            }
+        });
+
+        // 点击遮罩关闭侧边栏
+        document.addEventListener('click', (e) => {
+            const sidebar = document.querySelector('#sidebar');
+            if (sidebar && sidebar.classList.contains('mobile-open')) {
+                // 检查是否点击在侧边栏外部
+                if (!sidebar.contains(e.target) && !e.target.closest('#mobileMenuBtn')) {
+                    this.closeMobileSidebar();
+                }
+            }
         });
 
         // 监听 SPA 页面切换，重置浮动按钮状态
         window.addEventListener('spa-loaded', () => this.updateFloatingMenuBtn());
+    }
+
+    /**
+     * 切换移动端侧边栏
+     */
+    toggleMobileSidebar() {
+        const sidebar = document.querySelector('#sidebar');
+        if (!sidebar) return;
+
+        const isOpen = sidebar.classList.toggle('mobile-open');
+        document.body.classList.toggle('sidebar-open', isOpen);
+
+        if (!isOpen) {
+            sidebar.classList.add('mobile-closing');
+            document.body.classList.add('sidebar-closing');
+            setTimeout(() => {
+                sidebar.classList.remove('mobile-closing');
+                document.body.classList.remove('sidebar-closing');
+            }, 200);
+        }
+    }
+
+    /**
+     * 关闭移动端侧边栏
+     */
+    closeMobileSidebar() {
+        const sidebar = document.querySelector('#sidebar');
+        if (!sidebar || !sidebar.classList.contains('mobile-open')) return;
+
+        sidebar.classList.add('mobile-closing');
+        sidebar.classList.remove('mobile-open');
+        document.body.classList.add('sidebar-closing');
+        document.body.classList.remove('sidebar-open');
+
+        setTimeout(() => {
+            sidebar.classList.remove('mobile-closing');
+            document.body.classList.remove('sidebar-closing');
+        }, 200);
     }
 
     /**

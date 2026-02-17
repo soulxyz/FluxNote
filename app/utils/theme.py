@@ -192,6 +192,21 @@ def render_theme_template(template_name, **context):
     return render_template(theme_template, **context)
 
 def get_theme_css_url(theme_override=None):
-    """获取指定主题或当前主题的主 CSS URL"""
+    """
+    获取指定主题或当前主题的主 CSS URL
+
+    优先级：
+    1. 主题自包含静态文件: /theme/{theme}/static/css/style.css
+    2. 全局静态目录: /static/css/themes/{theme}.css
+    """
     theme = theme_override or get_current_theme()
+
+    # 检查主题自包含静态文件
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    theme_static_css = os.path.join(base_dir, 'templates', 'themes', theme, 'static', 'css', 'style.css')
+
+    if os.path.isfile(theme_static_css):
+        return f"/theme/{theme}/static/css/style.css"
+
+    # 回退到全局静态目录
     return f"/static/css/themes/{theme}.css"

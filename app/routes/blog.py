@@ -1,10 +1,11 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, send_from_directory, abort
 from app.extensions import db
 from app.models import Note, Tag, Config
 from sqlalchemy import func
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from app.utils.theme import render_theme_template, get_current_theme, get_theme_css_url, get_writer_theme
+import os
 
 blog_bp = Blueprint('blog', __name__)
 
@@ -240,3 +241,35 @@ def tag_notes(tag_name):
         theme_override=theme_override,
         **config
     )
+
+
+# ===== Theme Static Files =====
+
+@blog_bp.route('/theme/<theme_name>/static/<path:filename>')
+def theme_static(theme_name, filename):
+    """
+    提供主题静态文件（CSS、JS、图片等）
+    支持主题自包含，便于分发
+    """
+    # 获取主题目录
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    theme_dir = os.path.join(base_dir, 'templates', 'themes', theme_name)
+
+    # 检查主题是否存在
+    if not os.path.isdir(theme_dir):
+        abort(404)
+
+    # 静态文件目录
+    static_dir = os.path.join(theme_dir, 'static')
+
+    # 检查静态文件是否存在
+    if not os.path.isdir(static_dir):
+        abort(404)
+
+    # 安全检查：防止目录遍历攻击
+    safe_path = os.path.normpath(os.path.join(static_dir, filename))
+    if not safe_path.startswith(static_dir):
+        abort(403)
+
+    # 发送文件
+    return send_from_directory(static_dir, filename)

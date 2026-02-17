@@ -4,7 +4,7 @@
   "author": "轻笔记",
   "preview": {
     "type": "image",
-    "value": "/static/img/themes/sujian_preview.jpg"
+    "value": "/theme/default/static/img/preview.jpg"
   },
   "primary_color": "#475569",
   "is_writer": false

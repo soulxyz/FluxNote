@@ -226,6 +226,28 @@ class Note(db.Model):
             return 1
         return max(1, len(self.content) // 400)
 
+    @property
+    def first_image(self):
+        """
+        从Markdown内容中提取第一张图片的URL
+        支持格式：![alt](url) 或 <img src="url">
+        """
+        if not self.content:
+            return None
+        
+        # 1. 尝试匹配 Markdown 图片语法 ![...](url)
+        # 非贪婪匹配，获取第一个捕获组
+        md_match = re.search(r'!\[.*?\]\((.*?)\)', self.content)
+        if md_match:
+            return md_match.group(1).split()[0]  # 处理可能存在的 title 部分: "url title"
+
+        # 2. 尝试匹配 HTML 图片标签 <img src="url">
+        html_match = re.search(r'<img\s+[^>]*src=["\'](.*?)["\']', self.content, re.IGNORECASE)
+        if html_match:
+            return html_match.group(1)
+
+        return None
+
     def render_html(self, max_length=None):
         """
         渲染Markdown内容为HTML（用于服务端渲染）

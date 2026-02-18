@@ -2,6 +2,7 @@ import { api } from './api.js';
 import { state } from './state.js';
 import { formatDate, escapeHtml, parseWikiLinks, showToast } from './utils.js';
 import { editor } from './editor.js';
+import { loadMermaidIfNeeded } from '/static/js/markdown-renderer.js';
 
 // Re-export needed functions if necessary or keep internal
 // We will export functions to be called by main.js
@@ -62,11 +63,16 @@ export const ui = {
     },
 
     async renderMermaid(container = document) {
-        if (typeof mermaid === 'undefined') return;
-        
-        // Find all mermaid and mindmap code blocks
+        // Find all mermaid and mindmap code blocks first
         const blocks = container.querySelectorAll('pre code.language-mermaid, pre code.language-mindmap');
         if (blocks.length === 0) return;
+
+        // 懒加载 Mermaid（只在有图表时才加载 3.3MB）
+        const loaded = await loadMermaidIfNeeded();
+        if (!loaded || typeof mermaid === 'undefined') {
+            console.warn('Mermaid not loaded, diagrams will show as code');
+            return;
+        }
 
         const nodesToRender = [];
         

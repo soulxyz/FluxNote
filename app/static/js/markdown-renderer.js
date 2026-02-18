@@ -7,6 +7,71 @@
  *   await renderContent(container, content, options);
  */
 
+// Mermaid 懒加载状态
+let mermaidLoading = false;
+let mermaidLoaded = false;
+let mermaidCallbacks = [];
+
+/**
+ * 动态加载 Mermaid 库（按需加载 3.3MB）
+ * 只在页面包含 mermaid/mindmap 代码块时才加载
+ */
+export async function loadMermaidIfNeeded() {
+    // 已加载或正在加载，直接返回
+    if (mermaidLoaded && typeof mermaid !== 'undefined') {
+        return true;
+    }
+
+    if (mermaidLoading) {
+        // 等待加载完成
+        return new Promise(resolve => {
+            mermaidCallbacks.push(resolve);
+        });
+    }
+
+    mermaidLoading = true;
+
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/mermaid/10.9.0/mermaid.min.js';
+        script.async = true;
+
+        script.onload = () => {
+            mermaidLoaded = true;
+            mermaidLoading = false;
+
+            // 初始化 Mermaid
+            if (typeof mermaid !== 'undefined') {
+                mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            }
+
+            // 通知所有等待的回调
+            mermaidCallbacks.forEach(cb => cb(true));
+            mermaidCallbacks = [];
+            resolve(true);
+        };
+
+        script.onerror = () => {
+            mermaidLoading = false;
+            console.error('Failed to load Mermaid');
+            mermaidCallbacks.forEach(cb => cb(false));
+            mermaidCallbacks = [];
+            resolve(false);
+        };
+
+        document.head.appendChild(script);
+    });
+}
+
+/**
+ * 检查内容是否包含 Mermaid 图表
+ */
+export function hasMermaidContent(content) {
+    if (!content) return false;
+    return /```(?:mermaid|mindmap)\s*\n/i.test(content) ||
+           /class="(?:language-)?(?:mermaid|mindmap)"/i.test(content);
+}
+
 // 解码 HTML 实体（修复 DOMPurify 导致的 Mermaid 语法问题）
 export function decodeHtmlEntities(text) {
     if (!text) return '';
@@ -92,9 +157,23 @@ export async function renderContent(container, content, options = {}) {
 
         container.innerHTML = html;
 
-        // 6. 渲染 Mermaid 图表
-        if (enableMermaid && typeof mermaid !== 'undefined') {
-            await renderMermaidBlocks(container);
+        // 6. 渲染 Mermaid 图表（按需懒加载）
+        if (enableMermaid) {
+            // 检查是否包含 mermaid/mindmap 代码块
+            const mermaidBlocks = container.querySelectorAll([
+                'pre code.language-mermaid',
+                'pre code.mermaid',
+                'pre code.language-mindmap',
+                'pre code.mindmap'
+            ].join(','));
+
+            if (mermaidBlocks.length > 0) {
+                // 懒加载 Mermaid
+                const loaded = await loadMermaidIfNeeded();
+                if (loaded && typeof mermaid !== 'undefined') {
+                    await renderMermaidBlocks(container);
+                }
+            }
         }
 
         // 7. 代码高亮
@@ -200,11 +279,8 @@ export function initMarkdownRenderer(config = {}) {
         hljs.configure({ ignoreUnescapedHTML: true, ...hljsConfig });
     }
 
-    // 配置 Mermaid
-    if (typeof mermaid !== 'undefined') {
-        const mermaidConfig = config.mermaid || { theme: 'default' };
-        mermaid.initialize({ startOnLoad: false, ...mermaidConfig });
-    }
+    // Mermaid 不再在此初始化，改为懒加载
+    // 如果需要预加载，可以调用 loadMermaidIfNeeded()
 }
 
 /**
@@ -225,9 +301,19 @@ export async function initThemePlugins(container) {
         });
     }
 
-    // 2. Mermaid 图表
-    if (window.mermaid) {
-        await renderMermaidBlocks(container);
+    // 2. Mermaid 图表（懒加载）
+    const mermaidBlocks = container.querySelectorAll([
+        'pre code.language-mermaid',
+        'pre code.mermaid',
+        'pre code.language-mindmap',
+        'pre code.mindmap'
+    ].join(','));
+
+    if (mermaidBlocks.length > 0) {
+        const loaded = await loadMermaidIfNeeded();
+        if (loaded && window.mermaid) {
+            await renderMermaidBlocks(container);
+        }
     }
 
     // 3. 图片查看器
@@ -250,5 +336,7 @@ export default {
     fixChinesePunctuationForMarkdown,
     initMarkdownRenderer,
     renderMermaidBlocks,
-    initThemePlugins
+    initThemePlugins,
+    loadMermaidIfNeeded,
+    hasMermaidContent
 };

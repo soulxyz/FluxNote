@@ -1,5 +1,5 @@
 from flask import Flask, send_from_directory, jsonify, render_template
-from .extensions import db, login_manager, cors, migrate
+from .extensions import db, login_manager, cors, migrate, compress
 from .models import User, Config
 from .routes.auth import auth_bp
 from .routes.notes import notes_bp
@@ -55,6 +55,7 @@ def create_app():
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     cors.init_app(app)
+    compress.init_app(app)
 
     @login_manager.user_loader
     def load_user(user_id):

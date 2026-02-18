@@ -95,9 +95,8 @@ class ThemeSDK {
     async handlePageLoad() {
         const container = document.querySelector(this.options.contentSelector);
         if (container) {
-            // 确保第三方库加载后再执行插件初始化
-            // 某些情况下 Mermaid 加载稍慢，这里做一个极简的等待
-            if (typeof mermaid === 'undefined' || typeof hljs === 'undefined') {
+            // hljs 必须存在，mermaid 改为懒加载（在 initThemePlugins 内部按需加载）
+            if (typeof hljs === 'undefined') {
                 setTimeout(() => this.handlePageLoad(), 100);
                 return;
             }

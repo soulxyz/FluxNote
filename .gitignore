@@ -27,6 +27,7 @@ migrations/
 *.sqlite3
 *.db
 *.db-journal
+data/*.db.*
 
 # 测试与覆盖率
 .pytest_cache/

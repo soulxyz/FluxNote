@@ -834,7 +834,7 @@ function initGlobalEvents() {
             // 动态加载 html2canvas
             if (typeof html2canvas === 'undefined') {
                 const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                script.src = 'https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                 document.head.appendChild(script);
                 await new Promise((resolve, reject) => {
                     script.onload = resolve;

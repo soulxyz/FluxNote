@@ -510,6 +510,18 @@ button { font-family: inherit; cursor: pointer; }
 
 .editor-tools { display: flex; gap: 8px; }
 
+/* 草稿保存状态指示器 */
+.save-status-indicator {
+    font-size: 12px;
+    color: var(--slate-400);
+    white-space: nowrap;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.save-status-indicator.visible { opacity: 1; }
+.save-status-indicator.saving { color: var(--primary); }
+
 .input-controls { display: inline-flex; gap: 8px; align-items: center; }
 
 .tool-btn {
@@ -1737,6 +1749,15 @@ input:checked + .slider:before { transform: translateX(20px); }
     }
     .tool-btn { padding: 6px; color: #999; font-size: 16px; background: transparent; }
     .tool-btn:hover { color: var(--primary); background: transparent; }
+
+    /* 移动端草稿状态指示器 */
+    .save-status-indicator {
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+    .memo-editor.compact .save-status-indicator {
+        display: none;
+    }
 
     /* 标签输入框 - 手机端直接显示 */
     .tag-input-inline {

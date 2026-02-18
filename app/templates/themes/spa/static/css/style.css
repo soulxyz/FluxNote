@@ -160,7 +160,7 @@
         transform: translateX(-100%);
         box-shadow: 0 0 20px rgba(0,0,0,0.1);
         background: white;
-        z-index: 100;
+        z-index: 1001; /* 高于遮罩层的 1000 */
     }
 
     .theme-spa .sidebar.mobile-open {
@@ -170,7 +170,7 @@
     .theme-spa .main-stream {
         padding: 20px;
     }
-    
+
     .theme-spa .sidebar-toggle-btn {
         display: none; /* 移动端使用顶部菜单按钮 */
     }

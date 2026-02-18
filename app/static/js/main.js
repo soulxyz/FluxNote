@@ -293,44 +293,54 @@ function initGlobalEvents() {
 
     // Mobile Menu
     const mobileBtn = document.getElementById('mobileMenuBtn');
+    const brandLink = document.querySelector('.header-brand-link');
+
+    // 点击 FluxNote 或菜单按钮打开侧边栏
+    const toggleMobileSidebar = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = sidebar.classList.toggle('mobile-open');
+        document.body.classList.toggle('sidebar-open', isOpen);
+    };
+
     if (mobileBtn) {
-        mobileBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent bubbling to header-left
-            const isOpen = sidebar.classList.toggle('mobile-open');
-            document.body.classList.toggle('sidebar-open', isOpen);
-        });
+        mobileBtn.addEventListener('click', toggleMobileSidebar);
+    }
+    if (brandLink) {
+        brandLink.addEventListener('click', toggleMobileSidebar);
+    }
 
-        // Close sidebar with animation
-        const closeMobileSidebar = () => {
-            sidebar.classList.add('mobile-closing');
-            sidebar.classList.remove('mobile-open');
-            // Add closing class for overlay fade out
-            document.body.classList.add('sidebar-closing');
-            document.body.classList.remove('sidebar-open');
-            // Remove closing classes after animation completes
-            setTimeout(() => {
-                sidebar.classList.remove('mobile-closing');
-                document.body.classList.remove('sidebar-closing');
-            }, 200);
-        };
+    // Close sidebar with animation
+    const closeMobileSidebar = () => {
+        sidebar.classList.add('mobile-closing');
+        sidebar.classList.remove('mobile-open');
+        // Add closing class for overlay fade out
+        document.body.classList.add('sidebar-closing');
+        document.body.classList.remove('sidebar-open');
+        // Remove closing classes after animation completes
+        setTimeout(() => {
+            sidebar.classList.remove('mobile-closing');
+            document.body.classList.remove('sidebar-closing');
+        }, 200);
+    };
 
-        document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 900 && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !mobileBtn.contains(e.target)) {
-                closeMobileSidebar();
-            }
-        });
-
-        // Store close function for external use
-        window.closeMobileSidebar = closeMobileSidebar;
-
-        // Mobile sidebar close button
-        const mobileCloseBtn = document.getElementById('sidebarMobileClose');
-        if (mobileCloseBtn) {
-            mobileCloseBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                closeMobileSidebar();
-            });
+    document.addEventListener('click', (e) => {
+        const isBrandOrBtn = (mobileBtn && mobileBtn.contains(e.target)) || (brandLink && brandLink.contains(e.target));
+        if (window.innerWidth <= 900 && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !isBrandOrBtn) {
+            closeMobileSidebar();
         }
+    });
+
+    // Store close function for external use
+    window.closeMobileSidebar = closeMobileSidebar;
+
+    // Mobile sidebar close button
+    const mobileCloseBtn = document.getElementById('sidebarMobileClose');
+    if (mobileCloseBtn) {
+        mobileCloseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeMobileSidebar();
+        });
     }
 
     // Search Clear Button

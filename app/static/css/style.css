@@ -184,6 +184,10 @@ button { font-family: inherit; cursor: pointer; }
     cursor: pointer;
 }
 
+.header-brand-link {
+    display: none; /* 桌面端隐藏，手机端显示 */
+}
+
 /* 搜索框 */
 .header-search {
     position: relative;
@@ -1603,12 +1607,34 @@ input:checked + .slider:before { transform: translateX(20px); }
         color: var(--slate-400);
     }
 
-    .header-left { flex-shrink: 0; color: var(--slate-800); }
+    .header-left { flex-shrink: 0; color: var(--slate-800); display: flex; align-items: center; gap: 4px; }
     .header-left #mobileMenuBtn { font-size: 18px; color: #333; padding: 8px; margin: 0; }
+    .header-brand-link {
+        display: flex;
+        align-items: center;
+        font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--slate-800);
+        text-decoration: none;
+        letter-spacing: 0.3px;
+        cursor: pointer;
+        padding: 6px 12px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        -webkit-tap-highlight-color: transparent;
+        -webkit-focus-ring-color: transparent;
+        user-select: none;
+        outline: none;
+    }
+    .header-brand-link:focus {
+        outline: none;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
     #currentDateDisplay { display: none; }
 
-    /* 移动端菜单按钮 */
-    .mobile-menu-btn { display: inline-block; }
+    /* 移动端隐藏菜单按钮，用 FluxNote 代替 */
+    .mobile-menu-btn { display: none; }
 
     /* 搜索清空按钮 */
     .search-clear-btn {

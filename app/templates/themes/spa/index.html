@@ -9,6 +9,18 @@
 {% block title %}{{ site_title }} - {{ site_desc }}{% endblock %}
 
 {% block content %}
+<!-- 手机端顶部(仅移动端显示) -->
+<div class="mobile-brand-bar">
+    <div class="mobile-brand-info">
+        <h1 class="mobile-brand-title">{{ site_title }}</h1>
+        <p class="mobile-brand-desc">{{ site_desc }}</p>
+    </div>
+    <div class="mobile-stats-mini">
+        <span class="stat-mini-item"><strong>{{ stats.notes if stats else 0 }}</strong> 篇</span>
+        <span class="stat-mini-item"><strong>{{ stats.tags if stats else 0 }}</strong> 标签</span>
+    </div>
+</div>
+
 <!-- 顶部栏 -->
 <header class="main-header">
     <div class="header-left">

@@ -6,6 +6,7 @@
   <p>
     一款极简、私有化部署的个人知识库，融合了卡片笔记与现代 AI 能力。可以兼顾笔记和博客两个身份。
   </p>
+<img width="2560" height="1600" alt="c222630e57d7f8d83915d3e40fe6a798" src="https://github.com/user-attachments/assets/c6ec3eaa-e105-4248-99c4-927bf0624604" />
 
   <p>
     <a href="#-功能特性">功能特性</a> •
@@ -74,7 +75,7 @@
 
    访问 `http://localhost:5001` 即可开启你的知识之旅。
 
-## 🛠 技术栈
+## 技术栈
 
 FluxNote 坚持 **KISS (Keep It Simple, Stupid)** 原则，保持架构的轻量与可维护性。
 
@@ -84,7 +85,7 @@ FluxNote 坚持 **KISS (Keep It Simple, Stupid)** 原则，保持架构的轻量
 - **Security**: WebAuthn + Flask-Login
 - **AI**: OpenAI API 标准接口兼容
 
-## 📂 项目结构
+## 项目结构
 
 ```text
 FluxNote/
@@ -100,6 +101,6 @@ FluxNote/
 └── server.py             # 生产启动入口 (Waitress)
 ```
 
-## 📄 许可证
+## 许可证
 
 本项目基于 [MIT License](LICENSE) 开源。

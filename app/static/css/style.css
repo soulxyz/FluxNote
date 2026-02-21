@@ -642,18 +642,6 @@ button { font-family: inherit; cursor: pointer; }
 .tag-input-inline { border: 1px solid var(--slate-200); border-radius: 16px; padding: 4px 10px; font-size: 13px; width: 100px; outline: none; transition: border 0.2s, background 0.2s; background: var(--slate-50); }
 .tag-input-inline:focus { border-color: var(--primary); background: white; }
 
-/* 字数统计 */
-.word-count {
-    font-size: 12px;
-    color: var(--slate-400);
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.2s;
-    margin-left: auto;
-    padding-right: 4px;
-}
-.word-count.visible { opacity: 1; }
-
 /* 拖拽上传覆盖层 */
 .drag-drop-overlay {
     position: absolute;
@@ -2323,13 +2311,6 @@ input:checked + .slider:before { transform: translateX(20px); }
     .memo-editor.compact .tags-bar { display: none; }
     .memo-editor.compact .tag-input-inline { display: none !important; }
     .memo-editor.compact #toggleTagInputBtn { display: none; }
-    .memo-editor.compact .word-count { display: none; }
-
-    /* 移动端字数统计 */
-    .word-count {
-        font-size: 11px;
-        flex-shrink: 0;
-    }
 
     /* 移动端拖拽上传 */
     .drag-drop-overlay {

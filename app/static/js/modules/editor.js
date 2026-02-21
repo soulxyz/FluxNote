@@ -14,7 +14,6 @@ export const editor = {
         this.setupPasteImage(textarea);
         this.setupDragDropImage(textarea);
         this.setupMarkdownShortcuts(textarea);
-        this.setupWordCount(textarea);
         this.setupAITools(textarea);
         this.setupAutoHeight(textarea);
     },
@@ -743,46 +742,6 @@ export const editor = {
 
         // 监听焦点事件，确保在聚焦时高度正确
         textarea.addEventListener('focus', adjustHeight);
-    },
-
-    // 字数统计
-    setupWordCount(textarea) {
-        const memoEditor = textarea.closest('.memo-editor');
-        if (!memoEditor) return;
-
-        // 创建字数统计元素
-        let counter = memoEditor.querySelector('.word-count');
-        if (!counter) {
-            counter = document.createElement('span');
-            counter.className = 'word-count';
-            // 插入到 editor-tools 的末尾
-            const tools = memoEditor.querySelector('.editor-tools');
-            if (tools) {
-                tools.appendChild(counter);
-            }
-        }
-
-        const updateCount = () => {
-            const text = textarea.value;
-            // 统计中文字符和英文单词
-            const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-            const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
-            const total = chineseChars + englishWords;
-
-            if (total === 0) {
-                counter.textContent = '';
-                counter.classList.remove('visible');
-            } else {
-                counter.textContent = `${total} 字`;
-                counter.classList.add('visible');
-            }
-        };
-
-        // 初始化
-        updateCount();
-
-        // 监听输入
-        textarea.addEventListener('input', updateCount);
     },
 
     // 拖拽上传图片

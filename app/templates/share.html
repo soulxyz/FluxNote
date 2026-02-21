@@ -290,6 +290,21 @@
             color: var(--text-100);
         }
 
+        /* 图片样式 */
+        .markdown-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius-md);
+            margin: 1rem auto;
+            display: block;
+            box-shadow: var(--shadow-sm);
+            cursor: zoom-in;
+        }
+
+        [data-theme="dark"] .markdown-content img {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
         .card-footer {
             padding: 1.2rem 2rem;
             border-top: var(--glass-border);
@@ -958,7 +973,7 @@
                 <!-- 笔记内容 -->
                 <article>
                     <header class="card-header">
-                        <h1 class="card-title">{{ note.title or '无标题笔记' }}</h1>
+                        <h1 class="card-title">{% set title_text = note.title or '' %}{% if title_text.strip() and title_text != 'Untitled' and not title_text.startswith('![') and not title_text.startswith('[') and not title_text.startswith('- [ ]') and not title_text.startswith('- [x]') %}{{ title_text }}{% elif author_name %}{{ author_name }}分享的笔记{% else %}分享的笔记{% endif %}</h1>
                         <div class="card-date">
                             <i class="far fa-calendar"></i> {{ note.created_at.strftime('%Y/%m/%d') }}
                         </div>
@@ -1091,10 +1106,8 @@
                         </div>
                     `;
 
-                    // 模拟加载延迟，提升用户体验
-                    setTimeout(() => {
-                        renderNoteContent(data.note);
-                    }, 600);
+                    // 直接渲染内容
+                    renderNoteContent(data.note, data.author_name);
                 } else {
                     errorEl.textContent = data.error || '密码错误';
                     errorEl.style.display = 'block';
@@ -1111,17 +1124,38 @@
         }
 
         // 渲染笔记内容
-        function renderNoteContent(note) {
+        function renderNoteContent(note, authorName) {
             const dateStr = new Date(note.created_at).toLocaleDateString('zh-CN', {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit'
             });
 
+            // 判断是否是有效的标题（非 markdown 语法）
+            function isValidTitle(title) {
+                if (!title || !title.trim() || title === 'Untitled') return false;
+                // 过滤 markdown 语法
+                if (title.startsWith('![')) return false;  // 图片
+                if (title.startsWith('[') && title.includes('](')) return false;  // 链接
+                if (title.startsWith('- [ ]') || title.startsWith('- [x]')) return false;  // 待办
+                if (title.match(/^[-*+]\s*$/)) return false;  // 空列表
+                return true;
+            }
+
+            // 标题逻辑
+            let displayTitle;
+            if (isValidTitle(note.title)) {
+                displayTitle = note.title;
+            } else if (authorName) {
+                displayTitle = authorName + '分享的笔记';
+            } else {
+                displayTitle = '分享的笔记';
+            }
+
             document.querySelector('.share-card').innerHTML = `
                 <article>
                     <header class="card-header">
-                        <h1 class="card-title">${note.title || '无标题笔记'}</h1>
+                        <h1 class="card-title">${displayTitle}</h1>
                         <div class="card-date">
                             <i class="far fa-calendar"></i> ${dateStr}
                         </div>

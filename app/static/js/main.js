@@ -935,6 +935,8 @@ function initGlobalEvents() {
 
     window.addEventListener('note:refresh-list', () => loadNotes(true));
 
+    window.addEventListener('tags:refresh', () => loadTags());
+
     window.addEventListener('note:delete', async (e) => {
         const confirmed = await showConfirm('确定要删除这条笔记吗？', { title: '删除笔记', type: 'danger' });
         if (!confirmed) return;
@@ -947,6 +949,7 @@ function initGlobalEvents() {
                 setTimeout(() => card.remove(), 300);
             }
             ui.renderHeatmap();
+            loadTags(); // Refresh tags after deletion
         } else {
             showToast('删除失败');
         }
@@ -959,6 +962,7 @@ function initGlobalEvents() {
         if (res && res.ok) {
             showToast('已彻底删除');
             document.getElementById(`note-${e.detail}`)?.remove();
+            loadTags(); // Refresh tags after permanent deletion
         } else {
             showToast('删除失败');
         }
@@ -969,6 +973,7 @@ function initGlobalEvents() {
         if (res && res.ok) {
             showToast('已恢复');
             document.getElementById(`note-${e.detail}`)?.remove();
+            loadTags(); // Refresh tags after restore
         } else {
             showToast('恢复失败');
         }
@@ -1267,7 +1272,9 @@ function initGlobalEvents() {
                     if (res && res.ok) {
                         const data = await res.json();
                         if (shareUrlInput) {
-                            shareUrlInput.value = window.location.origin + data.share.url;
+                            // 后端可能返回完整URL或相对路径
+                            const url = data.share.url;
+                            shareUrlInput.value = url.startsWith('http') ? url : window.location.origin + url;
                             shareUrlInput.dataset.shareId = data.share.id;
 
                             // 显示URL区域
@@ -1413,7 +1420,8 @@ function initGlobalEvents() {
 
         if (res && res.ok) {
             const data = await res.json();
-            shareUrl.value = window.location.origin + data.share.url;
+            const url = data.share.url;
+            shareUrl.value = url.startsWith('http') ? url : window.location.origin + url;
             shareUrl.dataset.shareId = data.share.id;
             showToast('设置已更新');
         } else {

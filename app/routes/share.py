@@ -163,11 +163,19 @@ def verify_share(share_id):
     share.view_count += 1
     db.session.commit()
 
-    # 返回笔记内容
+    # 获取作者用户名
     note = share.note
+    author_name = None
+    if note and note.user_id:
+        from app.models import User
+        author = db.session.get(User, note.user_id)
+        if author:
+            author_name = author.username
+
     return jsonify({
         'success': True,
-        'note': note.to_dict()
+        'note': note.to_dict(),
+        'author_name': author_name
     })
 
 

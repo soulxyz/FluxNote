@@ -12,6 +12,9 @@ export const editor = {
         this.setupAutocomplete(textarea);
         this.setupSlashCommands(textarea);
         this.setupPasteImage(textarea);
+        this.setupDragDropImage(textarea);
+        this.setupMarkdownShortcuts(textarea);
+        this.setupWordCount(textarea);
         this.setupAITools(textarea);
         this.setupAutoHeight(textarea);
     },
@@ -740,5 +743,210 @@ export const editor = {
 
         // 监听焦点事件，确保在聚焦时高度正确
         textarea.addEventListener('focus', adjustHeight);
+    },
+
+    // 字数统计
+    setupWordCount(textarea) {
+        const memoEditor = textarea.closest('.memo-editor');
+        if (!memoEditor) return;
+
+        // 创建字数统计元素
+        let counter = memoEditor.querySelector('.word-count');
+        if (!counter) {
+            counter = document.createElement('span');
+            counter.className = 'word-count';
+            // 插入到 editor-tools 的末尾
+            const tools = memoEditor.querySelector('.editor-tools');
+            if (tools) {
+                tools.appendChild(counter);
+            }
+        }
+
+        const updateCount = () => {
+            const text = textarea.value;
+            // 统计中文字符和英文单词
+            const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+            const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+            const total = chineseChars + englishWords;
+
+            if (total === 0) {
+                counter.textContent = '';
+                counter.classList.remove('visible');
+            } else {
+                counter.textContent = `${total} 字`;
+                counter.classList.add('visible');
+            }
+        };
+
+        // 初始化
+        updateCount();
+
+        // 监听输入
+        textarea.addEventListener('input', updateCount);
+    },
+
+    // 拖拽上传图片
+    setupDragDropImage(textarea) {
+        const memoEditor = textarea.closest('.memo-editor');
+        if (!memoEditor) return;
+
+        let dragOverlay = null;
+
+        const showOverlay = () => {
+            if (!dragOverlay) {
+                dragOverlay = document.createElement('div');
+                dragOverlay.className = 'drag-drop-overlay';
+                dragOverlay.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>释放以上传图片</span>';
+                memoEditor.appendChild(dragOverlay);
+            }
+            dragOverlay.classList.add('active');
+            textarea.classList.add('drag-over');
+        };
+
+        const hideOverlay = () => {
+            if (dragOverlay) {
+                dragOverlay.classList.remove('active');
+            }
+            textarea.classList.remove('drag-over');
+        };
+
+        const handleDrop = async (e) => {
+            hideOverlay();
+            const files = e.dataTransfer?.files;
+            if (!files || files.length === 0) return;
+
+            const imageFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+
+            e.preventDefault();
+
+            for (const file of imageFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
+                showToast('正在上传图片...');
+
+                try {
+                    const response = await api.upload(formData);
+                    if (response && response.ok) {
+                        const data = await response.json();
+                        const md = `\n![image](${data.url})\n`;
+                        if (textarea.setRangeText) {
+                            textarea.setRangeText(md);
+                        } else {
+                            textarea.value += md;
+                        }
+                        showToast('图片上传成功');
+                    } else {
+                        showToast('上传失败');
+                    }
+                } catch (err) {
+                    console.error('Upload error:', err);
+                    showToast('上传失败');
+                }
+            }
+        };
+
+        // 阻止默认拖拽行为
+        textarea.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            showOverlay();
+        });
+
+        textarea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        textarea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            // 检查是否真的离开了编辑器区域
+            if (!memoEditor.contains(e.relatedTarget)) {
+                hideOverlay();
+            }
+        });
+
+        textarea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            handleDrop(e);
+        });
+
+        // 覆盖层也要响应 drop 事件
+        memoEditor.addEventListener('drop', (e) => {
+            if (e.target !== textarea) {
+                e.preventDefault();
+                handleDrop(e);
+            }
+        });
+    },
+
+    // Markdown 快捷键
+    setupMarkdownShortcuts(textarea) {
+        const shortcuts = {
+            // Ctrl+B: 加粗
+            'b': { prefix: '**', suffix: '**', name: '加粗' },
+            // Ctrl+I: 斜体
+            'i': { prefix: '*', suffix: '*', name: '斜体' },
+            // Ctrl+K: 链接
+            'k': { prefix: '[', suffix: '](url)', name: '链接' },
+            // Ctrl+`: 代码
+            '`': { prefix: '`', suffix: '`', name: '行内代码' },
+            // Ctrl+Shift+`: 代码块
+            'codeblock': { prefix: '```\n', suffix: '\n```', name: '代码块' }
+        };
+
+        textarea.addEventListener('keydown', (e) => {
+            // 检查是否按下 Ctrl (Windows) 或 Cmd (Mac)
+            const isMod = e.ctrlKey || e.metaKey;
+
+            if (!isMod) return;
+
+            const key = e.key.toLowerCase();
+            let shortcut = null;
+
+            // 特殊处理代码块 Ctrl+Shift+`
+            if (e.shiftKey && key === '`') {
+                shortcut = shortcuts['codeblock'];
+            } else if (shortcuts[key]) {
+                shortcut = shortcuts[key];
+            }
+
+            if (shortcut) {
+                e.preventDefault();
+
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const text = textarea.value;
+                const selectedText = text.substring(start, end);
+
+                // 如果有选中文本，包裹它；否则插入占位符
+                const { prefix, suffix } = shortcut;
+                let newText;
+                let newCursorStart, newCursorEnd;
+
+                if (selectedText) {
+                    newText = prefix + selectedText + suffix;
+                    newCursorStart = start + prefix.length;
+                    newCursorEnd = end + prefix.length;
+                } else {
+                    // 无选中文本，插入占位符并选中
+                    const placeholder = key === 'k' ? '链接文字' : '文本';
+                    newText = prefix + placeholder + suffix;
+                    newCursorStart = start + prefix.length;
+                    newCursorEnd = newCursorStart + placeholder.length;
+                }
+
+                if (textarea.setRangeText) {
+                    textarea.setRangeText(newText, start, end, 'end');
+                    // 选中新插入的文本（占位符）
+                    textarea.setSelectionRange(newCursorStart, newCursorEnd);
+                } else {
+                    textarea.value = text.substring(0, start) + newText + text.substring(end);
+                }
+
+                textarea.focus();
+
+                // 触发 input 事件以更新草稿保存等
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
     }
 };

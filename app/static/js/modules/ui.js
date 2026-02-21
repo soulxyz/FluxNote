@@ -460,9 +460,12 @@ export const ui = {
                     note.content = textarea.value;
                     note.tags = state.editTags;
                     note.is_public = isPublic;
-                    
+
                     // Local Refresh
                     this.restoreCard(note);
+
+                    // Trigger tags refresh event
+                    window.dispatchEvent(new CustomEvent('tags:refresh'));
                 } else {
                     showToast('保存失败');
                     saveBtn.disabled = false;

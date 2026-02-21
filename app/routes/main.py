@@ -64,8 +64,18 @@ def share_page(share_id):
     db.session.commit()
 
     note = share.note
+
+    # 获取作者用户名
+    author_name = None
+    if note and note.user_id:
+        from app.models import User
+        author = db.session.get(User, note.user_id)
+        if author:
+            author_name = author.username
+
     return render_template('share.html',
         note=note,
         share_id=share_id,
         site_title=site_title,
-        site_desc=site_desc)
+        site_desc=site_desc,
+        author_name=author_name)

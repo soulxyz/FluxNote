@@ -337,9 +337,12 @@ button { font-family: inherit; cursor: pointer; }
     border-radius: 2px;
     background: var(--slate-100);
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: box-shadow 0.15s, filter 0.15s;
 }
-.day-cell:hover { transform: scale(1.2); }
+.day-cell:hover {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
+    filter: brightness(1.1);
+}
 .day-cell[data-level="1"] { background: #6EE7B7; }
 .day-cell[data-level="2"] { background: #34D399; }
 .day-cell[data-level="3"] { background: #10B981; }
@@ -353,9 +356,12 @@ button { font-family: inherit; cursor: pointer; }
     height: 100%;
     background: var(--slate-100);
     cursor: pointer;
-    transition: transform 0.1s, background 0.2s;
+    transition: box-shadow 0.15s, filter 0.15s;
 }
-.theme-spa .heatmap-cell:hover { transform: scale(1.2); }
+.theme-spa .heatmap-cell:hover {
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
+    filter: brightness(1.1);
+}
 .theme-spa .heatmap-cell[data-level="1"] { background: #6EE7B7; }
 .theme-spa .heatmap-cell[data-level="2"] { background: #34D399; }
 .theme-spa .heatmap-cell[data-level="3"] { background: #10B981; }
@@ -635,6 +641,59 @@ button { font-family: inherit; cursor: pointer; }
 .tags-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .tag-input-inline { border: 1px solid var(--slate-200); border-radius: 16px; padding: 4px 10px; font-size: 13px; width: 100px; outline: none; transition: border 0.2s, background 0.2s; background: var(--slate-50); }
 .tag-input-inline:focus { border-color: var(--primary); background: white; }
+
+/* 字数统计 */
+.word-count {
+    font-size: 12px;
+    color: var(--slate-400);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-left: auto;
+    padding-right: 4px;
+}
+.word-count.visible { opacity: 1; }
+
+/* 拖拽上传覆盖层 */
+.drag-drop-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(16, 185, 129, 0.1);
+    border: 2px dashed var(--primary);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 10;
+    pointer-events: none;
+}
+.drag-drop-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+.drag-drop-overlay i {
+    font-size: 36px;
+    color: var(--primary);
+}
+.drag-drop-overlay span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+.memo-editor {
+    position: relative;
+}
+
+/* 拖拽时编辑器高亮 */
+#noteContent.drag-over {
+    background: var(--primary-light);
+}
 
 /* ============================================================
    6. 笔记卡片
@@ -998,6 +1057,8 @@ button { font-family: inherit; cursor: pointer; }
 .btn-secondary:hover { border-color: var(--slate-400); background: var(--slate-50); }
 .btn-danger { background: #EF4444; color: white; }
 .btn-danger:hover { background: #DC2626; }
+.btn-warning { background: #F59E0B; color: white; }
+.btn-warning:hover { background: #D97706; }
 .btn-outline { background: transparent; border-color: var(--primary); color: var(--primary); }
 .btn-outline:hover { background: var(--primary-light); }
 .btn-sm { padding: 4px 8px; font-size: 12px; }
@@ -1569,6 +1630,265 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 /* ============================================================
+   11.1 分享管理
+   ============================================================ */
+
+.shares-toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.shares-search {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+}
+
+.shares-search i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--slate-400);
+    font-size: 14px;
+}
+
+.shares-search input {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.shares-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.shares-filters {
+    display: flex;
+    gap: 8px;
+}
+
+.shares-filters select {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.shares-filters select:hover {
+    border-color: var(--slate-300);
+}
+
+.shares-filters select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.shares-stats {
+    display: flex;
+    gap: 24px;
+    padding: 16px 20px;
+    background: var(--slate-50);
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--slate-800);
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-top: 2px;
+}
+
+.shares-list {
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.share-item {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+}
+
+.share-item:hover {
+    border-color: var(--slate-300);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.share-item.expired {
+    opacity: 0.7;
+    background: var(--slate-50);
+}
+
+.share-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.share-item-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--slate-800);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.share-item-title i {
+    color: var(--slate-400);
+}
+
+.share-item-status {
+    display: flex;
+    gap: 6px;
+}
+
+.status-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-badge.active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-badge.expired {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.protected {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.share-item-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.share-item-meta span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.share-item-meta i {
+    font-size: 11px;
+}
+
+.share-item-url {
+    background: var(--slate-50);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--primary);
+    word-break: break-all;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.share-item-url i {
+    color: var(--slate-400);
+}
+
+.share-item-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--slate-100);
+}
+
+.share-item-actions .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
+.share-item-actions .btn i {
+    margin-right: 4px;
+}
+
+.shares-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--slate-500);
+}
+
+.shares-empty i {
+    font-size: 48px;
+    color: var(--slate-300);
+    margin-bottom: 16px;
+}
+
+.shares-empty p {
+    font-size: 14px;
+}
+
+/* 编辑分享模态框 */
+.share-edit-section {
+    margin-bottom: 16px;
+}
+
+.share-edit-section label {
+    display: block;
+    font-size: 13px;
+    color: var(--slate-600);
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.share-edit-section input,
+.share-edit-section select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.share-edit-section input:focus,
+.share-edit-section select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* ============================================================
    12. 设置页面
    ============================================================ */
 
@@ -2003,6 +2323,24 @@ input:checked + .slider:before { transform: translateX(20px); }
     .memo-editor.compact .tags-bar { display: none; }
     .memo-editor.compact .tag-input-inline { display: none !important; }
     .memo-editor.compact #toggleTagInputBtn { display: none; }
+    .memo-editor.compact .word-count { display: none; }
+
+    /* 移动端字数统计 */
+    .word-count {
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    /* 移动端拖拽上传 */
+    .drag-drop-overlay {
+        border-radius: 12px;
+    }
+    .drag-drop-overlay i {
+        font-size: 28px;
+    }
+    .drag-drop-overlay span {
+        font-size: 13px;
+    }
 
     /* --- 笔记卡片 --- */
     .note-header { margin-bottom: 8px; padding-bottom: 0; border-bottom: none; }

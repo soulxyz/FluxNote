@@ -346,13 +346,89 @@
 
     <!-- Shares Management Modal -->
     <div id="sharesModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-content" style="max-width: 900px;">
             <div class="modal-header">
-                <h2>我的分享</h2>
+                <h2><i class="fas fa-share-alt" style="margin-right: 10px; color: var(--primary);"></i>我的分享</h2>
                 <span class="close-shares">&times;</span>
             </div>
             <div class="modal-body">
-                <div id="sharesList" class="version-list"></div>
+                <!-- 搜索和筛选栏 -->
+                <div class="shares-toolbar">
+                    <div class="shares-search">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="sharesSearchInput" placeholder="搜索笔记标题...">
+                    </div>
+                    <div class="shares-filters">
+                        <select id="sharesStatusFilter">
+                            <option value="all">全部状态</option>
+                            <option value="active">活跃中</option>
+                            <option value="expired">已过期</option>
+                        </select>
+                        <select id="sharesSortFilter">
+                            <option value="newest">最新创建</option>
+                            <option value="oldest">最早创建</option>
+                            <option value="views">浏览最多</option>
+                            <option value="expiring">即将过期</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- 分享统计 -->
+                <div class="shares-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalSharesCount">0</span>
+                        <span class="stat-label">总分享</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="activeSharesCount">0</span>
+                        <span class="stat-label">活跃中</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="totalViewsCount">0</span>
+                        <span class="stat-label">总浏览</span>
+                    </div>
+                </div>
+                <!-- 分享列表 -->
+                <div id="sharesList" class="shares-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Share Modal -->
+    <div id="editShareModal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h2 id="editShareModalTitle"><i class="fas fa-edit" style="margin-right: 8px; color: var(--primary);"></i>编辑分享设置</h2>
+                <span class="close-edit-share">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="expiredWarning" style="display: none; background: #fef3c7; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                    <i class="fas fa-exclamation-triangle" style="color: #d97706; margin-right: 8px;"></i>
+                    <span style="color: #92400e; font-size: 13px;">此分享已过期，请设置新的有效期重新激活</span>
+                </div>
+                <div class="share-edit-section">
+                    <label>访问密码</label>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <input type="checkbox" id="editSharePasswordEnabled" style="width: 18px; height: 18px;">
+                        <span style="font-size: 14px; color: var(--slate-600);">启用密码保护</span>
+                    </div>
+                    <input type="password" id="editSharePassword" placeholder="输入新密码（留空则不修改）" disabled style="width: 100%;">
+                </div>
+                <div class="share-edit-section">
+                    <label>有效期</label>
+                    <select id="editShareExpires" style="width: 100%;">
+                        <option value="">保持不变</option>
+                        <option value="0">永久有效</option>
+                        <option value="24">1天后过期</option>
+                        <option value="168">7天后过期</option>
+                        <option value="720">30天后过期</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="gap: 10px; padding-top: 16px; border-top: 1px solid #f1f5f9;">
+                <button class="btn btn-secondary" id="cancelEditShare" style="flex: 1;">取消</button>
+                <button class="btn btn-primary" id="saveEditShare" style="flex: 1;">
+                    <i class="fas fa-check" style="margin-right: 6px;"></i><span id="saveEditShareText">保存修改</span>
+                </button>
             </div>
         </div>
     </div>

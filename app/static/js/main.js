@@ -3,7 +3,7 @@ import { state, setState } from './modules/state.js';
 import { ui } from './modules/ui.js';
 import { auth, initAuthEvents } from './modules/auth.js';
 import { editor } from './modules/editor.js';
-import { showToast, debounce, parseWikiLinks, escapeHtml, showConfirm } from './modules/utils.js';
+import { showToast, debounce, parseWikiLinks, escapeHtml, showConfirm, formatDate, formatExpiresAt } from './modules/utils.js';
 
 // === Scroll Loading Indicator ===
 function showScrollLoading() {
@@ -183,6 +183,8 @@ function initGlobalEvents() {
     });
 
     // My Shares Modal
+    let allShares = []; // 存储所有分享数据
+
     document.getElementById('navShares')?.addEventListener('click', async (e) => {
         e.preventDefault();
         const modal = document.getElementById('sharesModal');
@@ -190,7 +192,7 @@ function initGlobalEvents() {
 
         if (modal) {
             modal.style.display = 'block';
-            list.innerHTML = '<div style="text-align:center; padding:20px;">加载中...</div>';
+            list.innerHTML = '<div style="text-align:center; padding:40px; color:var(--slate-400);"><i class="fas fa-spinner fa-spin" style="font-size: 24px;"></i><p style="margin-top: 12px;">加载中...</p></div>';
 
             // Close logic
             const closeBtn = modal.querySelector('.close-shares');
@@ -198,70 +200,304 @@ function initGlobalEvents() {
             window.onclick = (ev) => { if(ev.target === modal) modal.style.display = 'none'; };
 
             try {
-                // Fetch shares (Assume API exists, need to ensure api.js has share.list or similar if distinct)
-                // Actually api.js might not have a dedicated method for user shares list yet.
-                // We'll use fetch directly or add to api object if needed.
-                // Let's assume we can fetch '/api/shares' directly here for simplicity or update api.js later.
                 const response = await fetch('/api/shares');
                 if (response.ok) {
-                    const shares = await response.json();
-                    if (shares.length === 0) {
-                        list.innerHTML = '<div style="text-align:center; padding:20px; color:#666;">暂无活跃分享</div>';
-                        return;
-                    }
-
-                    list.innerHTML = shares.map(s => `
-                        <div class="version-item" id="share-item-${s.id}">
-                            <div class="version-info" style="flex:1;">
-                                <div style="font-weight:600; color:var(--slate-800); margin-bottom:4px;">
-                                    ${escapeHtml(s.note_title || '无标题')}
-                                </div>
-                                <div style="font-size:12px; color:var(--slate-500);">
-                                    <span style="margin-right:10px;"><i class="far fa-clock"></i> 创建于 ${new Date(s.created_at).toLocaleDateString()}</span>
-                                    <span style="margin-right:10px;"><i class="far fa-eye"></i> 浏览 ${s.view_count}</span>
-                                    <span><i class="fas fa-hourglass-half"></i> ${s.expires_at ? new Date(s.expires_at).toLocaleDateString() + ' 过期' : '永久有效'}</span>
-                                </div>
-                                <div style="font-size:12px; color:var(--primary); margin-top:4px; word-break:break-all;">
-                                    ${s.url}
-                                </div>
-                            </div>
-                            <div class="version-actions">
-                                <button class="btn btn-secondary btn-sm copy-share-btn" data-url="${s.url}">复制</button>
-                                <button class="btn btn-danger btn-sm delete-share-btn" data-id="${s.id}">取消分享</button>
-                            </div>
-                        </div>
-                    `).join('');
-
-                    // Bind events
-                    list.querySelectorAll('.copy-share-btn').forEach(btn => {
-                        btn.onclick = () => {
-                            navigator.clipboard.writeText(btn.dataset.url).then(() => showToast('链接已复制'));
-                        };
-                    });
-
-                    list.querySelectorAll('.delete-share-btn').forEach(btn => {
-                        btn.onclick = async () => {
-                            const confirmed = await showConfirm('链接将失效，确定要取消此分享吗？', { title: '取消分享', type: 'danger' });
-                            if (!confirmed) return;
-                            const shareId = btn.dataset.id.trim();
-                            const res = await api.share.delete(shareId);
-                            if (res && res.ok) {
-                                document.getElementById(`share-item-${shareId}`).remove();
-                                showToast('分享已取消');
-                            } else {
-                                showToast('操作失败');
-                            }
-                        };
-                    });
+                    allShares = await response.json();
+                    renderSharesList(allShares);
                 } else {
-                    list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">加载失败</div>';
+                    list.innerHTML = '<div class="shares-empty"><i class="fas fa-exclamation-circle"></i><p>加载失败，请重试</p></div>';
                 }
             } catch (err) {
                 console.error(err);
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:red;">网络错误</div>';
+                list.innerHTML = '<div class="shares-empty"><i class="fas fa-wifi"></i><p>网络错误</p></div>';
             }
         }
     });
+
+    // 渲染分享列表
+    function renderSharesList(shares) {
+        const list = document.getElementById('sharesList');
+        const searchInput = document.getElementById('sharesSearchInput');
+        const statusFilter = document.getElementById('sharesStatusFilter');
+        const sortFilter = document.getElementById('sharesSortFilter');
+
+        // 获取筛选和排序条件
+        const searchTerm = searchInput?.value.toLowerCase() || '';
+        const status = statusFilter?.value || 'all';
+        const sortBy = sortFilter?.value || 'newest';
+
+        // 筛选
+        let filtered = shares.filter(s => {
+            const matchSearch = !searchTerm || (s.note_title || '').toLowerCase().includes(searchTerm);
+            const isExpired = s.is_expired || (s.expires_at && new Date(s.expires_at) < new Date());
+            const matchStatus = status === 'all' ||
+                              (status === 'active' && !isExpired) ||
+                              (status === 'expired' && isExpired);
+            return matchSearch && matchStatus;
+        });
+
+        // 排序
+        filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'oldest':
+                    return new Date(a.created_at) - new Date(b.created_at);
+                case 'views':
+                    return b.view_count - a.view_count;
+                case 'expiring':
+                    if (!a.expires_at) return 1;
+                    if (!b.expires_at) return -1;
+                    return new Date(a.expires_at) - new Date(b.expires_at);
+                default: // newest
+                    return new Date(b.created_at) - new Date(a.created_at);
+            }
+        });
+
+        // 更新统计
+        updateSharesStats(shares);
+
+        if (filtered.length === 0) {
+            list.innerHTML = `
+                <div class="shares-empty">
+                    <i class="fas fa-share-alt"></i>
+                    <p>${shares.length === 0 ? '暂无分享记录' : '没有匹配的分享'}</p>
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = filtered.map(s => {
+            const isExpired = s.is_expired || (s.expires_at && new Date(s.expires_at) < new Date());
+            const hasPassword = s.has_password;
+
+            return `
+                <div class="share-item ${isExpired ? 'expired' : ''}" id="share-item-${s.id}">
+                    <div class="share-item-header">
+                        <div class="share-item-title">
+                            <i class="fas fa-file-alt"></i>
+                            ${escapeHtml(s.note_title || '无标题')}
+                        </div>
+                        <div class="share-item-status">
+                            ${hasPassword ? '<span class="status-badge protected"><i class="fas fa-lock"></i> 已加密</span>' : ''}
+                            ${isExpired ? '<span class="status-badge expired">已过期</span>' : '<span class="status-badge active">活跃中</span>'}
+                        </div>
+                    </div>
+                    <div class="share-item-meta">
+                        <span><i class="far fa-clock"></i> ${formatDate(s.created_at)}</span>
+                        <span><i class="far fa-eye"></i> ${s.view_count} 次浏览</span>
+                        <span><i class="fas fa-hourglass-half"></i> ${formatExpiresAt(s.expires_at)}</span>
+                    </div>
+                    <div class="share-item-url">
+                        <i class="fas fa-link"></i>
+                        <span>${s.url}</span>
+                    </div>
+                    <div class="share-item-actions">
+                        <button class="btn btn-secondary btn-sm copy-share-btn" data-url="${s.url}">
+                            <i class="fas fa-copy"></i> 复制
+                        </button>
+                        <button class="btn btn-secondary btn-sm edit-share-btn" data-id="${s.id}" data-password="${hasPassword}" data-expired="${isExpired}">
+                            <i class="fas fa-edit"></i> ${isExpired ? '重新激活' : '编辑'}
+                        </button>
+                        ${!isExpired ? `
+                        <button class="btn btn-warning btn-sm expire-share-btn" data-id="${s.id}">
+                            <i class="fas fa-clock"></i> 过期
+                        </button>
+                        ` : ''}
+                        <button class="btn btn-danger btn-sm delete-share-btn" data-id="${s.id}">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 绑定事件
+        bindShareItemEvents();
+    }
+
+    // 更新统计信息
+    function updateSharesStats(shares) {
+        const total = shares.length;
+        const active = shares.filter(s => {
+            const isExpired = s.is_expired || (s.expires_at && new Date(s.expires_at) < new Date());
+            return !isExpired;
+        }).length;
+        const totalViews = shares.reduce((sum, s) => sum + (s.view_count || 0), 0);
+
+        document.getElementById('totalSharesCount').textContent = total;
+        document.getElementById('activeSharesCount').textContent = active;
+        document.getElementById('totalViewsCount').textContent = totalViews;
+    }
+
+    // 绑定分享项目事件
+    function bindShareItemEvents() {
+        const list = document.getElementById('sharesList');
+
+        // 复制链接
+        list.querySelectorAll('.copy-share-btn').forEach(btn => {
+            btn.onclick = () => {
+                navigator.clipboard.writeText(btn.dataset.url).then(() => showToast('链接已复制'));
+            };
+        });
+
+        // 编辑分享
+        list.querySelectorAll('.edit-share-btn').forEach(btn => {
+            btn.onclick = () => showEditShareModal(btn.dataset.id, btn.dataset.password === 'true', btn.dataset.expires);
+        });
+
+        // 立即过期
+        list.querySelectorAll('.expire-share-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const confirmed = await showConfirm('确定要让此分享立即过期吗？', { title: '设为过期', type: 'danger' });
+                if (!confirmed) return;
+                const shareId = btn.dataset.id;
+                try {
+                    const res = await fetch(`/api/share/${shareId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ expire_now: true })
+                    });
+                    if (res.ok) {
+                        const response = await fetch('/api/shares');
+                        if (response.ok) {
+                            allShares = await response.json();
+                            renderSharesList(allShares);
+                        }
+                        showToast('分享已过期');
+                    } else {
+                        showToast('操作失败');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast('网络错误');
+                }
+            };
+        });
+
+        // 删除分享
+        list.querySelectorAll('.delete-share-btn').forEach(btn => {
+            btn.onclick = async () => {
+                const confirmed = await showConfirm('链接将失效，确定要删除此分享吗？', { title: '删除分享', type: 'danger' });
+                if (!confirmed) return;
+                const shareId = btn.dataset.id.trim();
+                const res = await api.share.delete(shareId);
+                if (res && res.ok) {
+                    // 从数据中移除并重新渲染
+                    allShares = allShares.filter(s => s.id !== shareId);
+                    renderSharesList(allShares);
+                    showToast('分享已删除');
+                } else {
+                    showToast('操作失败');
+                }
+            };
+        });
+    }
+
+    // 显示编辑分享模态框
+    let currentEditShareId = null;
+
+    function showEditShareModal(shareId, hasPassword, isExpired) {
+        const modal = document.getElementById('editShareModal');
+        const passwordEnabled = document.getElementById('editSharePasswordEnabled');
+        const passwordInput = document.getElementById('editSharePassword');
+        const expiresSelect = document.getElementById('editShareExpires');
+        const warningDiv = document.getElementById('expiredWarning');
+        const titleEl = document.getElementById('editShareModalTitle');
+        const saveText = document.getElementById('saveEditShareText');
+
+        currentEditShareId = shareId;
+
+        // 根据是否过期显示不同界面
+        if (isExpired) {
+            titleEl.innerHTML = '<i class="fas fa-redo" style="margin-right: 8px; color: #d97706;"></i>重新激活分享';
+            warningDiv.style.display = 'block';
+            expiresSelect.value = '168'; // 默认7天
+            saveText.textContent = '重新激活';
+        } else {
+            titleEl.innerHTML = '<i class="fas fa-edit" style="margin-right: 8px; color: var(--primary);"></i>编辑分享设置';
+            warningDiv.style.display = 'none';
+            expiresSelect.value = '';
+            saveText.textContent = '保存修改';
+        }
+
+        // 设置初始值
+        passwordEnabled.checked = hasPassword;
+        passwordInput.disabled = !hasPassword;
+        passwordInput.value = '';
+
+        // 显示模态框
+        modal.style.display = 'block';
+
+        // 关闭按钮
+        modal.querySelector('.close-edit-share').onclick = () => modal.style.display = 'none';
+        document.getElementById('cancelEditShare').onclick = () => modal.style.display = 'none';
+
+        // 点击背景关闭
+        const closeHandler = (ev) => {
+            if (ev.target === modal) {
+                modal.style.display = 'none';
+                window.removeEventListener('click', closeHandler);
+            }
+        };
+        window.addEventListener('click', closeHandler);
+    }
+
+    // 密码启用切换
+    document.getElementById('editSharePasswordEnabled')?.addEventListener('change', (e) => {
+        const passwordInput = document.getElementById('editSharePassword');
+        if (passwordInput) {
+            passwordInput.disabled = !e.target.checked;
+            if (!e.target.checked) passwordInput.value = '';
+        }
+    });
+
+    // 保存编辑
+    document.getElementById('saveEditShare')?.addEventListener('click', async () => {
+        if (!currentEditShareId) return;
+
+        const passwordEnabled = document.getElementById('editSharePasswordEnabled')?.checked;
+        const password = document.getElementById('editSharePassword')?.value;
+        const expiresIn = document.getElementById('editShareExpires')?.value;
+        const warningDiv = document.getElementById('expiredWarning');
+
+        // 过期分享必须选择有效期
+        if (warningDiv.style.display !== 'none' && expiresIn === '') {
+            showToast('请选择有效期');
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/share/${currentEditShareId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    password: passwordEnabled ? password : null,
+                    expires_in: expiresIn !== '' ? parseInt(expiresIn) : null
+                })
+            });
+
+            if (res.ok) {
+                document.getElementById('editShareModal').style.display = 'none';
+                // 重新加载分享列表
+                const response = await fetch('/api/shares');
+                if (response.ok) {
+                    allShares = await response.json();
+                    renderSharesList(allShares);
+                }
+                showToast(warningDiv.style.display !== 'none' ? '分享已重新激活' : '分享设置已更新');
+            } else {
+                const data = await res.json();
+                showToast(data.error || '更新失败');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('网络错误');
+        }
+    });
+
+    // 搜索和筛选事件
+    document.getElementById('sharesSearchInput')?.addEventListener('input', () => renderSharesList(allShares));
+    document.getElementById('sharesStatusFilter')?.addEventListener('change', () => renderSharesList(allShares));
+    document.getElementById('sharesSortFilter')?.addEventListener('change', () => renderSharesList(allShares));
 
     // Sidebar Toggle
     const toggleBtn = document.getElementById('sidebarToggle');

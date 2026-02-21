@@ -20,11 +20,18 @@ def generate_share_id():
 
 def get_base_url():
     """获取应用基础URL"""
-    # 尝试从配置获取，否则使用请求的host
+    # 尝试从配置获取
     base_url = Config.get('base_url')
     if base_url:
         return base_url.rstrip('/')
-    return ''  # 前端会使用当前域名
+
+    # 从请求中构建完整 URL
+    if request:
+        scheme = request.scheme
+        host = request.host
+        return f"{scheme}://{host}"
+
+    return ''
 
 
 @share_bp.route('/share', methods=['POST'])
@@ -182,6 +189,58 @@ def delete_share(share_id):
     db.session.commit()
 
     return jsonify({'success': True})
+
+
+@share_bp.route('/share/<share_id>', methods=['PUT'])
+@login_required
+def update_share(share_id):
+    """更新分享设置"""
+    share = db.session.get(Share, share_id)
+
+    if not share:
+        return jsonify({'error': '分享链接不存在'}), 404
+
+    # 验证归属
+    if share.note.user_id != current_user.id:
+        return jsonify({'error': '无权修改此分享'}), 403
+
+    data = request.json
+
+    # 立即过期
+    if data.get('expire_now'):
+        share.expires_at = datetime.now() - timedelta(seconds=1)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'share': share.to_dict()
+        })
+
+    # 更新密码
+    password = data.get('password')
+    if password is not None:
+        if password.strip():
+            share.set_password(password.strip())
+        else:
+            share.password = None
+
+    # 更新过期时间
+    expires_in = data.get('expires_in')
+    if expires_in is not None:
+        if expires_in:
+            try:
+                hours = int(expires_in)
+                share.expires_at = datetime.now() + timedelta(hours=hours)
+            except ValueError:
+                return jsonify({'error': '无效的过期时间'}), 400
+        else:
+            share.expires_at = None
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'share': share.to_dict()
+    })
 
 
 @share_bp.route('/notes/<note_id>/shares', methods=['GET'])

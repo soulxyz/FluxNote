@@ -110,6 +110,39 @@ export function formatDate(dateString) {
     return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
 }
 
+// 格式化过期时间（支持未来时间）
+export function formatExpiresAt(dateString) {
+    if (!dateString) return '永久有效';
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = date - now; // 未来时间为正数
+
+    // 已过期
+    if (diff < 0) {
+        return '已过期';
+    }
+
+    // 1小时内
+    if (diff < 3600000) {
+        const mins = Math.floor(diff / 60000);
+        return mins < 1 ? '即将过期' : `${mins}分钟后过期`;
+    }
+
+    // 24小时内
+    if (diff < 86400000) {
+        return `${Math.floor(diff / 3600000)}小时后过期`;
+    }
+
+    // 7天内
+    if (diff < 604800000) {
+        return `${Math.floor(diff / 86400000)}天后过期`;
+    }
+
+    // 更长时间显示具体日期
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' 过期';
+}
+
 export function parseWikiLinks(content) {
     if (!content) return '';
     return content.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, title, display) => {

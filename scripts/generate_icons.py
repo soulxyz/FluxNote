@@ -1,11 +1,11 @@
 """
 图标生成脚本
-从 SVG 源文件生成各尺寸的 PNG 图标
+从源 PNG 文件生成各尺寸的 PWA 图标
 
 使用方法:
     python scripts/generate_icons.py
 
-需要安装: pip install Pillow cairosvg
+需要安装: pip install Pillow
 """
 
 import os
@@ -21,139 +21,67 @@ except ImportError:
     print("请运行: pip install Pillow")
     sys.exit(1)
 
-try:
-    import cairosvg
-except ImportError:
-    print("提示: cairosvg 未安装，将使用备用方法")
-    print("如需从 SVG 生成，请运行: pip install cairosvg")
-    cairosvg = None
-
-# 图标尺寸
+# 图标尺寸配置
 SIZES = [72, 96, 128, 144, 152, 180, 192, 384, 512]
 
 # 路径配置
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 ICONS_DIR = os.path.join(PROJECT_ROOT, 'app', 'static', 'img', 'icons')
-SVG_FILE = os.path.join(ICONS_DIR, 'icon.svg')
-APPLE_SVG = os.path.join(ICONS_DIR, 'apple-touch-icon.svg')
+
+# 源文件路径 (优先使用您提供的PNG)
+SOURCE_PNG = os.path.join(PROJECT_ROOT, 'svg_1771765590204.png')
 
 
-def generate_from_svg(svg_path, output_path, size):
-    """从 SVG 生成 PNG"""
-    if cairosvg:
-        cairosvg.svg2png(
-            url=svg_path,
-            write_to=output_path,
-            output_width=size,
-            output_height=size
-        )
-        return True
-    return False
-
-
-def generate_simple_icon(output_path, size):
-    """生成简单的占位图标（当无法处理 SVG 时）"""
-    from PIL import Image, ImageDraw
-
-    # 创建渐变背景
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    # 绘制圆角矩形背景
-    margin = int(size * 0.06)
-    corner_radius = int(size * 0.16)
-    draw.rounded_rectangle(
-        [margin, margin, size - margin, size - margin],
-        radius=corner_radius,
-        fill='#10B981'
-    )
-
-    # 绘制白色笔记纸张
-    paper_margin = int(size * 0.23)
-    paper_width = size - 2 * paper_margin
-    paper_height = int(size * 0.625)
-    paper_radius = int(size * 0.03)
-    draw.rounded_rectangle(
-        [paper_margin, int(size * 0.195), paper_margin + paper_width, int(size * 0.195) + paper_height],
-        radius=paper_radius,
-        fill='white'
-    )
-
-    # 绘制线条
-    line_color = '#E2E8F0'
-    line_y_start = int(size * 0.31)
-    line_spacing = int(size * 0.098)
-    line_margin = int(size * 0.31)
-    line_width = int(size * 0.45)
-
-    for i in range(4):
-        y = line_y_start + i * line_spacing
-        draw.line(
-            [(line_margin, y), (line_margin + line_width - i * int(size * 0.04), y)],
-            fill=line_color,
-            width=max(1, int(size * 0.008))
-        )
-
-    img.save(output_path, 'PNG')
-    print(f"  生成简单图标: {os.path.basename(output_path)}")
-
-
-def main():
+def generate_icons():
     print("开始生成 PWA 图标...")
-    print(f"图标目录: {ICONS_DIR}")
+    print(f"源文件: {SOURCE_PNG}")
+    print(f"输出目录: {ICONS_DIR}")
 
-    # 检查目录
+    if not os.path.exists(SOURCE_PNG):
+        print(f"错误: 未找到源文件 {SOURCE_PNG}")
+        return
+
     if not os.path.exists(ICONS_DIR):
         os.makedirs(ICONS_DIR)
-        print(f"创建目录: {ICONS_DIR}")
 
-    # 检查 SVG 文件
-    has_svg = os.path.exists(SVG_FILE)
-    if has_svg and cairosvg:
-        print(f"找到 SVG 源文件: {SVG_FILE}")
-        use_svg = True
-    elif has_svg and not cairosvg:
-        print("SVG 文件存在，但 cairosvg 未安装")
-        print("将生成简单占位图标")
-        use_svg = False
-    else:
-        print("未找到 SVG 源文件，将生成简单占位图标")
-        use_svg = False
+    try:
+        # 打开源图片
+        with Image.open(SOURCE_PNG) as img:
+            # 确保是 RGBA 模式以保留透明度
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            print(f"源图片尺寸: {img.size}")
 
-    # 生成各尺寸图标
-    for size in SIZES:
-        output_file = os.path.join(ICONS_DIR, f'icon-{size}.png')
+            # 1. 生成各尺寸标准图标
+            for size in SIZES:
+                output_filename = f'icon-{size}.png'
+                output_path = os.path.join(ICONS_DIR, output_filename)
+                
+                # 高质量缩放
+                resized_img = img.resize((size, size), Image.Resampling.LANCZOS)
+                resized_img.save(output_path, 'PNG')
+                print(f"  ✓ 生成 {output_filename}")
 
-        if use_svg:
-            try:
-                generate_from_svg(SVG_FILE, output_file, size)
-                print(f"  ✓ icon-{size}.png")
-            except Exception as e:
-                print(f"  ✗ icon-{size}.png 失败: {e}")
-                generate_simple_icon(output_file, size)
-        else:
-            generate_simple_icon(output_file, size)
+            # 2. 生成 Apple Touch Icon (180x180)
+            apple_output = os.path.join(ICONS_DIR, 'apple-touch-icon.png')
+            apple_img = img.resize((180, 180), Image.Resampling.LANCZOS)
+            
+            # iOS 图标通常不需要透明背景，虽然 PNG 支持。
+            # 这里保持透明，或者可以加一个白色背景
+            # apple_bg = Image.new('RGB', (180, 180), (255, 255, 255))
+            # apple_bg.paste(apple_img, (0, 0), apple_img)
+            # apple_bg.save(apple_output, 'PNG')
+            
+            apple_img.save(apple_output, 'PNG')
+            print(f"  ✓ 生成 apple-touch-icon.png")
 
-    # 生成 Apple Touch Icon
-    apple_output = os.path.join(ICONS_DIR, 'apple-touch-icon.png')
-    if use_svg:
-        svg_source = APPLE_SVG if os.path.exists(APPLE_SVG) else SVG_FILE
-        try:
-            generate_from_svg(svg_source, apple_output, 180)
-            print(f"  ✓ apple-touch-icon.png (180x180)")
-        except Exception as e:
-            print(f"  ✗ apple-touch-icon.png 失败: {e}")
-            generate_simple_icon(apple_output, 180)
-    else:
-        generate_simple_icon(apple_output, 180)
+    except Exception as e:
+        print(f"生成过程中出错: {e}")
 
-    print("\n图标生成完成!")
-    print(f"\n生成的文件位于: {ICONS_DIR}")
-    print("\n注意: 如果使用的是占位图标，建议安装 cairosvg 后重新生成：")
-    print("  pip install cairosvg")
-    print("  python scripts/generate_icons.py")
+    print("\n所有图标生成完成!")
 
 
 if __name__ == '__main__':
-    main()
+    generate_icons()

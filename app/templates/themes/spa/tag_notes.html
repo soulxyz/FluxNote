@@ -82,9 +82,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module">
-import { renderContent } from '/static/js/markdown-renderer.js';
-
+    <script type="module">
+        import { renderContent } from '/static/js/markdown-renderer.js?v={{ app_version }}';
 // 渲染所有笔记内容
 async function renderAllNotes() {
     const notes = document.querySelectorAll('.note-card[data-note-id]');

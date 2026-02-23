@@ -32,15 +32,15 @@
     "categories": ["productivity", "utilities"],
     "screenshots": [
         {
-            "src": "/static/img/preview.jpg",
+            "src": "/static/img/preview.png",
             "sizes": "1280x800",
-            "type": "image/jpeg",
+            "type": "image/png",
             "form_factor": "wide"
         },
         {
-            "src": "/static/img/preview.jpg",
+            "src": "/static/img/preview.png",
             "sizes": "1280x800",
-            "type": "image/jpeg",
+            "type": "image/png",
             "form_factor": "narrow"
         }
     ],

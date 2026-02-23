@@ -17,18 +17,34 @@ from webauthn.helpers.structs import (
     PublicKeyCredentialType
 )
 from app.extensions import db
-from app.models import User, UserCredential
+from app.models import User, UserCredential, Config
 import os
 
 webauthn_bp = Blueprint('webauthn', __name__)
 
 def get_webauthn_config():
     """获取动态 WebAuthn 配置"""
-    # 优先从配置获取，否则从请求中推断
+    # 1. 尝试从数据库 Config 获取 (支持后台动态修改)
+    db_rp_id = Config.get('WEBAUTHN_RP_ID')
+    db_origin = Config.get('WEBAUTHN_ORIGIN')
+
+    # 2. 尝试从 Flask app config 获取 (环境变量/settings.json)
+    app_rp_id = current_app.config.get('WEBAUTHN_RP_ID')
+    app_origin = current_app.config.get('WEBAUTHN_ORIGIN')
+
+    # 3. 自动推断 (开发环境兜底)
     # 注意：rp_id 必须是域名（localhost 也可以），不能包含协议或端口
-    rp_id = current_app.config.get('WEBAUTHN_RP_ID') or request.host.split(':')[0]
+    inferred_rp_id = request.host.split(':')[0]
     # origin 必须包含协议和端口
-    origin = current_app.config.get('WEBAUTHN_ORIGIN') or f"{request.scheme}://{request.host}"
+    inferred_origin = f"{request.scheme}://{request.host}"
+
+    rp_id = db_rp_id or app_rp_id or inferred_rp_id
+    origin = db_origin or app_origin or inferred_origin
+
+    # 调试日志 (仅在调试模式或显式请求时输出，防止日志泛滥，这里简单使用print即可，生产环境会被捕获)
+    if current_app.debug or os.environ.get('FLASK_DEBUG') == '1':
+        print(f"[WebAuthn] Using Config: RP_ID={rp_id}, ORIGIN={origin}")
+
     return rp_id, origin
 
 RP_NAME = "流光笔记 FluxNote"

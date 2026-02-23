@@ -115,7 +115,7 @@
 
     <!-- 热力图数据 (全局变量供 heatmap.js 使用) -->
     <script>window.heatmapData = {{ heatmap_data | tojson }};</script>
-    <script type="module" src="/static/js/heatmap.js"></script>
+    <script type="module" src="/static/js/heatmap.js?v={{ app_version }}"></script>
 {% endblock %}
 
 {% block scripts %}

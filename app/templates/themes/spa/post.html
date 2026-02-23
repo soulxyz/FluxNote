@@ -61,9 +61,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script type="module">
-import { renderContent } from '/static/js/markdown-renderer.js';
-
+    <script type="module">
+        import { renderContent } from '/static/js/markdown-renderer.js?v={{ app_version }}';
 async function renderPost() {
     const id = "{{ note.id }}";
     const rawContainer = document.getElementById(`raw-content-${id}`);

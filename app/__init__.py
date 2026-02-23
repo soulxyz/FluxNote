@@ -15,6 +15,9 @@ import os
 from sqlalchemy import text, inspect
 import traceback
 
+# 应用版本号 - 每次部署更新时递增此版本号以清除客户端缓存
+APP_VERSION = '1.0.8'
+
 
 def is_debug_mode():
     """检查是否开启调试模式"""
@@ -78,17 +81,35 @@ def create_app():
     def uploaded_file(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-    # Service Worker Route - 需要特殊响应头以允许根作用域
+    # Service Worker Route - Dynamically inject version and debug flag
     @app.route('/static/sw.js')
     def service_worker():
-        response = send_from_directory(
-            os.path.join(app.root_path, 'static'),
-            'sw.js',
-            mimetype='application/javascript'
-        )
-        # 允许 Service Worker 控制根路径
-        response.headers['Service-Worker-Allowed'] = '/'
-        return response
+        sw_path = os.path.join(app.root_path, 'static', 'sw.js')
+        try:
+            with open(sw_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Inject current version into SW
+            import re
+            content = re.sub(r"const CACHE_VERSION = ['\"]DEV['\"];", f"const CACHE_VERSION = '{APP_VERSION}';", content)
+            
+            # Inject Debug Flag
+            is_debug = 'true' if is_debug_mode() else 'false'
+            content = re.sub(r"const IS_DEBUG = (true|false);", f"const IS_DEBUG = {is_debug};", content)
+            
+            response = app.response_class(content, mimetype='application/javascript')
+            response.headers['Service-Worker-Allowed'] = '/'
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
+        except Exception as e:
+            # Log error and return a safe response (not HTML)
+            print(f"Error loading SW: {str(e)}")
+            return "console.error('Service Worker load failed');", 500, {'Content-Type': 'application/javascript'}
+
+    # 注入全局模板变量
+    @app.context_processor
+    def inject_version():
+        return dict(app_version=APP_VERSION)
 
     # ===== Global Error Handlers =====
     # 防止在生产环境中泄露敏感错误信息

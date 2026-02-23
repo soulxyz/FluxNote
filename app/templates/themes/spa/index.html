@@ -112,7 +112,7 @@
 
 {% block scripts %}
 <script type="module">
-import { renderContent } from '/static/js/markdown-renderer.js';
+    import { renderContent } from '/static/js/markdown-renderer.js?v={{ app_version }}';
 
 // 渲染所有笔记内容 (SPA 特有的前端异步加载渲染)
 async function renderAllNotes() {

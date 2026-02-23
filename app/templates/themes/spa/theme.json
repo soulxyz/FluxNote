@@ -3,8 +3,8 @@
   "description": "丝滑无刷新体验，多维侧边栏统计，如应用般流畅。",
   "author": "流光笔记",
   "preview": {
-    "type": "gradient",
-    "value": "linear-gradient(135deg, #10B981 0%, #059669 100%)"
+    "type": "image",
+    "value": "/theme/spa/static/img/preview.png"
   },
   "primary_color": "#10B981",
   "is_writer": true,

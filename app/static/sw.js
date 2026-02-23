@@ -3,7 +3,11 @@
  * 仅在登录后启用，提供离线访问能力
  */
 
-const CACHE_VERSION = 'v7';
+// This will be replaced by server: const CACHE_VERSION = '1.0.8';
+const CACHE_VERSION = 'DEV'; 
+// This will be replaced by server: const IS_DEBUG = true/false;
+const IS_DEBUG = false;
+
 const STATIC_CACHE = `fluxnote-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `fluxnote-dynamic-${CACHE_VERSION}`;
 
@@ -25,7 +29,12 @@ const JS_MODULES = [
     '/static/js/modules/ui.js',
     '/static/js/modules/auth.js',
     '/static/js/modules/editor.js',
-    '/static/js/modules/utils.js'
+    '/static/js/modules/utils.js',
+    '/static/js/modules/events.js',
+    '/static/js/modules/comment-widget.js', // Ensure all modules are listed
+    '/static/js/theme-sdk.js',
+    '/static/js/pwa.js',
+    '/static/js/heatmap.js'
 ];
 
 // 第三方库（可选）
@@ -44,6 +53,9 @@ const FONTS = [
     '/static/lib/fontawesome/webfonts/fa-solid-900.woff2',
     '/static/lib/fontawesome/webfonts/fa-regular-400.woff2'
 ];
+
+// 所有需要预缓存的资源集合
+const ALL_ASSETS = [...PRECACHE_ASSETS, ...JS_MODULES, ...LIBS, ...FONTS];
 
 // 不缓存的路径
 const EXCLUDED_PATHS = [
@@ -75,16 +87,27 @@ function isNavigationRequest(request) {
            request.headers.get('accept')?.includes('text/html');
 }
 
-// 缓存单个资源
-async function cacheAsset(cache, url) {
+/**
+ * Helper: Fetch asset with version param to bypass HTTP cache,
+ * but store in Cache Storage with clean URL key.
+ * 这样 ES Modules 的 import '/static/foo.js' (无版本号) 才能命中缓存
+ */
+async function cacheAssetWithVersion(cache, url) {
     try {
-        const response = await fetch(url);
+        // 添加版本号参数以绕过浏览器 HTTP 缓存
+        const versionedUrl = url.includes('?') 
+            ? `${url}&v=${CACHE_VERSION}` 
+            : `${url}?v=${CACHE_VERSION}`;
+            
+        const response = await fetch(versionedUrl);
+        
         if (response.ok) {
+            // 使用原始 URL (不带版本号) 作为 Key 存入缓存
             await cache.put(url, response);
             return true;
         }
     } catch (e) {
-        console.log('[SW] Failed to cache:', url);
+        console.warn(`[SW] Failed to cache: ${url}`, e);
     }
     return false;
 }
@@ -97,22 +120,15 @@ self.addEventListener('install', (event) => {
         (async () => {
             const cache = await caches.open(STATIC_CACHE);
 
-            // 预缓存关键资源
-            try {
-                await cache.addAll(PRECACHE_ASSETS);
-            } catch (e) {
-                console.error('[SW] Critical cache failed:', e);
-                // 不抛出错误，允许降级运行
-            }
-
-            // 并行缓存其他资源
-            await Promise.all([
-                ...JS_MODULES.map(url => cacheAsset(cache, url)),
-                ...LIBS.map(url => cacheAsset(cache, url)),
-                ...FONTS.map(url => cacheAsset(cache, url))
-            ]);
+            // 并行缓存所有资源
+            // 使用 cacheAssetWithVersion 确保获取最新内容并以 clean URL 存储
+            await Promise.all(ALL_ASSETS.map(url => cacheAssetWithVersion(cache, url)));
 
             console.log('[SW] Installation complete');
+            // 强制跳过等待，让新 SW 尽快接管 (配合客户端 reload 逻辑)
+            // self.skipWaiting(); 
+            // 注意：如果自动 skipWaiting，可能会导致正在使用的旧页面资源加载错误。
+            // 最好还是由用户点击“刷新”按钮触发 postMessage('skipWaiting')。
         })()
     );
 });
@@ -226,23 +242,45 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 3. 静态资源：缓存优先 -> 网络 -> 404
+    // 3. 静态资源：stale-while-revalidate 策略
+    // 先返回缓存（快速），同时在后台更新缓存（确保下次访问是最新版本）
     event.respondWith(
         (async () => {
-            const cached = await caches.match(request);
-            if (cached) return cached;
-
-            try {
-                const response = await fetch(request);
-                if (response.ok) {
-                    const cache = await caches.open(STATIC_CACHE);
-                    cache.put(request, response.clone());
-                    return response;
-                }
-            } catch (error) {
-                // 网络失败且无缓存
+            // Debug 模式下强制网络优先，不走缓存
+            if (IS_DEBUG) {
+                 return fetch(request).catch(() => {
+                     return new Response('Offline (Debug Mode)', { status: 503, statusText: 'Offline' });
+                 });
             }
-            
+
+            // 查找缓存时忽略查询参数 (ignoreSearch: true)
+            // 这样 /style.css?v=1.0.9 也能命中 /style.css 的缓存
+            const cached = await caches.match(request, { ignoreSearch: true });
+
+            // 启动后台更新 (仅当不是 debug 模式时)
+            const fetchPromise = fetch(request).then(response => {
+                if (response.ok) {
+                    const cache = caches.open(STATIC_CACHE);
+                    // 存储时使用 clean URL (去除查询参数)
+                    // 确保 cache key 始终为 /static/js/main.js 而不是 /static/js/main.js?v=1.0.9
+                    const cleanUrl = new URL(request.url);
+                    cleanUrl.search = '';
+                    
+                    cache.then(c => c.put(cleanUrl.toString(), response.clone()));
+                }
+                return response;
+            }).catch(() => null);
+
+            // 有缓存就立即返回，否则等待网络
+            if (cached) {
+                return cached;
+            }
+
+            const networkResponse = await fetchPromise;
+            if (networkResponse) {
+                return networkResponse;
+            }
+
             return new Response('', { status: 404, statusText: 'Not Found' });
         })()
     );

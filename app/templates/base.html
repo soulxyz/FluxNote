@@ -4,13 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- PWA Configuration -->
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#10B981">
-    <link rel="apple-touch-icon" href="/static/img/icons/apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    
     {% block meta %}
     <meta name="description" content="{{ site_desc }}">
     {% endblock %}
@@ -18,20 +11,20 @@
     <title>{% block title %}{{ site_title }}{% endblock %}</title>
 
     <!-- 公共资源：所有主题共用 -->
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css">
-    
+    <link rel="stylesheet" href="/static/css/style.css?v={{ app_version }}">
+    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css?v={{ app_version }}">
+
     <!-- 第三方库：由 SDK 统一调度，但需在 Head 引入样式 -->
     {% block highlight_theme %}
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
+    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css?v={{ app_version }}">
     {% endblock %}
-    
+
     {% block viewer_css %}
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
+    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css?v={{ app_version }}">
     {% endblock %}
 
     <!-- 主题自定义样式 -->
-    <link rel="stylesheet" href="{{ theme_css }}">
+    <link rel="stylesheet" href="{{ theme_css }}?v={{ app_version }}">
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -44,15 +37,15 @@
     {% block body %}{% endblock %}
 
     <!-- 基础依赖库 -->
-    <script src="/static/lib/marked/marked.min.js"></script>
-    <script src="/static/lib/dompurify/purify.min.js"></script>
-    <script src="/static/lib/highlightjs/highlight.min.js"></script>
-    <script src="/static/lib/viewerjs/viewer.min.js"></script>
+    <script src="/static/lib/marked/marked.min.js?v={{ app_version }}"></script>
+    <script src="/static/lib/dompurify/purify.min.js?v={{ app_version }}"></script>
+    <script src="/static/lib/highlightjs/highlight.min.js?v={{ app_version }}"></script>
+    <script src="/static/lib/viewerjs/viewer.min.js?v={{ app_version }}"></script>
     <!-- Mermaid - 懒加载，不再首屏同步加载 -->
 
     <!-- Theme SDK 入口 -->
     <script type="module">
-        import themeSDK from '/static/js/theme-sdk.js';
+        import themeSDK from '/static/js/theme-sdk.js?v={{ app_version }}';
         window.themeSDK = themeSDK; // 暴露给全局，方便调试或特殊调用
         
         // 自动初始化 (子模板可以通过 block 覆盖配置)

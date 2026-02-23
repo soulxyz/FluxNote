@@ -7,7 +7,7 @@
     <title>流光笔记 - 记录生活</title>
 
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/static/manifest.json">
+    <link rel="manifest" href="/static/manifest.json?v={{ app_version }}">
     <meta name="theme-color" content="#10B981">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -17,19 +17,19 @@
     <meta name="application-name" content="流光笔记">
     <meta name="msapplication-TileColor" content="#10B981">
     <meta name="msapplication-config" content="/static/browserconfig.xml">
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ app_version }}">
     <!-- Preload critical fonts for faster rendering -->
     <link rel="preload" href="/static/lib/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/lib/fontawesome/webfonts/fa-regular-400.woff2" as="font" type="font/woff2" crossorigin>
     <!-- FontAwesome - async load with fallback -->
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css"></noscript>
+    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css?v={{ app_version }}" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css?v={{ app_version }}"></noscript>
     <!-- Markdown Support - defer for non-blocking -->
-    <script src="/static/lib/marked/marked.min.js" defer></script>
-    <script src="/static/lib/dompurify/purify.min.js" defer></script>
+    <script src="/static/lib/marked/marked.min.js?v={{ app_version }}" defer></script>
+    <script src="/static/lib/dompurify/purify.min.js?v={{ app_version }}" defer></script>
     <!-- Syntax Highlighting - defer for non-blocking -->
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css">
-    <script src="/static/lib/highlightjs/highlight.min.js" defer></script>
+    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css?v={{ app_version }}">
+    <script src="/static/lib/highlightjs/highlight.min.js?v={{ app_version }}" defer></script>
 
     <!-- Mermaid Diagrams - 移除首屏加载，改为懒加载 -->
 
@@ -51,8 +51,8 @@
     </script>
 
     <!-- Viewer.js for Image Zoom - defer -->
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css">
-    <script src="/static/lib/viewerjs/viewer.min.js" defer></script>
+    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css?v={{ app_version }}">
+    <script src="/static/lib/viewerjs/viewer.min.js?v={{ app_version }}" defer></script>
 </head>
 <body>
     <div class="app-layout" id="appLayout">
@@ -445,7 +445,10 @@
         </div>
     </div>
 
-    <script type="module" src="/static/js/main.js"></script>
+    <!-- PWA Logic (Admin Only) -->
+    <script type="module" src="/static/js/pwa.js?v={{ app_version }}"></script>
+
+    <script type="module" src="/static/js/main.js?v={{ app_version }}"></script>
     {% if show_login %}
     <script>
         // Auto show login modal when redirected from blog login link

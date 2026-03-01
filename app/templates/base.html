@@ -11,16 +11,16 @@
     <title>{% block title %}{{ site_title }}{% endblock %}</title>
 
     <!-- 公共资源：所有主题共用 -->
-    <link rel="stylesheet" href="/static/css/style.css?v={{ app_version }}">
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css?v={{ app_version }}">
+    <link rel="stylesheet" href={{ static_v("css/style.css") }}>
+    <link rel="stylesheet" href={{ static_v("lib/fontawesome/css/all.min.css") }}>
 
     <!-- 第三方库：由 SDK 统一调度，但需在 Head 引入样式 -->
     {% block highlight_theme %}
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css?v={{ app_version }}">
+    <link rel="stylesheet" href={{ static_v("lib/highlightjs/github.min.css") }}>
     {% endblock %}
 
     {% block viewer_css %}
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css?v={{ app_version }}">
+    <link rel="stylesheet" href={{ static_v("lib/viewerjs/viewer.min.css") }}>
     {% endblock %}
 
     <!-- 主题自定义样式 -->
@@ -37,10 +37,10 @@
     {% block body %}{% endblock %}
 
     <!-- 基础依赖库 -->
-    <script src="/static/lib/marked/marked.min.js?v={{ app_version }}"></script>
-    <script src="/static/lib/dompurify/purify.min.js?v={{ app_version }}"></script>
-    <script src="/static/lib/highlightjs/highlight.min.js?v={{ app_version }}"></script>
-    <script src="/static/lib/viewerjs/viewer.min.js?v={{ app_version }}"></script>
+    <script src={{ static_v("lib/marked/marked.min.js") }}></script>
+    <script src={{ static_v("lib/dompurify/purify.min.js") }}></script>
+    <script src={{ static_v("lib/highlightjs/highlight.min.js") }}></script>
+    <script src={{ static_v("lib/viewerjs/viewer.min.js") }}></script>
     <!-- Mermaid - 懒加载，不再首屏同步加载 -->
 
     <!-- Theme SDK 入口 -->

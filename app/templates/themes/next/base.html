@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block highlight_theme %}
-<link rel="stylesheet" href="/static/lib/highlightjs/atom-one-light.min.css?v={{ app_version }}">
+<link rel="stylesheet" href={{ static_v("lib/highlightjs/atom-one-light.min.css") }}>
 {% endblock %}
 
 {% block body_class %}theme-next{% endblock %}

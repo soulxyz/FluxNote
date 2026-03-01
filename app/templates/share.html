@@ -6,18 +6,18 @@
     <meta name="description" content="{{ site_desc }}">
     <title>{{ note.title if note else '分享' }} - {{ site_title }}</title>
     <!-- 移除 style.css，使用内联样式 -->
-    <link rel="stylesheet" href="/static/lib/fontawesome/css/all.min.css?v={{ app_version }}">
+    <link rel="stylesheet" href={{ static_v("lib/fontawesome/css/all.min.css") }}>
     <!-- Mermaid - 按需加载 -->
     <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/mermaid/10.9.0/mermaid.min.js"></script>
     <!-- Markdown Support -->
-    <script src="/static/lib/marked/marked.min.js?v={{ app_version }}"></script>
-    <script src="/static/lib/dompurify/purify.min.js?v={{ app_version }}"></script>
+    <script src={{ static_v("lib/marked/marked.min.js") }}></script>
+    <script src={{ static_v("lib/dompurify/purify.min.js") }}></script>
     <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="/static/lib/highlightjs/github.min.css?v={{ app_version }}">
-    <script src="/static/lib/highlightjs/highlight.min.js?v={{ app_version }}"></script>
+    <link rel="stylesheet" href={{ static_v("lib/highlightjs/github.min.css") }}>
+    <script src={{ static_v("lib/highlightjs/highlight.min.js") }}></script>
     <!-- Viewer.js for Image Zoom -->
-    <link rel="stylesheet" href="/static/lib/viewerjs/viewer.min.css?v={{ app_version }}">
-    <script src="/static/lib/viewerjs/viewer.min.js?v={{ app_version }}"></script>
+    <link rel="stylesheet" href={{ static_v("lib/viewerjs/viewer.min.css") }}>
+    <script src={{ static_v("lib/viewerjs/viewer.min.js") }}></script>
     <!-- Markdown Renderer Module -->
     <script type="module">
         import { renderContent, initMarkdownRenderer } from '/static/js/markdown-renderer.js?v={{ app_version }}';

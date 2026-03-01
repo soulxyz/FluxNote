@@ -86,8 +86,21 @@ def create_app():
     # 注入全局模板变量，使用动态生成的哈希值作为版本号
     @app.context_processor
     def inject_version():
-        # 每次渲染模板时，动态读取核心文件的修改时间计算哈希
-        return dict(app_version=get_static_hash())
+        from .utils.version import get_static_manifest, get_static_hash
+        manifest = get_static_manifest()
+        
+        # 细粒度版本控制助手
+        def static_v(filename):
+            # filename 格式如: 'js/main.js'
+            path = f"/static/{filename}"
+            # 如果在清单中，返回该文件的独立哈希，否则回退到全局哈希
+            v = manifest.get(path, get_static_hash())
+            return f"/static/{filename}?v={v}"
+            
+        return dict(
+            app_version=get_static_hash(),
+            static_v=static_v
+        )
 
     # ===== Global Error Handlers =====
     # 防止在生产环境中泄露敏感错误信息

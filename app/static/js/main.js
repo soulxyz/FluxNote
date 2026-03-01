@@ -178,6 +178,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         onLogin: loadData,
         onLogout: loadData
     });
+
+    // Handle PWA Shortcuts (?action=new)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'new') {
+        setTimeout(() => {
+            const textarea = document.getElementById('noteContent');
+            if (textarea) {
+                if (state.isTrashMode) switchView('all');
+                textarea.focus();
+                textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 500); // Wait a bit for initial data load/UI render
+    }
 });
 
 async function loadData() {
@@ -187,6 +200,46 @@ async function loadData() {
     ui.renderOverviewStats();
     ui.updateHeaderDate();
     ui.handleHashJump(); // Manually jump to anchor after notes are rendered
+}
+
+
+/**
+ * 将本地存储中的离线更改（草稿、更新、删除）合并到给定的笔记列表中
+ */
+function applyOfflineChanges(notes) {
+    const offlineDrafts = JSON.parse(localStorage.getItem('offline_drafts') || '[]');
+    const offlineDeletes = JSON.parse(localStorage.getItem('offline_deletes') || '[]');
+    const offlineUpdates = JSON.parse(localStorage.getItem('offline_updates') || '{}');
+
+    // 1. 过滤已删除的笔记
+    const deleteIds = offlineDeletes.map(d => (typeof d === 'string' ? d : d.id));
+    let processedNotes = Array.isArray(notes) ? notes.filter(n => !deleteIds.includes(n.id)) : [];
+
+    // 2. 应用待同步的更新
+    processedNotes = processedNotes.map(n => {
+        if (offlineUpdates[n.id]) {
+            return { ...n, ...offlineUpdates[n.id], is_offline_update: true };
+        }
+        return n;
+    });
+
+    // 3. 合并离线草稿
+    if (offlineDrafts.length > 0) {
+        const draftNotes = offlineDrafts.map((draft, index) => ({
+            id: `offline-${draft._id || (Date.now() + index)}`,
+            content: draft.content,
+            tags: draft.tags || [],
+            is_public: draft.is_public,
+            created_at: draft.created_at,
+            user_id: state.currentUser ? state.currentUser.id : -1,
+            backlinks: [],
+            is_offline_draft: true
+        })).reverse();
+        
+        processedNotes = [...draftNotes, ...processedNotes];
+    }
+    
+    return processedNotes;
 }
 
 // === Note Logic ===
@@ -205,76 +258,20 @@ async function loadNotes(reset = false) {
 
     const list = document.getElementById('notesList');
 
-    // 离线检查 - 优先处理
+    // 1. 网络环境预检查
     if (!navigator.onLine) {
-        console.log('[Notes] Offline mode, loading cached notes');
-        const cachedNotes = localStorage.getItem('cached_notes');
-        const offlineDrafts = JSON.parse(localStorage.getItem('offline_drafts') || '[]');
-        const offlineDeletes = JSON.parse(localStorage.getItem('offline_deletes') || '[]');
-        const offlineUpdates = JSON.parse(localStorage.getItem('offline_updates') || '{}');
-        
+        console.log('[Notes] Device is offline, loading from local cache');
+        const cached = localStorage.getItem('cached_notes');
         let notes = [];
-        
-        if (cachedNotes) {
+        if (cached) {
             try {
-                const parsed = JSON.parse(cachedNotes);
-                // Cache Versioning & Expiration Check
-                if (parsed && parsed.version === 1 && Array.isArray(parsed.data)) {
-                    const CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
-                    if (Date.now() - parsed.timestamp < CACHE_MAX_AGE) {
-                        notes = parsed.data;
-                    } else {
-                        console.log('[Notes] Cached notes expired');
-                        // Optional: showToast('离线数据已过期');
-                    }
-                } else if (Array.isArray(parsed)) {
-                    // Legacy support
-                    notes = parsed;
-                }
-            } catch (e) {
-                console.error('[Notes] Failed to parse cached notes:', e);
-            }
+                const parsed = JSON.parse(cached);
+                notes = (parsed && parsed.data) ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+            } catch (e) { console.error(e); }
         }
-
-        // 1. 过滤已删除的笔记
-        const deleteIds = offlineDeletes.map(d => (typeof d === 'string' ? d : d.id));
-        if (deleteIds.length > 0) {
-            notes = notes.filter(n => !deleteIds.includes(n.id));
-        }
-
-        // 2. 应用待同步的更新
-        notes = notes.map(n => {
-            if (offlineUpdates[n.id]) {
-                return { ...n, ...offlineUpdates[n.id], is_offline_update: true }; // flag for UI?
-            }
-            return n;
-        });
-        
-        // 3. 合并离线草稿（作为临时笔记展示）
-        if (offlineDrafts.length > 0) {
-            const draftNotes = offlineDrafts.map((draft, index) => ({
-                id: `offline-${draft._id || (Date.now() + index)}`, // Fallback for old drafts
-                content: draft.content,
-                tags: draft.tags || [],
-                is_public: draft.is_public,
-                created_at: draft.created_at, // Use stored ISO string
-                user_id: state.currentUser ? state.currentUser.id : -1,
-                backlinks: [],
-                is_offline_draft: true
-            })).reverse(); // 最新草稿在前
-            
-            notes = [...draftNotes, ...notes];
-        }
-
-        if (notes.length > 0) {
-            setState('notes', notes);
-            console.log('[Notes] Rendering', notes.length, 'notes (including drafts)');
-            ui.renderNotes(notes, true);
-        } else {
-            console.log('[Notes] No notes available offline');
-            if (list) list.innerHTML = '<div class="empty-state">离线模式 - 无缓存数据</div>';
-        }
-        
+        const processed = applyOfflineChanges(notes);
+        setState('notes', processed);
+        ui.renderNotes(processed, true);
         setState('isLoading', false);
         hideScrollLoading();
         return;
@@ -303,18 +300,22 @@ async function loadNotes(reset = false) {
         }
 
         if (!response) {
-            // 网络请求失败，尝试加载缓存
-            const cachedNotes = localStorage.getItem('cached_notes');
-            if (cachedNotes) {
+            // 网络请求失败（如服务器宕机），尝试加载缓存并合并离线数据
+            console.log('[Notes] Server unreachable, falling back to local cache');
+            const cached = localStorage.getItem('cached_notes');
+            let notes = [];
+            if (cached) {
                 try {
-                    const notes = JSON.parse(cachedNotes);
-                    setState('notes', notes);
-                    ui.renderNotes(notes, true);
-                    showToast('网络错误 - 显示缓存内容');
-                } catch (e) {
-                    console.error('Failed to load cached notes:', e);
-                }
+                    const parsed = JSON.parse(cached);
+                    notes = (parsed && parsed.data) ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+                } catch (e) { console.error(e); }
             }
+            const processed = applyOfflineChanges(notes);
+            setState('notes', processed);
+            ui.renderNotes(processed, true);
+            showToast('网络错误 - 显示本地内容');
+            setState('isLoading', false);
+            hideScrollLoading();
             return;
         }
         const data = await response.json();

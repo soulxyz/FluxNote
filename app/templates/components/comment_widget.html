@@ -55,11 +55,11 @@
 <script type="module">
     import '/static/js/modules/utils.js?v={{ app_version }}';
 </script>
-<script src="/static/js/modules/comment-widget.js?v={{ app_version }}"></script>
+<script src={{ static_v("js/modules/comment-widget.js") }}></script>
 <script>
     // SPA Compatibility: Trigger init if script is already loaded
     if (window.initCommentWidget) {
         window.initCommentWidget();
     }
 </script>
-<link rel="stylesheet" href="/static/css/comments.css?v={{ app_version }}">
+<link rel="stylesheet" href={{ static_v("css/comments.css") }}>

@@ -682,6 +682,43 @@ function initEditorLogic(loadNotes) {
                 ui.renderTags('input');
                 loadNotes(true);
                 showToast('已记录');
+            } else if (res === null) {
+                // Backend unreachable, fallback to offline logic
+                const draftId = Date.now();
+                const draft = {
+                    _id: draftId,
+                    content,
+                    tags: [...state.currentTags],
+                    is_public: isPublic,
+                    created_at: new Date().toISOString()
+                };
+                const drafts = JSON.parse(localStorage.getItem('offline_drafts') || '[]');
+                drafts.push(draft);
+                localStorage.setItem('offline_drafts', JSON.stringify(drafts));
+
+                const tempNote = {
+                    id: `offline-${draftId}`,
+                    content: draft.content,
+                    tags: draft.tags,
+                    is_public: draft.is_public,
+                    created_at: draft.created_at,
+                    user_id: state.currentUser ? state.currentUser.id : -1,
+                    backlinks: [],
+                    is_offline_draft: true
+                };
+                const list = document.getElementById('notesList');
+                if (list) {
+                    list.querySelector('.empty-state')?.remove();
+                    const card = ui.createNoteCard(tempNote);
+                    card.style.opacity = '0.85';
+                    list.insertBefore(card, list.firstChild);
+                }
+
+                document.getElementById('noteContent').value = '';
+                localStorage.removeItem('note_draft_content');
+                setState('currentTags', []);
+                ui.renderTags('input');
+                showToast('已保存到离线草稿，联网后自动同步');
             } else {
                 showToast('保存失败');
             }
@@ -820,6 +857,8 @@ function initCustomEvents(loadNotes, loadTags) {
             removeCardFromUI(id);
             ui.renderHeatmap();
             loadTags();
+        } else if (res === null) {
+            handleOfflineDelete(id);
         } else {
             showToast('删除失败');
         }
@@ -877,6 +916,11 @@ function initCustomEvents(loadNotes, loadTags) {
         if (res && res.ok) {
             note.content = newContent;
             ui.restoreCard(note);
+        } else if (res === null) {
+            handleOfflineUpdate(id, { content: newContent });
+            note.content = newContent;
+            ui.restoreCard(note);
+            showToast('已保存 (离线)');
         } else {
             showToast('更新失败');
             ui.restoreCard(note);
@@ -909,6 +953,16 @@ function initCustomEvents(loadNotes, loadTags) {
                 ui.restoreCard(note);
             }
             showToast('保存成功');
+            loadTags();
+        } else if (res === null) {
+            handleOfflineUpdate(id, { content, tags, is_public });
+            if (note) {
+                note.content = content;
+                note.tags = tags;
+                note.is_public = is_public;
+                ui.restoreCard(note);
+            }
+            showToast('已保存 (离线)');
             loadTags();
         } else {
             showToast('保存失败');

@@ -2,23 +2,29 @@ from flask import Blueprint, render_template, redirect, url_for, current_app, ma
 from flask_login import current_user
 from app.extensions import db
 from app.models import Share, Config, User
-from app.utils.version import get_static_hash
+from app.utils.version import get_static_hash, get_static_manifest
 import os
+import json
 
 main_bp = Blueprint('main', __name__)
 
 @main_bp.route('/sw.js')
 def service_worker():
-    """动态提供 Service Worker 脚本，注入基于文件修改时间的动态版本号"""
+    """动态提供 Service Worker 脚本，注入细粒度版本清单"""
     sw_path = os.path.join(current_app.static_folder, 'sw.js')
     try:
         with open(sw_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # 注入动态生成的版本号
+        # 1. 注入总哈希（用于触发 SW 脚本更新）
         dynamic_version = get_static_hash()
         content = content.replace("const CACHE_VERSION = 'DEV';", f"const CACHE_VERSION = '{dynamic_version}';")
-        # 注入调试模式
+        
+        # 2. 注入细粒度文件清单（用于增量缓存更新）
+        manifest = get_static_manifest()
+        content = content.replace("const ASSET_MANIFEST = {};", f"const ASSET_MANIFEST = {json.dumps(manifest)};")
+
+        # 3. 注入调试模式
         is_debug = 'true' if current_app.debug else 'false'
         content = content.replace("const IS_DEBUG = false;", f"const IS_DEBUG = {is_debug};")
 

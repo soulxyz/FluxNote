@@ -1,9 +1,42 @@
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, redirect, url_for, current_app, make_response, send_from_directory
 from flask_login import current_user
 from app.extensions import db
 from app.models import Share, Config, User
+from app.utils.version import get_static_hash
+import os
 
 main_bp = Blueprint('main', __name__)
+
+@main_bp.route('/sw.js')
+def service_worker():
+    """动态提供 Service Worker 脚本，注入基于文件修改时间的动态版本号"""
+    sw_path = os.path.join(current_app.static_folder, 'sw.js')
+    try:
+        with open(sw_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # 注入动态生成的版本号
+        dynamic_version = get_static_hash()
+        content = content.replace("const CACHE_VERSION = 'DEV';", f"const CACHE_VERSION = '{dynamic_version}';")
+        # 注入调试模式
+        is_debug = 'true' if current_app.debug else 'false'
+        content = content.replace("const IS_DEBUG = false;", f"const IS_DEBUG = {is_debug};")
+
+        response = make_response(content)
+        response.headers['Content-Type'] = 'application/javascript'
+        # 显式允许根作用域
+        response.headers['Service-Worker-Allowed'] = '/'
+        # 禁用浏览器对 SW 本身的缓存，确保更新能立即触发
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    except Exception as e:
+        current_app.logger.error(f"Error serving sw.js: {e}")
+        return "Service Worker not found", 404
+
+@main_bp.route('/manifest.json')
+def manifest():
+    """根路径提供 manifest.json"""
+    return send_from_directory(current_app.static_folder, 'manifest.json')
 
 @main_bp.route('/')
 def index():

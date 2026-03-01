@@ -1,147 +1,106 @@
-/**
- * PWA Registration Module
- * Handles Service Worker registration and updates
- */
-
 import { showToast } from './modules/utils.js';
 
-// Global variable to track offline mode
-window.isOfflineMode = !navigator.onLine;
+export const pwa = {
+    init() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                // 使用根路径下的 /sw.js，确保护盖全站作用域
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('[PWA] Service Worker registered:', registration.scope);
+                        
+                        // 1. 处理初始加载时的更新检测
+                        if (registration.waiting) {
+                            this.updateFound(registration.waiting);
+                        }
 
-// Register PWA
-export async function initPWA() {
-    if (!('serviceWorker' in navigator)) {
-        console.log('[PWA] Service Worker not supported');
-        return;
-    }
+                        // 2. 监听后续发现的新版本
+                        registration.onupdatefound = () => {
+                            const installingWorker = registration.installing;
+                            installingWorker.onstatechange = () => {
+                                if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    this.updateFound(installingWorker);
+                                }
+                            };
+                        };
+                    })
+                    .catch(error => {
+                        console.error('[PWA] Registration failed:', error);
+                    });
 
-    // 1. 离线状态监听
-    window.addEventListener('online', () => {
-        window.isOfflineMode = false;
-        document.body.classList.remove('offline');
-        // main.js handles the toast
-    });
-
-    window.addEventListener('offline', () => {
-        window.isOfflineMode = true;
-        document.body.classList.add('offline');
-    });
-
-    // 2. Controller Change (Update Applied)
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-    });
-
-    try {
-        const registration = await navigator.serviceWorker.register('/static/sw.js', {
-            scope: '/'
-        });
-
-        // 3. Update Detection
-        if (registration.waiting) {
-            updateReady(registration.waiting);
-            return;
-        }
-
-        registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (!newWorker) return;
-
-            newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed') {
-                    if (navigator.serviceWorker.controller) {
-                        // New update available
-                        updateReady(newWorker);
-                    } else {
-                        // Content cached for offline use
-                        showToast('已就绪，可离线使用');
-                    }
-                }
+                // 3. 监听控制器更替，新 SW 激活后自动刷新
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    console.log('[PWA] Controller changed, reloading...');
+                    window.location.reload();
+                });
             });
+        }
+    },
+
+    /**
+     * 当发现新版本已就绪（waiting）时调用
+     */
+    updateFound(worker) {
+        console.log('[PWA] New version available');
+        
+        // 创建一个无侵入式的更新提示 Toast
+        const updateToast = document.createElement('div');
+        updateToast.className = 'pwa-update-toast';
+        updateToast.innerHTML = `
+            <div class="pwa-update-content">
+                <i class="fas fa-magic" style="color: #f59e0b; margin-right: 8px;"></i>
+                <span>发现新版本系统，点击立即体验</span>
+            </div>
+            <button class="pwa-update-close">&times;</button>
+        `;
+        
+        // 基本样式内联，确保不依赖外部 CSS 的更新
+        Object.assign(updateToast.style, {
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            backgroundColor: '#1e293b',
+            color: 'white',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px',
+            zIndex: '9999',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            transform: 'translateY(100px)',
+            opacity: '0',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontSize: '14px'
         });
 
-    } catch (error) {
-        console.error('[PWA] Registration failed:', error);
+        document.body.appendChild(updateToast);
+        
+        // 动画显示
+        requestAnimationFrame(() => {
+            updateToast.style.transform = 'translateY(0)';
+            updateToast.style.opacity = '1';
+        });
+
+        // 点击更新内容区域
+        updateToast.querySelector('.pwa-update-content').addEventListener('click', () => {
+            updateToast.style.opacity = '0.5';
+            worker.postMessage('skipWaiting'); // 触发 SW 激活并刷新页面
+        });
+
+        // 点击关闭按钮
+        updateToast.querySelector('.pwa-update-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateToast.style.transform = 'translateY(100px)';
+            updateToast.style.opacity = '0';
+            setTimeout(() => updateToast.remove(), 300);
+        });
     }
-}
+};
 
-function updateReady(worker) {
-    console.log('[PWA] New version ready');
-    showUpdateNotification(worker);
-}
-
-function showUpdateNotification(worker) {
-    // 检查是否存在现有提示
-    if (document.querySelector('.pwa-update-toast')) return;
-
-    const toast = document.createElement('div');
-    toast.className = 'pwa-update-toast';
-    
-    // 使用应用主题样式
-    toast.style.cssText = `
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        background: white;
-        color: #1e293b;
-        padding: 16px;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        border: 1px solid #e2e8f0;
-        max-width: 300px;
-        animation: slideIn 0.3s ease-out;
-    `;
-
-    toast.innerHTML = `
-        <div style="display:flex; align-items:center; gap:10px;">
-            <i class="fas fa-sparkles" style="color:#10B981; font-size:1.2em;"></i>
-            <div style="flex:1;">
-                <h4 style="margin:0; font-size:14px; font-weight:600;">发现新版本</h4>
-                <p style="margin:4px 0 0; font-size:12px; color:#64748b;">更新以获取最新功能和修复</p>
-            </div>
-        </div>
-        <div style="display:flex; gap:8px; justify-content:flex-end;">
-            <button id="pwaLaterBtn" style="padding:6px 12px; font-size:12px; border:1px solid #e2e8f0; background:white; color:#64748b; border-radius:6px; cursor:pointer;">稍后</button>
-            <button id="pwaRefreshBtn" style="padding:6px 12px; font-size:12px; border:none; background:#10B981; color:white; border-radius:6px; cursor:pointer; font-weight:500;">立即刷新</button>
-        </div>
-    `;
-
-    document.body.appendChild(toast);
-
-    // 绑定事件
-    document.getElementById('pwaRefreshBtn').onclick = () => {
-        // 发送 skipWaiting 消息触发激活，进而触发 controllerchange 刷新页面
-        worker.postMessage('skipWaiting');
-        toast.innerHTML = '<div style="text-align:center; padding:10px; color:#64748b;"><i class="fas fa-spinner fa-spin"></i> 正在更新...</div>';
-    };
-
-    document.getElementById('pwaLaterBtn').onclick = () => {
-        toast.style.animation = 'fadeOut 0.3s ease-in forwards';
-        setTimeout(() => toast.remove(), 300);
-    };
-}
-
-// Add animation styles if not present
-if (!document.getElementById('pwa-styles')) {
-    const style = document.createElement('style');
-    style.id = 'pwa-styles';
-    style.textContent = `
-        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-    `;
-    document.head.appendChild(style);
-}
-
-// 延迟初始化，确保 DOM 加载完成
-if (document.readyState === 'complete') {
-    initPWA();
-} else {
-    window.addEventListener('load', initPWA);
-}
+pwa.init();

@@ -11,13 +11,16 @@ from .routes.auth_webauthn import webauthn_bp
 from .routes.share import share_bp
 from .routes.blog import blog_bp
 from .routes.comment import comment_bp
+from .utils.version import get_static_hash
 import os
+import logging
 from sqlalchemy import text, inspect
 import traceback
 
-# 应用版本号 - 每次部署更新时递增此版本号以清除客户端缓存
-APP_VERSION = '1.0.8'
+logger = logging.getLogger(__name__)
 
+# 全局静态版本哈希生成逻辑，替代原有的硬编码 APP_VERSION
+# APP_VERSION = '1.0.8'  <- 移除硬编码
 
 def is_debug_mode():
     """检查是否开启调试模式"""
@@ -25,7 +28,6 @@ def is_debug_mode():
         return Config.get('debug_mode', 'false').lower() == 'true'
     except:
         return False
-
 
 def create_app():
     app = Flask(__name__)
@@ -81,35 +83,11 @@ def create_app():
     def uploaded_file(filename):
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-    # Service Worker Route - Dynamically inject version and debug flag
-    @app.route('/static/sw.js')
-    def service_worker():
-        sw_path = os.path.join(app.root_path, 'static', 'sw.js')
-        try:
-            with open(sw_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # Inject current version into SW
-            import re
-            content = re.sub(r"const CACHE_VERSION = ['\"]DEV['\"];", f"const CACHE_VERSION = '{APP_VERSION}';", content)
-            
-            # Inject Debug Flag
-            is_debug = 'true' if is_debug_mode() else 'false'
-            content = re.sub(r"const IS_DEBUG = (true|false);", f"const IS_DEBUG = {is_debug};", content)
-            
-            response = app.response_class(content, mimetype='application/javascript')
-            response.headers['Service-Worker-Allowed'] = '/'
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            return response
-        except Exception as e:
-            # Log error and return a safe response (not HTML)
-            print(f"Error loading SW: {str(e)}")
-            return "console.error('Service Worker load failed');", 500, {'Content-Type': 'application/javascript'}
-
-    # 注入全局模板变量
+    # 注入全局模板变量，使用动态生成的哈希值作为版本号
     @app.context_processor
     def inject_version():
-        return dict(app_version=APP_VERSION)
+        # 每次渲染模板时，动态读取核心文件的修改时间计算哈希
+        return dict(app_version=get_static_hash())
 
     # ===== Global Error Handlers =====
     # 防止在生产环境中泄露敏感错误信息

@@ -1,8 +1,10 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_login import login_required, current_user
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from app.extensions import db
 from app.models import Note, User, Tag, NoteReference, NoteVersion
+from app.utils.cache import invalidate_stats_cache
 from app.utils import allowed_file, extract_title_and_links
 from app.utils.error_handler import safe_error
 from werkzeug.utils import secure_filename
@@ -102,7 +104,7 @@ def get_notes():
             query = query.filter(func.date(Note.created_at) == date_str)
 
         # Pagination
-        pagination = query.order_by(Note.created_at.desc()).paginate(
+        pagination = query.options(selectinload(Note.outgoing_references), selectinload(Note.incoming_references)).order_by(Note.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
 
@@ -211,6 +213,7 @@ def create_note():
 
         db.session.add(new_note)
         db.session.commit()
+        invalidate_stats_cache()
 
         return jsonify(new_note.to_dict()), 201
     except Exception as e:
@@ -284,6 +287,7 @@ def update_note(note_id):
         update_note_references(note, links)
 
         db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -337,6 +341,7 @@ def restore_note_version(note_id, version_id):
         update_note_references(note, links)
         
         db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -355,6 +360,7 @@ def delete_note(note_id):
             note.is_deleted = True
             note.deleted_at = datetime.now()
             db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -375,6 +381,7 @@ def restore_note(note_id):
         note.is_deleted = False
         note.deleted_at = None
         db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -391,6 +398,7 @@ def permanent_delete_note(note_id):
                 return jsonify({'error': '无权删除此笔记'}), 403
             db.session.delete(note)
             db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
@@ -406,7 +414,7 @@ def get_trash_notes():
         
         query = Note.query.filter_by(user_id=current_user.id, is_deleted=True)
         
-        pagination = query.order_by(Note.deleted_at.desc()).paginate(
+        pagination = query.options(selectinload(Note.outgoing_references), selectinload(Note.incoming_references)).order_by(Note.deleted_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
 
@@ -496,7 +504,7 @@ def search_notes():
 
         else:
             # Tag only search (Standard SQL Pagination)
-            pagination = query.order_by(Note.created_at.desc()).paginate(
+            pagination = query.options(selectinload(Note.outgoing_references), selectinload(Note.incoming_references)).order_by(Note.created_at.desc()).paginate(
                 page=page, per_page=per_page, error_out=False
             )
             return jsonify({
@@ -535,6 +543,7 @@ def clear_all_history():
         subquery = db.session.query(Note.id).filter(Note.user_id == current_user.id).subquery()
         num_deleted = db.session.query(NoteVersion).filter(NoteVersion.note_id.in_(subquery)).delete(synchronize_session=False)
         db.session.commit()
+        invalidate_stats_cache()
         return jsonify({'success': True, 'count': num_deleted})
     except Exception as e:
         db.session.rollback()

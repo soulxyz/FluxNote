@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, send_from_direct
 from app.extensions import db
 from app.models import Note, Tag, Config
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from app.utils.theme import render_theme_template, get_current_theme, get_theme_css_url, get_writer_theme
@@ -72,7 +73,7 @@ def index():
             pass # Ignore invalid date format
 
     # 按创建时间倒序
-    pagination = query.order_by(Note.created_at.desc()).paginate(
+    pagination = query.options(selectinload(Note.outgoing_references), selectinload(Note.incoming_references)).order_by(Note.created_at.desc()).paginate(
         page=page,
         per_page=POSTS_PER_PAGE,
         error_out=False

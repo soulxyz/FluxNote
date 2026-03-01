@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { state, setState } from './state.js';
 import { ui } from './ui.js';
-import { showToast, debounce, parseWikiLinks, escapeHtml, showConfirm, formatDate, formatExpiresAt } from './utils.js';
+import { showToast, debounce, throttle, parseWikiLinks, escapeHtml, showConfirm, formatDate, formatExpiresAt } from './utils.js';
 
 // 防止重复绑定的标志
 let eventsInitialized = false;
@@ -50,12 +50,14 @@ export function initGlobalEvents(context) {
                     return;
                 }
                 
+                const fragment = document.createDocumentFragment();
                 notes.forEach(note => {
                     const card = ui.createNoteCard(note);
                     const actions = card.querySelector('.note-actions');
                     if(actions) actions.style.display = 'none';
-                    list.appendChild(card);
+                    fragment.appendChild(card);
                 });
+                list.appendChild(fragment);
                 
                 if (window.hljs) hljs.highlightAll();
             }
@@ -76,6 +78,42 @@ export function initGlobalEvents(context) {
 
     // Custom Events (Event Bus)
     initCustomEvents(loadNotes, loadTags);
+
+    // Global Event Delegation for Note Cards
+    document.body.addEventListener('click', (e) => {
+        // Handle Note Actions
+        const actionEl = e.target.closest('.note-action');
+        if (actionEl) {
+            const action = actionEl.dataset.action;
+            const id = actionEl.dataset.id;
+            if (action && id) {
+                window.dispatchEvent(new CustomEvent(`note:${action}`, { detail: id }));
+            }
+            return;
+        }
+
+        // Handle Tag Clicks within cards
+        const tagEl = e.target.closest('.note-tag');
+        if (tagEl && tagEl.closest('.note-card') && tagEl.dataset.tag) {
+            window.dispatchEvent(new CustomEvent('filter:tag', { detail: tagEl.dataset.tag }));
+            return;
+        }
+
+        // Handle Task Checkbox Clicks
+        const taskCheckbox = e.target.closest('.markdown-body input[type="checkbox"]');
+        if (taskCheckbox && taskCheckbox.closest('.note-card')) {
+            const card = taskCheckbox.closest('.note-card');
+            const id = card.id.replace('note-', '');
+            // Find index of this checkbox among all checkboxes in this card
+            const checkboxes = Array.from(card.querySelectorAll('.markdown-body input[type="checkbox"]'));
+            const index = checkboxes.indexOf(taskCheckbox);
+            if (index > -1) {
+                window.dispatchEvent(new CustomEvent('note:toggle-task', { 
+                    detail: { id, index, checked: taskCheckbox.checked } 
+                }));
+            }
+        }
+    });
 
     eventsInitialized = true;
     console.log('Global events initialized');
@@ -719,7 +757,7 @@ function initEditorLogic(loadNotes) {
 
     // Infinite Scroll
     if (notesStream) {
-        notesStream.addEventListener('scroll', () => {
+        notesStream.addEventListener('scroll', throttle(() => {
             const searchInput = document.getElementById('searchInput');
             if (searchInput && searchInput.value.trim() !== '') return;
             if (notesStream.scrollTop + notesStream.clientHeight >= notesStream.scrollHeight - 300) {
@@ -727,7 +765,7 @@ function initEditorLogic(loadNotes) {
                     loadNotes(false);
                 }
             }
-        });
+        }, 200));
     }
 }
 

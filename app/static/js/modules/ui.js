@@ -36,13 +36,15 @@ export const ui = {
             return;
         }
 
+        const fragment = document.createDocumentFragment();
         notesToRender.forEach((note, index) => {
             const card = this.createNoteCard(note);
             // Stagger animation: max delay 0.5s to prevent long waits for large lists
             const delay = Math.min(index * 0.05, 0.5);
             card.style.animationDelay = `${delay}s`;
-            list.appendChild(card);
+            fragment.appendChild(card);
         });
+        list.appendChild(fragment);
 
         // Render Mermaid/Mindmap first to replace code blocks with divs
         this.renderMermaid(list);
@@ -240,31 +242,9 @@ export const ui = {
             card.style.background = '#fffbeb';
         }
 
-        // Event delegation for tags inside the card
-        card.querySelectorAll('.note-tag').forEach(tagEl => {
-            tagEl.onclick = () => window.dispatchEvent(new CustomEvent('filter:tag', { detail: tagEl.dataset.tag }));
-        });
-
-        // Action buttons delegation
-        card.querySelectorAll('.note-action').forEach(actionEl => {
-            actionEl.onclick = (e) => {
-                const action = actionEl.dataset.action;
-                const id = actionEl.dataset.id;
-                window.dispatchEvent(new CustomEvent(`note:${action}`, { detail: id }));
-            };
-        });
-
-        // Task list interaction
-        card.querySelectorAll('.markdown-body input[type="checkbox"]').forEach((cb, idx) => {
+        // Checkboxes in markdown must be clickable for event delegation
+        card.querySelectorAll('.markdown-body input[type="checkbox"]').forEach(cb => {
             cb.removeAttribute('disabled');
-            cb.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // We use change event or just capture the click and prevent default to handle manually?
-                // Actually, let's just use the checked status after the click.
-                window.dispatchEvent(new CustomEvent('note:toggle-task', { 
-                    detail: { id: note.id, index: idx, checked: cb.checked } 
-                }));
-            });
         });
 
         return card;

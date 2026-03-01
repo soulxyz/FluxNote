@@ -3,10 +3,12 @@ from flask_login import current_user, login_required
 from app.models import Note, db
 from sqlalchemy import func
 from datetime import datetime, timedelta
+from app.utils.cache import cached
 
 stats_bp = Blueprint('stats', __name__)
 
 @stats_bp.route('/api/stats/heatmap', methods=['GET'])
+@cached(ttl=600)
 def get_heatmap_data():
     """
     Get note counts per day for the last 365 days.
@@ -46,6 +48,7 @@ def get_heatmap_data():
     return jsonify(result)
 
 @stats_bp.route('/api/stats/overview', methods=['GET'])
+@cached(ttl=600)
 def get_overview():
     """
     Get overview stats: total notes, total tags, active days.

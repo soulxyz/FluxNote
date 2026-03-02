@@ -502,6 +502,7 @@ button { font-family: inherit; cursor: pointer; }
     border: none;
     resize: vertical; /* 允许垂直调整大小 */
     font-size: 16px;
+    font-family: inherit; /* 强制继承全局字体 */
     line-height: 1.6;
     color: var(--slate-800);
     padding: 0;
@@ -687,12 +688,12 @@ button { font-family: inherit; cursor: pointer; }
    6. 笔记卡片
    ============================================================ */
 
-.notes-stream { display: flex; flex-direction: column; gap: 20px; }
+.notes-stream { display: flex; flex-direction: column; gap: 12px; }
 
 .note-card {
     background: white;
     border-radius: var(--radius);
-    padding: 24px;
+    padding: 20px;
     border: 1px solid var(--slate-200);
     box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
     transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
@@ -2332,8 +2333,8 @@ input:checked + .slider:before { transform: translateX(20px); }
         border-radius: 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
         border: none;
-        margin-bottom: 16px;
-        padding: 16px;
+        margin-bottom: 0;
+        padding: 14px;
     }
 
     /* 笔记列表区域 - 单独滚动 */
@@ -2402,10 +2403,17 @@ input:checked + .slider:before { transform: translateX(20px); }
         color: var(--primary);
         box-shadow: none;
         border: 1px solid transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     .btn-send:hover, .btn-send:active { background: var(--primary-light); }
     .btn-send::after { content: none; }
-    .btn-send i { font-size: 18px; margin: 0; }
+    .btn-send i { 
+        font-size: 18px; 
+        margin: 0;
+        transform: translate(-2px, 1px); /* 纸飞机图标的视觉居中校正 */
+    }
 
     /* 紧凑编辑器 - 收窄但保持舒适输入高度 */
     .memo-editor.compact {

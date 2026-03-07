@@ -156,7 +156,9 @@ def create_app():
 
     # Initialize DB logic
     with app.app_context():
-        db.create_all()
+        # 一站式自愈与诊断 (自动同步数据库、检测路由冲突等)
+        from .utils.health import run_self_check
+        run_self_check(app)
         # 根据数据库配置更新调试模式
         app.config['DEBUG'] = is_debug_mode()
 

@@ -32,7 +32,10 @@ async function syncOfflineData() {
             const res = await api.notes.create({
                 content: draft.content,
                 tags: draft.tags,
-                is_public: draft.is_public
+                is_public: draft.is_public,
+                is_capsule: draft.is_capsule || false,
+                capsule_date: draft.capsule_date || null,
+                capsule_hint: draft.capsule_hint || ''
             });
             if (res && res.ok) {
                 successCount++;
@@ -200,6 +203,37 @@ async function loadData() {
     ui.renderOverviewStats();
     ui.updateHeaderDate();
     ui.handleHashJump(); // Manually jump to anchor after notes are rendered
+    
+    // 时光胶囊：主动检查是否有待开启的胶囊
+    if (state.currentUser) {
+        checkAndNotifyCapsules();
+    }
+}
+
+async function checkAndNotifyCapsules() {
+    try {
+        const res = await api.notes.capsules();
+        if (res && res.ok) {
+            const capsules = await res.json();
+            const readyOnes = capsules.filter(c => c.capsule_status === 'ready');
+            if (readyOnes.length > 0) {
+                const count = readyOnes.length;
+                setTimeout(() => {
+                    showToast(`⌛ 你有 ${count} 个时光胶囊已到期，快去陈列室拆开吧！`, 8000);
+                    const navCaps = document.getElementById('navCapsules');
+                    if (navCaps && !navCaps.querySelector('.capsule-ready-badge')) {
+                        const badge = document.createElement('span');
+                        badge.className = 'capsule-ready-badge';
+                        badge.style.cssText = 'background:#f39c12;color:white;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;vertical-align:middle;';
+                        badge.textContent = count;
+                        navCaps.appendChild(badge);
+                    }
+                }, 1500);
+            }
+        }
+    } catch (e) {
+        console.warn('Check capsules failed', e);
+    }
 }
 
 
@@ -356,7 +390,8 @@ async function loadNotes(reset = false) {
         const cachedNotes = localStorage.getItem('cached_notes');
         if (cachedNotes) {
             try {
-                const notes = JSON.parse(cachedNotes);
+                const parsed = JSON.parse(cachedNotes);
+                const notes = (parsed && parsed.data) ? parsed.data : (Array.isArray(parsed) ? parsed : []);
                 setState('notes', notes);
                 ui.renderNotes(notes, true);
                 showToast('网络错误 - 显示缓存内容');

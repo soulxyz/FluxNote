@@ -173,6 +173,9 @@ export function initGlobalEvents(context) {
     // My Shares Modal logic
     initSharesModal();
 
+    // Time Capsule Modal logic
+    initCapsuleModal(loadNotes);
+
     // Sidebar Toggle
     initSidebarLogic();
 
@@ -743,25 +746,35 @@ function initEditorLogic(loadNotes) {
     }
     
     document.getElementById('saveNote')?.addEventListener('click', async () => {
-        const content = document.getElementById('noteContent').value.trim();
+        const textarea = document.getElementById('noteContent');
+        const content = textarea.value.trim();
         const isPublic = document.getElementById('noteIsPublic').checked;
         const saveBtn = document.getElementById('saveNote');
+
+        // 时光胶囊数据
+        const isCapsule = textarea.dataset.isCapsule === 'true';
+        const capsuleDate = textarea.dataset.capsuleDate || null;
+        const capsuleHint = textarea.dataset.capsuleHint || '';
 
         if (!content) return showToast('内容不能为空');
 
         saveBtn.disabled = true;
         saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-        // Offline logic included in main.js, here we simplify or replicate?
-        // Ideally we should use api.js which might handle offline logic, or keep the offline check here.
-        
+        const payload = { 
+            content, 
+            tags: state.currentTags, 
+            is_public: isPublic,
+            is_capsule: isCapsule,
+            capsule_date: capsuleDate,
+            capsule_hint: capsuleHint
+        };
+
         if (!navigator.onLine) {
             const draftId = Date.now();
             const draft = {
                 _id: draftId,
-                content,
-                tags: [...state.currentTags],
-                is_public: isPublic,
+                ...payload,
                 created_at: new Date().toISOString()
             };
             const drafts = JSON.parse(localStorage.getItem('offline_drafts') || '[]');
@@ -799,22 +812,31 @@ function initEditorLogic(loadNotes) {
         }
 
         try {
-            const res = await api.notes.create({ content, tags: state.currentTags, is_public: isPublic });
+            const res = await api.notes.create(payload);
             if (res && res.ok) {
-                document.getElementById('noteContent').value = '';
+                textarea.value = '';
+                delete textarea.dataset.isCapsule;
+                delete textarea.dataset.capsuleDate;
+                delete textarea.dataset.capsuleHint;
+                
+                // 重置按钮样式
+                const capsuleBtn = textarea.closest('.memo-editor')?.querySelector('.capsule-trigger');
+                if (capsuleBtn) {
+                    capsuleBtn.innerHTML = '<i class="far fa-hourglass"></i>';
+                    capsuleBtn.style.color = '';
+                }
+
                 localStorage.removeItem('note_draft_content');
                 setState('currentTags', []);
                 ui.renderTags('input');
                 loadNotes(true);
-                showToast('已记录');
+                showToast(isCapsule ? '已封存时光胶囊' : '已记录');
             } else if (res === null) {
                 // Backend unreachable, fallback to offline logic
                 const draftId = Date.now();
                 const draft = {
                     _id: draftId,
-                    content,
-                    tags: [...state.currentTags],
-                    is_public: isPublic,
+                    ...payload,
                     created_at: new Date().toISOString()
                 };
                 const drafts = JSON.parse(localStorage.getItem('offline_drafts') || '[]');
@@ -1030,6 +1052,16 @@ function initCustomEvents(loadNotes, loadTags) {
 
         if (newContent === note.content) return;
 
+        // 必须携带所有原有字段，否则后端会将 tags/is_public/is_capsule 重置为默认值
+        const updatePayload = {
+            content: newContent,
+            tags: note.tags,
+            is_public: note.is_public,
+            is_capsule: note.is_capsule,
+            capsule_date: note.capsule_date,
+            capsule_hint: note.capsule_hint
+        };
+
         if (!navigator.onLine) {
             handleOfflineUpdate(id, { content: newContent });
             note.content = newContent;
@@ -1037,7 +1069,7 @@ function initCustomEvents(loadNotes, loadTags) {
             return;
         }
 
-        const res = await api.notes.update(id, { content: newContent });
+        const res = await api.notes.update(id, updatePayload);
         if (res && res.ok) {
             note.content = newContent;
             ui.restoreCard(note);
@@ -1053,40 +1085,39 @@ function initCustomEvents(loadNotes, loadTags) {
     });
 
     window.addEventListener('note:request-update', async (e) => {
-        const { id, content, tags, is_public } = e.detail;
+        const { id, content, tags, is_public, is_capsule, capsule_date, capsule_hint } = e.detail;
         const note = state.notes.find(n => n.id == id);
-        
+        const updatePayload = { content, tags, is_public, is_capsule, capsule_date, capsule_hint };
+
+        const syncNoteState = (note) => {
+            if (!note) return;
+            note.content = content;
+            note.tags = tags;
+            note.is_public = is_public;
+            note.is_capsule = is_capsule;
+            note.capsule_date = capsule_date;
+            note.capsule_hint = capsule_hint;
+        };
+
         if (!navigator.onLine) {
-            handleOfflineUpdate(id, { content, tags, is_public });
-            if (note) {
-                note.content = content;
-                note.tags = tags;
-                note.is_public = is_public;
-                ui.restoreCard(note);
-            }
+            handleOfflineUpdate(id, updatePayload);
+            syncNoteState(note);
+            if (note) ui.restoreCard(note);
             showToast('已保存 (离线)');
             loadTags();
             return;
         }
 
-        const res = await api.notes.update(id, { content, tags, is_public });
+        const res = await api.notes.update(id, updatePayload);
         if (res && res.ok) {
-            if (note) {
-                note.content = content;
-                note.tags = tags;
-                note.is_public = is_public;
-                ui.restoreCard(note);
-            }
+            syncNoteState(note);
+            if (note) ui.restoreCard(note);
             showToast('保存成功');
             loadTags();
         } else if (res === null) {
-            handleOfflineUpdate(id, { content, tags, is_public });
-            if (note) {
-                note.content = content;
-                note.tags = tags;
-                note.is_public = is_public;
-                ui.restoreCard(note);
-            }
+            handleOfflineUpdate(id, updatePayload);
+            syncNoteState(note);
+            if (note) ui.restoreCard(note);
             showToast('已保存 (离线)');
             loadTags();
         } else {
@@ -1435,6 +1466,166 @@ function handleOfflineUpdate(id, updates) {
         offlineUpdates[id] = { ...existing, ...updates };
         localStorage.setItem('offline_updates', JSON.stringify(offlineUpdates));
     }
+}
+
+function initCapsuleModal(loadNotes) {
+    document.getElementById('navCapsules')?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const modal = document.getElementById('capsuleModal');
+        const list = document.getElementById('capsuleList');
+
+        if (modal) {
+            modal.style.display = 'block';
+            list.innerHTML = '<div style="text-align:center; padding:40px; color:#999;"><i class="fas fa-spinner fa-spin"></i> 加载陈列室中...</div>';
+
+            // 激活导航高亮
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('navCapsules')?.classList.add('active');
+
+            const closeCapsuleModal = () => {
+                modal.style.display = 'none';
+                window.removeEventListener('click', outsideClick);
+                document.getElementById('navCapsules')?.classList.remove('active');
+                document.getElementById('navAllNotes')?.classList.add('active');
+            };
+
+            const outsideClick = (ev) => { if (ev.target === modal) closeCapsuleModal(); };
+            window.addEventListener('click', outsideClick);
+
+            const closeBtn = modal.querySelector('.close-capsule');
+            if (closeBtn) closeBtn.onclick = closeCapsuleModal;
+
+            try {
+                const response = await api.notes.capsules();
+                if (response && response.ok) {
+                    const capsules = await response.json();
+                    renderCapsules(capsules, loadNotes, closeCapsuleModal);
+                } else {
+                    list.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#ef4444;"><i class="fas fa-exclamation-circle"></i> 加载失败</div>';
+                }
+            } catch (err) {
+                console.error(err);
+                list.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:40px; color:#ef4444;"><i class="fas fa-wifi"></i> 网络错误</div>';
+            }
+        }
+    });
+}
+
+function renderCapsules(capsules, loadNotes, closeCapsuleModal) {
+    const list = document.getElementById('capsuleList');
+    if (!list) return;
+
+    if (capsules.length === 0) {
+        list.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:80px 20px; color:#94a3b8;"><i class="fas fa-hourglass" style="font-size:48px; margin-bottom:20px; opacity:0.3;"></i><p>还没有封存的时光胶囊<br><span style="font-size:13px;">在编辑器中点击 ⏳ 按钮封存一段记忆吧</span></p></div>';
+        return;
+    }
+
+    const formatCapsuleDate = (dateStr) => {
+        if (!dateStr) return '—';
+        return new Date(dateStr).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    };
+
+    list.innerHTML = capsules.map(c => {
+        const isLocked = c.capsule_status === 'locked';
+        const isReady = c.capsule_status === 'ready';
+        const isOpened = c.capsule_status === 'opened';
+        
+        let statusHtml = '';
+        let cardStyle = '';
+        let actionBtn = '';
+
+        if (isLocked) {
+            statusHtml = `<span class="capsule-badge locked"><i class="fas fa-lock"></i> 锁定中</span>`;
+            cardStyle = 'filter: grayscale(0.5); opacity: 0.8;';
+            if (c.capsule_date) {
+                const remaining = new Date(c.capsule_date) - new Date();
+                const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                actionBtn = `<div class="capsule-timer">还有 ${days} 天 ${hours} 小时解锁</div>`;
+            } else {
+                actionBtn = `<div class="capsule-timer">解锁日期未设置</div>`;
+            }
+        } else if (isReady) {
+            statusHtml = `<span class="capsule-badge ready"><i class="fas fa-unlock"></i> 可开启</span>`;
+            cardStyle = 'border: 2px solid #f39c12; box-shadow: 0 0 15px rgba(243, 156, 18, 0.3);';
+            actionBtn = `<button class="btn btn-primary open-capsule-btn" data-id="${c.id}" style="width:100%; margin-top:10px; background:#f39c12; border:none;">拆开信封</button>`;
+        } else {
+            statusHtml = `<span class="capsule-badge opened"><i class="fas fa-envelope-open"></i> 已拆开</span>`;
+            actionBtn = `<button class="btn btn-secondary view-capsule-btn" data-id="${c.id}" style="width:100%; margin-top:10px;">查看内容</button>`;
+        }
+
+        return `
+            <div class="capsule-card" style="${cardStyle}">
+                <div class="capsule-card-header">
+                    ${statusHtml}
+                    <span class="capsule-date">${formatCapsuleDate(c.capsule_date)}</span>
+                </div>
+                <div class="capsule-card-body">
+                    <div class="capsule-hint">"${escapeHtml(c.capsule_hint || '没有寄语')}"</div>
+                    ${isOpened ? `<div class="capsule-title">${escapeHtml(c.title)}</div>` : '<div class="capsule-locked-placeholder">🔒 内容已封存</div>'}
+                </div>
+                <div class="capsule-card-footer">
+                    ${actionBtn}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // 绑定开启事件
+    list.querySelectorAll('.open-capsule-btn').forEach(btn => {
+        btn.onclick = async () => {
+            const id = btn.dataset.id;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在开启...';
+            
+            try {
+                const res = await api.notes.openCapsule(id);
+                if (res && res.ok) {
+                    showToast('⌛ 时光胶囊已拆开');
+                    // 重新加载胶囊列表
+                    const capsulesRes = await api.notes.capsules();
+                    const updatedCapsules = await capsulesRes.json();
+                    renderCapsules(updatedCapsules, loadNotes, closeCapsuleModal);
+                    // 同时刷新主流
+                    loadNotes(true);
+                } else {
+                    const data = await res.json();
+                    showToast(data.error || '开启失败');
+                    btn.disabled = false;
+                    btn.innerHTML = '拆开信封';
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('网络错误');
+                btn.disabled = false;
+                btn.innerHTML = '拆开信封';
+            }
+        };
+    });
+
+    list.querySelectorAll('.view-capsule-btn').forEach(btn => {
+        btn.onclick = () => {
+            if (typeof closeCapsuleModal === 'function') closeCapsuleModal();
+            const targetId = btn.dataset.id;
+
+            // 确保在全部笔记视图，刷新后再跳转
+            window.dispatchEvent(new CustomEvent('note:refresh-list'));
+
+            const tryJump = (attempt = 0) => {
+                const el = document.getElementById(`note-${targetId}`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.add('jump-highlight');
+                    setTimeout(() => el.classList.remove('jump-highlight'), 2000);
+                } else if (attempt < 4) {
+                    setTimeout(() => tryJump(attempt + 1), 500);
+                } else {
+                    showToast('笔记已加载，请在列表中查看');
+                }
+            };
+            setTimeout(() => tryJump(), 300);
+        };
+    });
 }
 
 function removeCardFromUI(id) {

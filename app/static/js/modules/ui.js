@@ -136,6 +136,8 @@ export const ui = {
 
     createNoteCard(note) {
         const isOwner = state.currentUser && note.user_id === state.currentUser.id;
+        const isLockedCapsule = note.is_capsule && note.capsule_status !== 'opened' && note.capsule_status !== 'none';
+        const isOpenedCapsule = note.is_capsule && note.capsule_status === 'opened';
         const card = document.createElement('div');
         card.className = 'note-card';
         card.id = `note-${note.id}`;
@@ -212,6 +214,7 @@ export const ui = {
             <div class="note-header">
                 <span>${formatDate(note.created_at)}</span>
                 ${note.is_public ? '<i class="fas fa-globe" title="公开"></i>' : '<i class="fas fa-lock" title="私密"></i>'}
+                ${isOpenedCapsule ? '<span title="已拆开的时光胶囊" style="color:#f39c12; font-size:12px; display:inline-flex; align-items:center; gap:3px;"><i class="fas fa-hourglass-end"></i> 胶囊</span>' : ''}
                 ${note.is_offline_draft ? '<span class="offline-badge" title="待同步"><i class="fas fa-cloud-upload-alt"></i></span>' : ''}
             </div>
             <div class="note-content markdown-body" style="${isOwner ? 'cursor: pointer;' : ''}" ${isOwner && !note.is_offline_draft ? `ondblclick="window.dispatchEvent(new CustomEvent('note:edit', { detail: '${note.id}' }))"` : ''}>${content}</div>
@@ -231,7 +234,7 @@ export const ui = {
                     <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
                     <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
                     <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
-                    <span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>
+                    ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
                 </div>`) : ''}
             </div>
 
@@ -437,19 +440,23 @@ export const ui = {
                 saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 保存中';
                 const isPublic = document.getElementById(`edit-public-${id}`).checked;
 
+                // 时光胶囊数据
+                const isCapsule = textarea.dataset.isCapsule === 'true';
+                const capsuleDate = textarea.dataset.capsuleDate || null;
+                const capsuleHint = textarea.dataset.capsuleHint || '';
+
                 // Dispatch event to main.js for handling (offline support)
                 window.dispatchEvent(new CustomEvent('note:request-update', {
                     detail: {
                         id: id,
                         content: textarea.value,
                         tags: state.editTags,
-                        is_public: isPublic
+                        is_public: isPublic,
+                        is_capsule: isCapsule,
+                        capsule_date: capsuleDate,
+                        capsule_hint: capsuleHint
                     }
                 }));
-                
-                // Note: The UI restore/error handling is now done by main.js via ui.restoreCard
-                // If we need to handle specific failure to keep editor open, we'd need another event.
-                // For now, main.js will restore the card (closing editor) on success or fail.
             };
 
             btnsDiv.appendChild(cancelBtn);
@@ -471,9 +478,22 @@ export const ui = {
             editor.setupMarkdownShortcuts(textarea);
             editor.setupAutoHeight(textarea);
             editor.setupAITools(textarea);
+            editor.setupCapsuleTool(textarea);
+
+            // 如果原本就是时光胶囊，初始化状态
+            if (note.is_capsule) {
+                textarea.dataset.isCapsule = 'true';
+                textarea.dataset.capsuleDate = note.capsule_date;
+                textarea.dataset.capsuleHint = note.capsule_hint || '';
+
+                const capsuleBtn = toolsLeft.querySelector('.capsule-trigger');
+                if (capsuleBtn) {
+                    capsuleBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+                    capsuleBtn.style.color = '#f39c12';
+                }
+            }
 
             textarea.focus();
-
         } catch (e) {
             console.error(e);
             showToast('加载失败');

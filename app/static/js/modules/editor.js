@@ -15,6 +15,7 @@ export const editor = {
         this.setupDragDropImage(textarea);
         this.setupMarkdownShortcuts(textarea);
         this.setupAITools(textarea);
+        this.setupCapsuleTool(textarea);
         this.setupAutoHeight(textarea);
     },
 
@@ -453,6 +454,127 @@ export const editor = {
         aiBtn.title = 'AI 助手';
         aiBtn.onclick = (e) => this.showAIMenu(e, textarea);
         controls.appendChild(aiBtn);
+    },
+
+    setupCapsuleTool(textarea) {
+        let controls = null;
+        const memoEditor = textarea.closest('.memo-editor');
+        if (memoEditor) {
+            controls = memoEditor.querySelector('.editor-footer .input-controls');
+        }
+        if (!controls) {
+            const inlineContainer = textarea.closest('.inline-editor-container');
+            if (inlineContainer) {
+                controls = inlineContainer.querySelector('.inline-tools-left');
+            }
+        }
+        if (!controls) return;
+        if (controls.querySelector('.capsule-trigger')) return;
+
+        const capsuleBtn = document.createElement('button');
+        capsuleBtn.className = 'tool-btn capsule-trigger';
+        capsuleBtn.innerHTML = '<i class="far fa-hourglass"></i>';
+        capsuleBtn.title = '设为时光胶囊';
+        capsuleBtn.onclick = (e) => this.showCapsuleMenu(e, textarea);
+        controls.appendChild(capsuleBtn);
+    },
+
+    showCapsuleMenu(event, textarea) {
+        event.preventDefault();
+        event.stopPropagation();
+        const button = event.currentTarget;
+
+        const existing = document.getElementById('capsuleMenu');
+        if (existing) {
+            existing.remove();
+            return;
+        }
+
+        const menu = document.createElement('div');
+        menu.id = 'capsuleMenu';
+        menu.className = 'ai-dropdown-menu capsule-menu';
+        menu.style.padding = '15px';
+        menu.style.width = '260px';
+
+        // 获取当前值
+        const isCapsule = textarea.dataset.isCapsule === 'true';
+        const capsuleDate = textarea.dataset.capsuleDate || '';
+        const capsuleHint = textarea.dataset.capsuleHint || '';
+
+        const inputStyle = 'width:100%; font-size:13px; padding:7px 10px; border:1px solid var(--slate-200); border-radius:6px; outline:none; transition:border 0.2s; box-sizing:border-box;';
+        menu.innerHTML = `
+            <div style="margin-bottom: 12px; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-hourglass-start" style="color: #f39c12;"></i> 时光胶囊设置
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #666;">解锁日期</label>
+                <input type="datetime-local" id="capsule-date-input" style="${inputStyle}" value="${capsuleDate}">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-size: 12px; margin-bottom: 4px; color: #666;">外部寄语 (Hint)</label>
+                <input type="text" id="capsule-hint-input" style="${inputStyle}" placeholder="写给未来的自己..." value="${capsuleHint}">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary" id="capsule-cancel" style="padding: 4px 12px; font-size: 12px;">取消封存</button>
+                <button class="btn btn-primary" id="capsule-save" style="padding: 4px 12px; font-size: 12px;">确认封存</button>
+            </div>
+        `;
+
+        document.body.appendChild(menu);
+
+        const rect = button.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + window.scrollY + 5}px`;
+        menu.style.left = `${rect.left + window.scrollX}px`;
+        menu.style.display = 'block';
+
+        // 给输入框添加 focus 高亮
+        menu.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', () => { input.style.borderColor = 'var(--primary)'; input.style.boxShadow = '0 0 0 2px var(--primary-light)'; });
+            input.addEventListener('blur', () => { input.style.borderColor = 'var(--slate-200)'; input.style.boxShadow = 'none'; });
+        });
+
+        // 事件处理
+        menu.querySelector('#capsule-save').onclick = () => {
+            const date = menu.querySelector('#capsule-date-input').value;
+            const hint = menu.querySelector('#capsule-hint-input').value;
+            
+            if (!date) {
+                showToast('请选择解锁日期');
+                return;
+            }
+
+            textarea.dataset.isCapsule = 'true';
+            textarea.dataset.capsuleDate = date.replace('T', ' ') + ':00'; // 转为后端需要的格式
+            textarea.dataset.capsuleHint = hint;
+            
+            button.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+            button.style.color = '#f39c12';
+            button.title = '已设为时光胶囊';
+            
+            showToast('已设为时光胶囊，发布后将封存');
+            menu.remove();
+        };
+
+        menu.querySelector('#capsule-cancel').onclick = () => {
+            textarea.dataset.isCapsule = 'false';
+            delete textarea.dataset.capsuleDate;
+            delete textarea.dataset.capsuleHint;
+            
+            button.innerHTML = '<i class="far fa-hourglass"></i>';
+            button.style.color = '';
+            button.title = '设为时光胶囊';
+            
+            showToast('时光胶囊已取消');
+            menu.remove();
+        };
+
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('mousedown', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('mousedown', closeMenu), 0);
     },
 
     showAIMenu(event, textarea) {

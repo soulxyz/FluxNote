@@ -126,7 +126,9 @@ export const api = {
         backlinks: (id) => fetchJson(`/api/notes/${id}/backlinks`),
         titles: () => fetchJson('/api/notes/titles'),
         review: () => fetchJson('/api/notes/review'),
-        shares: (noteId) => fetchJson(`/api/notes/${noteId}/shares`)
+        shares: (noteId) => fetchJson(`/api/notes/${noteId}/shares`),
+        capsules: () => fetchJson('/api/notes/capsules'),
+        openCapsule: (id) => fetchJson(`/api/notes/capsules/${id}/open`, { method: 'POST' })
     },
     tags: {
         list: () => fetchJson('/api/tags')

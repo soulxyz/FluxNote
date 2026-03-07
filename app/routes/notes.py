@@ -75,7 +75,11 @@ def update_note_references(note, links_list):
 def get_notes_graph():
     """获取笔记关系图谱数据"""
     try:
-        notes = Note.query.filter_by(user_id=current_user.id, is_deleted=False).all()
+        notes = Note.query.filter(
+            Note.user_id == current_user.id, 
+            Note.is_deleted == False,
+            Note.get_visible_filter()
+        ).all()
         nodes = []
         edges = []
         note_dict = {note.id: note for note in notes}
@@ -108,7 +112,8 @@ def daily_review():
         # SQLite random order
         query = Note.query.filter(
             Note.user_id == current_user.id,
-            Note.is_deleted == False
+            Note.is_deleted == False,
+            Note.get_visible_filter()
         ).order_by(func.random()).limit(5)
 
         notes = query.all()
@@ -125,7 +130,7 @@ def get_notes():
         tag = request.args.get('tag', '').strip()
         date_str = request.args.get('date', '').strip() # YYYY-MM-DD
 
-        query = Note.query.filter(Note.is_deleted == False)
+        query = Note.query.filter(Note.is_deleted == False, Note.get_visible_filter())
 
         if current_user.is_authenticated:
             # Show public notes AND user's own notes
@@ -161,7 +166,7 @@ def get_notes():
 def get_note_titles():
     """Get list of titles for autocomplete"""
     try:
-        query = Note.query.filter(Note.is_deleted == False)
+        query = Note.query.filter(Note.is_deleted == False, Note.get_visible_filter())
         if current_user.is_authenticated:
             query = query.filter(db.or_(Note.is_public == True, Note.user_id == current_user.id))
         else:
@@ -183,7 +188,7 @@ def get_backlinks(note_id):
         # Efficient Query: Find all notes that reference this note ID
         query = db.session.query(Note).join(NoteReference, NoteReference.source_id == Note.id)\
             .filter(NoteReference.target_id == note_id)\
-            .filter(Note.is_deleted == False)
+            .filter(Note.is_deleted == False, Note.get_visible_filter())
 
         if current_user.is_authenticated:
             query = query.filter(db.or_(Note.is_public == True, Note.user_id == current_user.id))
@@ -231,6 +236,9 @@ def create_note():
         content = data.get('content', '').strip()
         tags = data.get('tags', [])
         is_public = data.get('is_public', False)
+        is_capsule = data.get('is_capsule', False)
+        capsule_date = data.get('capsule_date')
+        capsule_hint = data.get('capsule_hint', '').strip()
 
         if not content:
             return jsonify({'error': '内容不能为空'}), 400
@@ -241,8 +249,23 @@ def create_note():
             content=content,
             title=title,
             user_id=current_user.id,
-            is_public=is_public
+            is_public=is_public,
+            is_capsule=is_capsule
         )
+
+        if is_capsule:
+            new_note.capsule_status = 'locked'
+            new_note.capsule_hint = capsule_hint
+            if capsule_date:
+                try:
+                    new_note.capsule_date = datetime.strptime(capsule_date, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        new_note.capsule_date = datetime.strptime(capsule_date, '%Y-%m-%d')
+                    except ValueError:
+                        return jsonify({'error': '日期格式错误，请使用 YYYY-MM-DD HH:MM:SS'}), 400
+                if new_note.capsule_date <= datetime.now():
+                    return jsonify({'error': '时光胶囊的解锁时间必须在未来'}), 400
 
         # Update Tags Relation
         update_note_tags(new_note, tags)
@@ -259,6 +282,75 @@ def create_note():
         db.session.rollback()
         return jsonify(safe_error(e, '创建笔记失败')), 500
 
+@notes_bp.route('/notes/capsules', methods=['GET'])
+@login_required
+def get_capsules():
+    """获取时光胶囊列表（包含锁定和待开启的）"""
+    try:
+        # 获取所有标记为胶囊且未彻底删除的笔记
+        capsules = Note.query.filter_by(
+            user_id=current_user.id, 
+            is_capsule=True, 
+            is_deleted=False
+        ).order_by(Note.capsule_date.asc()).all()
+        
+        results = []
+        now = datetime.now()
+        
+        for c in capsules:
+            d = c.to_dict()
+            
+            # 自动更新状态逻辑：如果锁定中且时间已到，标记为 ready（但不修改数据库，只在返回时计算）
+            if c.capsule_status == 'locked' and c.capsule_date and c.capsule_date <= now:
+                d['capsule_status'] = 'ready'
+            
+            # 核心安全逻辑：如果不是 opened 状态，抹除标题和内容
+            if d['capsule_status'] in ['locked', 'ready']:
+                d['title'] = '🔒 时光胶囊'
+                d['content'] = '内容已封存，请在解锁时间到达后拆开。'
+                d['links'] = []
+                d['backlinks'] = []
+                d['tags'] = []
+                
+            results.append(d)
+            
+        return jsonify(results)
+    except Exception as e:
+        return jsonify(safe_error(e, '获取时光胶囊列表失败')), 500
+
+@notes_bp.route('/notes/capsules/<note_id>/open', methods=['POST'])
+@login_required
+def open_capsule(note_id):
+    """拆开时光胶囊"""
+    try:
+        # Use with_for_update() to prevent race condition on double-clicking
+        note = Note.query.filter_by(id=note_id).with_for_update().first()
+        if not note or note.user_id != current_user.id:
+            return jsonify({'error': '胶囊不存在'}), 404
+            
+        if not note.is_capsule:
+            return jsonify({'error': '此笔记不是时光胶囊'}), 400
+            
+        if note.capsule_status == 'opened':
+            return jsonify({'error': '胶囊已经拆开了'}), 400
+            
+        # 校验时间
+        if note.capsule_date > datetime.now():
+            remaining = note.capsule_date - datetime.now()
+            days = remaining.days
+            hours = remaining.seconds // 3600
+            return jsonify({'error': f'时间未到，还需等待 {days} 天 {hours} 小时'}), 403
+            
+        # 执行开启
+        note.capsule_status = 'opened'
+        note.updated_at = datetime.now()
+        db.session.commit()
+        
+        return jsonify({'success': True, 'note': note.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(safe_error(e, '拆开胶囊失败')), 500
+
 @notes_bp.route('/notes/<note_id>', methods=['GET'])
 def get_note(note_id):
     """Get a single note (Public access allowed for public notes)"""
@@ -268,12 +360,13 @@ def get_note(note_id):
             return jsonify({'error': '笔记不存在'}), 404
 
         # Check permission
-        if note.is_public:
-            return jsonify(note.to_dict())
-            
-        # Private note: requires login and owner check
-        if not current_user.is_authenticated or note.user_id != current_user.id:
+        is_owner = current_user.is_authenticated and note.user_id == current_user.id
+        if not note.is_public and not is_owner:
             return jsonify({'error': '无权查看'}), 403
+
+        # Obfuscate if it's a locked capsule
+        if not note.is_viewable_by_owner():
+            return jsonify(note.to_obfuscated_dict())
 
         return jsonify(note.to_dict())
     except Exception as e:
@@ -288,6 +381,9 @@ def update_note(note_id):
         content = data.get('content', '').strip()
         tags = data.get('tags', [])
         is_public = data.get('is_public', False)
+        is_capsule = data.get('is_capsule', False)
+        capsule_date = data.get('capsule_date')
+        capsule_hint = data.get('capsule_hint', '').strip()
 
         if not content:
             return jsonify({'error': '内容不能为空'}), 400
@@ -298,6 +394,27 @@ def update_note(note_id):
 
         if note.user_id != current_user.id:
             return jsonify({'error': '无权修改此笔记'}), 403
+
+        # Update capsule fields if provided
+        note.is_capsule = is_capsule
+        if is_capsule:
+            if note.capsule_status == 'none':
+                note.capsule_status = 'locked'
+            note.capsule_hint = capsule_hint
+            if capsule_date:
+                try:
+                    parsed_date = datetime.strptime(capsule_date, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        parsed_date = datetime.strptime(capsule_date, '%Y-%m-%d')
+                    except ValueError:
+                        return jsonify({'error': '日期格式错误，请使用 YYYY-MM-DD HH:MM:SS'}), 400
+                # 仅对锁定中的胶囊强制要求日期在未来；已拆开(opened)的胶囊日期已是过去时间，属正常
+                if note.capsule_status == 'locked' and parsed_date <= datetime.now():
+                    return jsonify({'error': '时光胶囊的解锁时间必须在未来'}), 400
+                note.capsule_date = parsed_date
+        else:
+            note.capsule_status = 'none'
 
         # === Create Version History ===
         from app.models import Config
@@ -396,6 +513,9 @@ def delete_note(note_id):
             if note.user_id != current_user.id:
                 return jsonify({'error': '无权删除此笔记'}), 403
             
+            if note.is_capsule and note.capsule_status != 'opened':
+                return jsonify({'error': '未解锁的时光胶囊无法删除'}), 400
+            
             note.is_deleted = True
             note.deleted_at = datetime.now()
             db.session.commit()
@@ -480,7 +600,7 @@ def search_notes():
         if not keyword_input and not tag:
             return get_notes()
 
-        query = Note.query.filter(Note.is_deleted == False)
+        query = Note.query.filter(Note.is_deleted == False, Note.get_visible_filter())
 
         # Apply Auth Filters
         if current_user.is_authenticated:
@@ -572,18 +692,3 @@ def get_tags():
         return jsonify(tags)
     except Exception as e:
         return jsonify(safe_error(e, '获取标签失败')), 500
-
-@notes_bp.route('/notes/history/clear_all', methods=['POST'])
-@login_required
-def clear_all_history():
-    """Delete all note versions for the current user"""
-    try:
-        # Join with Note to ensure we only delete current user's history
-        subquery = db.session.query(Note.id).filter(Note.user_id == current_user.id).subquery()
-        num_deleted = db.session.query(NoteVersion).filter(NoteVersion.note_id.in_(subquery)).delete(synchronize_session=False)
-        db.session.commit()
-        invalidate_stats_cache()
-        return jsonify({'success': True, 'count': num_deleted})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify(safe_error(e, '清除历史版本失败')), 500

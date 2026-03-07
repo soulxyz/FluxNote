@@ -964,7 +964,8 @@ button { font-family: inherit; cursor: pointer; }
     gap: 10px;
 }
 
-.close-auth, .close-version, .close-share, .close-review, .close-shares {
+.close-auth, .close-version, .close-share, .close-review, .close-shares,
+.close-capsule, .close-graph, .close-edit-share {
     color: #aaa;
     font-size: 24px;
     font-weight: bold;
@@ -972,7 +973,8 @@ button { font-family: inherit; cursor: pointer; }
     line-height: 1;
     transition: color 0.2s;
 }
-.close-auth:hover, .close-version:hover, .close-share:hover, .close-review:hover, .close-shares:hover { color: var(--slate-600); }
+.close-auth:hover, .close-version:hover, .close-share:hover, .close-review:hover, .close-shares:hover,
+.close-capsule:hover, .close-graph:hover, .close-edit-share:hover { color: var(--slate-600); }
 
 /* 确认弹窗 */
 .confirm-modal {
@@ -2000,6 +2002,159 @@ input:checked + .slider:before { transform: translateX(20px); }
     font-size: 14px;
 }
 
+/* ============================================================
+   15. 时光胶囊 (Time Capsule)
+   ============================================================ */
+
+.capsule-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+    padding: 10px 0;
+}
+
+.capsule-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid var(--slate-200);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.capsule-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 25px rgba(0,0,0,0.1);
+}
+
+.capsule-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.capsule-badge {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.capsule-badge.locked {
+    background: var(--slate-100);
+    color: var(--slate-500);
+}
+
+.capsule-badge.ready {
+    background: #fef3c7;
+    color: #d97706;
+    animation: capsule-pulse 2s infinite;
+}
+
+.capsule-badge.opened {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.capsule-date {
+    font-size: 12px;
+    color: var(--slate-400);
+    font-weight: 500;
+}
+
+.capsule-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 10px 0;
+}
+
+.capsule-hint {
+    font-size: 16px;
+    color: var(--slate-700);
+    font-style: italic;
+    margin-bottom: 12px;
+    line-height: 1.5;
+    font-weight: 500;
+}
+
+.capsule-title {
+    font-size: 14px;
+    color: var(--slate-900);
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.capsule-locked-placeholder {
+    font-size: 13px;
+    color: var(--slate-300);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.capsule-timer {
+    font-size: 12px;
+    color: var(--slate-500);
+    background: var(--slate-50);
+    padding: 6px 12px;
+    border-radius: 8px;
+    display: inline-block;
+    margin-top: 15px;
+}
+
+/* 磨砂玻璃层 */
+.capsule-card[style*="filter: grayscale"]::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.capsule-card-footer {
+    margin-top: auto;
+    padding-top: 16px;
+}
+
+.open-capsule-btn {
+    transition: all 0.3s;
+    font-weight: 600;
+}
+
+.open-capsule-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+}
+
+@keyframes capsule-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* 编辑器中的胶囊按钮激活状态 */
+.capsule-trigger.active {
+    color: #f39c12 !important;
+}
+
+.capsule-menu {
+    border-top: 3px solid #f39c12 !important;
+}
+
 .share-edit-section input:focus,
 .share-edit-section select:focus {
     outline: none;
@@ -2492,4 +2647,19 @@ input:checked + .slider:before { transform: translateX(20px); }
     .stat-number { font-size: 24px; }
     .admin-comment-item { flex-direction: column; }
     .admin-comment-item .comment-checkbox { margin-bottom: 8px; }
+
+    /* --- 时光胶囊 --- */
+    .capsule-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    #capsuleModal .modal-content {
+        margin: 10px auto;
+        padding: 20px;
+        max-width: 100% !important;
+        width: 95%;
+    }
+    .capsule-card {
+        padding: 18px;
+    }
 }

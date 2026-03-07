@@ -127,6 +127,9 @@
                         <a href="#" class="nav-item" id="navDailyReview" onclick="return false;">
                             <i class="fas fa-history"></i> 每日回顾
                         </a>
+                        <a href="#" class="nav-item" id="navCapsules" onclick="return false;">
+                            <i class="fas fa-hourglass-start"></i> 时光胶囊
+                        </a>
                         <a href="#" class="nav-item" id="navShares" onclick="return false;">
                             <i class="fas fa-share-alt"></i> 我的分享
                         </a>
@@ -457,6 +460,21 @@
             </div>
             <div class="modal-body" style="flex: 1; padding: 0; min-height: 400px;">
                 <div id="graphContainer" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time Capsule Modal -->
+    <div id="capsuleModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-hourglass-start" style="margin-right: 10px; color: #f39c12;"></i> 时光胶囊陈列室</h2>
+                <span class="close-capsule">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="capsuleList" class="capsule-grid">
+                    <!-- 动态加载胶囊卡片 -->
+                </div>
             </div>
         </div>
     </div>

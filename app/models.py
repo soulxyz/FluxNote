@@ -125,6 +125,12 @@ class Note(db.Model):
     is_deleted = db.Column(db.Boolean, default=False)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
+    # 时光胶囊 (Time Capsule) 字段
+    is_capsule = db.Column(db.Boolean, default=False)
+    capsule_date = db.Column(db.DateTime, nullable=True)
+    capsule_hint = db.Column(db.String(255), nullable=True)
+    capsule_status = db.Column(db.String(20), default='none') # none, locked, ready, opened
+
     # Relationship to Tags
     tags_list = db.relationship('Tag', secondary=note_tags, lazy='subquery',
         backref=db.backref('notes', lazy=True))
@@ -146,10 +152,35 @@ class Note(db.Model):
             'user_id': self.user_id,
             'is_public': self.is_public,
             'is_deleted': self.is_deleted,
-            'deleted_at': self.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if self.deleted_at else None
+            'deleted_at': self.deleted_at.strftime('%Y-%m-%d %H:%M:%S') if self.deleted_at else None,
+            'is_capsule': self.is_capsule,
+            'capsule_date': self.capsule_date.strftime('%Y-%m-%d %H:%M:%S') if self.capsule_date else None,
+            'capsule_hint': self.capsule_hint,
+            'capsule_status': self.capsule_status
         }
 
+    @staticmethod
+    def get_visible_filter():
+        """返回SQLAlchemy过滤条件：用于获取普通可见的笔记（排除未拆开的胶囊）"""
+        return db.or_(Note.is_capsule == False, Note.capsule_status == 'opened')
+
+    def is_viewable_by_owner(self):
+        """判断当前胶囊是否对所有者可见真实内容"""
+        return not self.is_capsule or self.capsule_status == 'opened'
+
+    def to_obfuscated_dict(self):
+        """返回脱敏后的字典数据（用于未拆开的胶囊）"""
+        d = self.to_dict()
+        d['title'] = '🔒 时光胶囊'
+        d['content'] = '内容已封存，请在解锁时间到达后拆开。'
+        d['links'] = []
+        d['backlinks'] = []
+        d['tags'] = []
+        return d
+
     def get_excerpt(self, max_length=150):
+        if self.is_capsule and self.capsule_status != 'opened':
+            return '🔒 内容已封存，请在解锁时间到达后拆开。'
         """
         从 Markdown 内容中提取智能摘要
         - 移除代码块（包括 mermaid、mindmap 等）

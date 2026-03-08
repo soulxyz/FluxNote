@@ -4,7 +4,7 @@ Flask-Compress==1.14
 Werkzeug==2.3.7
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
-waitress==2.1.2
+waitress==3.0.1
 openai
 httpx
 webauthn

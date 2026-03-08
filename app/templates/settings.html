@@ -346,6 +346,92 @@
                 </div>
             </div>
         </div>
+        <!-- 系统更新 -->
+        <div class="settings-section">
+            <div class="section-title"><i class="fas fa-cloud-download-alt"></i> 系统更新</div>
+
+            <div class="form-row">
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                    <div style="display:flex; align-items:center; gap:8px; background:var(--slate-50); padding:6px 14px; border-radius:8px; border:1px solid var(--slate-200);">
+                        <i class="fas fa-code-branch" style="color:var(--primary); font-size:13px;"></i>
+                        <span style="font-size:13px; color:var(--slate-500);">当前版本</span>
+                        <span style="font-weight:700; color:var(--slate-800); font-size:14px;" id="currentVersion">{{ app_semver }}</span>
+                    </div>
+                    <div id="updateBadge" style="display:none;">
+                        <span style="background:#dcfce7; color:#16a34a; font-size:12px; font-weight:600; padding:3px 10px; border-radius:12px;">
+                            <i class="fas fa-arrow-up" style="font-size:10px;"></i> 有新版本
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <label>GitHub 仓库 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
+                <input type="text" id="githubRepo" placeholder="例如: username/my-blog" value="soulxyz/FlexNote">
+                <p class="help-text">填入你在 GitHub 上的仓库地址，系统将通过 GitHub Releases 检查更新。</p>
+            </div>
+            <div class="form-row">
+                <label>GitHub Token <span style="color:#999; font-weight:normal;">(可选，私有仓库需要)</span></label>
+                <input type="password" id="githubToken" placeholder="ghp_xxxx...">
+                <p class="help-text">如果是私有仓库，需要填入具有 repo 权限的 Personal Access Token。公开仓库可留空。</p>
+            </div>
+            <div class="form-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="saveUpdateConfig()">
+                    <i class="fas fa-save"></i> 保存配置
+                </button>
+                <button class="btn btn-secondary" id="checkUpdateBtn" onclick="checkForUpdate()">
+                    <i class="fas fa-sync-alt"></i> 检查更新
+                </button>
+            </div>
+
+            <!-- 更新信息卡片 -->
+            <div id="updateInfo" style="display:none; margin-top:20px; background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1px solid #bbf7d0; border-radius:10px; padding:18px 20px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                    <i class="fas fa-gift" style="color:#16a34a; font-size:18px;"></i>
+                    <span style="font-weight:700; font-size:16px; color:var(--slate-800);" id="updateReleaseName"></span>
+                    <span style="font-size:12px; color:var(--slate-400);" id="updatePublishedAt"></span>
+                </div>
+                <div id="updateChangelog" style="font-size:13px; color:var(--slate-600); line-height:1.7; max-height:200px; overflow-y:auto; margin-bottom:14px; white-space:pre-wrap;"></div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="applyUpdateBtn" onclick="applyUpdate()">
+                        <i class="fas fa-download"></i> 下载并安装更新
+                    </button>
+                    <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
+                        <i class="fab fa-github"></i> 在 GitHub 查看
+                    </a>
+                </div>
+            </div>
+
+            <!-- 无更新提示 -->
+            <div id="noUpdateInfo" style="display:none; margin-top:20px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px; padding:16px 20px; text-align:center;">
+                <i class="fas fa-check-circle" style="color:#16a34a; font-size:24px; margin-bottom:8px;"></i>
+                <div style="font-weight:600; color:var(--slate-700);">当前已是最新版本</div>
+                <div style="font-size:13px; color:var(--slate-400); margin-top:4px;" id="noUpdateVersionText"></div>
+            </div>
+
+            <!-- 更新进度 -->
+            <div id="updateProgress" style="display:none; margin-top:20px;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
+                    <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
+                </div>
+                <div style="background:var(--slate-200); border-radius:6px; height:6px; overflow:hidden;">
+                    <div id="updateProgressBar" style="background:var(--primary); height:100%; width:0%; transition:width 0.5s ease; border-radius:6px;"></div>
+                </div>
+            </div>
+
+            <!-- 更新日志 -->
+            <div style="border-top:1px solid #eee; margin:20px 0;"></div>
+            <div class="form-row">
+                <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="toggleUpdateLogs()">
+                    <div style="font-weight:600; font-size:14px;"><i class="fas fa-history" style="color:var(--slate-400); margin-right:6px;"></i>更新日志</div>
+                    <i class="fas fa-chevron-down" id="updateLogsArrow" style="font-size:12px; color:var(--slate-400); transition:transform 0.2s;"></i>
+                </div>
+                <div id="updateLogsContent" style="display:none; margin-top:12px;">
+                    <pre id="updateLogsText" style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:8px; padding:12px 16px; font-size:12px; color:var(--slate-600); line-height:1.6; max-height:300px; overflow-y:auto; white-space:pre-wrap; font-family:'SF Mono','Menlo','Consolas',monospace;">暂无日志</pre>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>
@@ -425,6 +511,7 @@
             loadThemes();
             loadCommentStats();
             loadSTTConfig();
+            loadUpdateConfig();
         });
 
         // ... existing loadSettings ...
@@ -1141,6 +1228,202 @@
             } catch (error) {
                 showToast('切换失败', 'error');
             }
+        }
+
+        // === 系统更新 ===
+        let _pendingUpdate = null;
+
+        async function loadUpdateConfig() {
+            try {
+                const response = await fetch('/api/update/current');
+                const res = await response.json();
+                const data = res.data;
+                document.getElementById('currentVersion').textContent = data.version;
+                document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FlexNote';
+                // 也尝试加载 github_token（如果有的话）
+                const settingsRes = await fetch('/api/settings');
+                const settings = await settingsRes.json();
+                if (settings.data?.github_token) {
+                    document.getElementById('githubToken').value = '••••••••';
+                }
+            } catch (e) {}
+        }
+
+        async function saveUpdateConfig() {
+            const repo = document.getElementById('githubRepo').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+
+            try {
+                // 保存仓库地址
+                const resp = await fetch('/api/update/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ github_repo: repo })
+                });
+                if (!resp.ok) {
+                    const d = await resp.json();
+                    showToast(d.message || '保存失败', 'error');
+                    return;
+                }
+
+                // 保存 token（通过通用设置接口）
+                if (token && !token.includes('•')) {
+                    await fetch('/api/settings', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ github_token: token })
+                    });
+                }
+
+                showToast('更新配置已保存', 'success');
+            } catch (e) {
+                showToast('保存失败', 'error');
+            }
+        }
+
+        async function checkForUpdate() {
+            const btn = document.getElementById('checkUpdateBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检查中...';
+
+            // 隐藏之前的结果
+            document.getElementById('updateInfo').style.display = 'none';
+            document.getElementById('noUpdateInfo').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/update/check');
+                const res = await response.json();
+
+                if (!response.ok) {
+                    showToast(res.message || '检查失败', 'error');
+                    return;
+                }
+
+                const data = res.data;
+                if (data.has_update) {
+                    _pendingUpdate = data;
+                    document.getElementById('updateBadge').style.display = 'inline-block';
+                    document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
+                    document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
+                    document.getElementById('updateChangelog').textContent = data.changelog || '无更新说明';
+                    document.getElementById('updateHtmlUrl').href = data.html_url || '#';
+                    document.getElementById('updateInfo').style.display = 'block';
+                } else {
+                    document.getElementById('updateBadge').style.display = 'none';
+                    document.getElementById('noUpdateVersionText').textContent = `v${data.local_version}`;
+                    document.getElementById('noUpdateInfo').style.display = 'block';
+                }
+            } catch (e) {
+                showToast('检查更新失败，请确认网络连接', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt"></i> 检查更新';
+            }
+        }
+
+        async function applyUpdate() {
+            if (!_pendingUpdate) return;
+            if (!await showConfirm('确认更新',
+                `确定要更新到 <strong>${_pendingUpdate.remote_version}</strong> 吗？<br>` +
+                `<span style="font-size:13px;color:#666;">更新前会自动备份数据库。更新完成后服务将自动重启。</span>`
+            )) return;
+
+            const applyBtn = document.getElementById('applyUpdateBtn');
+            applyBtn.disabled = true;
+            applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在更新...';
+
+            // 显示进度条
+            document.getElementById('updateProgress').style.display = 'block';
+            const progressBar = document.getElementById('updateProgressBar');
+            const progressText = document.getElementById('updateProgressText');
+
+            progressBar.style.width = '10%';
+            progressText.textContent = '正在下载更新包...';
+
+            try {
+                const response = await fetch('/api/update/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        zip_url: _pendingUpdate.zip_url,
+                        version: _pendingUpdate.remote_version
+                    })
+                });
+
+                progressBar.style.width = '80%';
+                progressText.textContent = '正在安装...';
+
+                const res = await response.json();
+
+                if (!response.ok) {
+                    showToast(res.message || '更新失败', 'error');
+                    progressBar.style.width = '0%';
+                    document.getElementById('updateProgress').style.display = 'none';
+                    applyBtn.disabled = false;
+                    applyBtn.innerHTML = '<i class="fas fa-download"></i> 下载并安装更新';
+                    return;
+                }
+
+                progressBar.style.width = '100%';
+                progressText.textContent = '更新完成，服务正在重启...';
+
+                // 等待服务重启后自动刷新页面
+                setTimeout(() => waitForRestart(), 3000);
+
+            } catch (e) {
+                // 请求可能因服务重启而中断，这是正常的
+                progressBar.style.width = '100%';
+                progressText.textContent = '服务正在重启，请稍候...';
+                setTimeout(() => waitForRestart(), 3000);
+            }
+        }
+
+        async function waitForRestart(attempt = 0) {
+            const maxAttempts = 30;
+            const progressText = document.getElementById('updateProgressText');
+
+            if (attempt >= maxAttempts) {
+                progressText.textContent = '重启超时，请手动刷新页面';
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/update/current', { cache: 'no-store' });
+                if (resp.ok) {
+                    progressText.textContent = '重启成功！正在刷新...';
+                    setTimeout(() => window.location.reload(), 1000);
+                    return;
+                }
+            } catch (e) {
+                // 服务还没起来，继续等
+            }
+
+            progressText.textContent = `等待服务重启... (${attempt + 1}/${maxAttempts})`;
+            setTimeout(() => waitForRestart(attempt + 1), 2000);
+        }
+
+        let updateLogsExpanded = false;
+        function toggleUpdateLogs() {
+            updateLogsExpanded = !updateLogsExpanded;
+            const content = document.getElementById('updateLogsContent');
+            const arrow = document.getElementById('updateLogsArrow');
+            if (updateLogsExpanded) {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+                loadUpdateLogs();
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function loadUpdateLogs() {
+            try {
+                const response = await fetch('/api/update/logs');
+                const res = await response.json();
+                const logs = res.data?.logs || '暂无日志';
+                document.getElementById('updateLogsText').textContent = logs;
+            } catch (e) {}
         }
 
         // === 评论管理 ===

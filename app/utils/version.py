@@ -3,6 +3,19 @@ import os
 import hashlib
 import time
 
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def get_app_version():
+    """读取 VERSION 文件中的应用版本号"""
+    version_file = os.path.join(_BASE_DIR, 'VERSION')
+    try:
+        with open(version_file, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return '0.0.0'
+
+
 def get_static_hash():
     """
     计算所有核心文件的总哈希值，作为全局版本号。

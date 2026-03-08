@@ -11,6 +11,7 @@ from .routes.auth_webauthn import webauthn_bp
 from .routes.share import share_bp
 from .routes.blog import blog_bp
 from .routes.comment import comment_bp
+from .routes.update import update_bp
 from .utils.version import get_static_hash
 import os
 import logging
@@ -84,6 +85,7 @@ def create_app():
     app.register_blueprint(share_bp, url_prefix='/api')  # 分享功能
     app.register_blueprint(blog_bp)  # 博客功能
     app.register_blueprint(comment_bp, url_prefix='/api') # 评论功能
+    app.register_blueprint(update_bp)  # 系统更新
 
     # Register Upload Route (Global)
     @app.route('/uploads/<filename>')
@@ -93,19 +95,17 @@ def create_app():
     # 注入全局模板变量，使用动态生成的哈希值作为版本号
     @app.context_processor
     def inject_version():
-        from .utils.version import get_static_manifest, get_static_hash
+        from .utils.version import get_static_manifest, get_static_hash, get_app_version
         manifest = get_static_manifest()
         
-        # 细粒度版本控制助手
         def static_v(filename):
-            # filename 格式如: 'js/main.js'
             path = f"/static/{filename}"
-            # 如果在清单中，返回该文件的独立哈希，否则回退到全局哈希
             v = manifest.get(path, get_static_hash())
             return f"/static/{filename}?v={v}"
             
         return dict(
             app_version=get_static_hash(),
+            app_semver=get_app_version(),
             static_v=static_v
         )
 

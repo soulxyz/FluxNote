@@ -11,3 +11,4 @@ webauthn
 Flask-Migrate
 markdown
 bleach
+packaging

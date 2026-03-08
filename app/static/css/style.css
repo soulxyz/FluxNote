@@ -3439,41 +3439,111 @@ input:checked + .slider:before { transform: translateX(20px); }
     }
 
     /* --- 设置页移动端适配 --- */
-    /* 侧边栏在移动端变为顶部横向标签栏 */
+    /* 侧边栏在移动端变为顶部统一头部 */
     .settings-sidebar {
+        display: flex !important;
+        flex-direction: column !important;
+        transform: none !important;
         width: 100% !important;
+        max-width: 100% !important;
         height: auto !important;
-        position: relative !important;
+        position: sticky !important;
         top: 0 !important;
+        left: 0 !important;
         overflow: visible;
         flex-shrink: 0;
+        background: #fff !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+        z-index: 20;
+        padding: 0 !important;
+        border-right: none !important;
     }
-    .settings-nav-header { padding: 10px 0 12px; }
+    .settings-nav-header {
+        padding: 14px 50px 6px 16px;
+        margin-bottom: 0;
+        border-bottom: none;
+    }
+    .settings-nav-scroll-wrap {
+        position: relative;
+        overflow: hidden;
+    }
+    .settings-nav-scroll-wrap::after {
+        content: '';
+        position: absolute;
+        top: 0; bottom: 0; right: 0;
+        width: 32px;
+        background: linear-gradient(to right, transparent, #fff);
+        pointer-events: none;
+        z-index: 2;
+        transition: opacity 0.2s;
+    }
+    .settings-nav-scroll-wrap.scrolled-end::after {
+        opacity: 0;
+    }
     .settings-nav-menu {
         display: flex;
         flex-wrap: nowrap;
         overflow-x: auto;
-        padding: 0 0 8px;
-        gap: 2px;
+        padding: 0 16px 6px;
+        gap: 6px;
         -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0,0,0,0.12) transparent;
     }
-    .settings-nav-menu::-webkit-scrollbar { display: none; }
+    .settings-nav-menu::-webkit-scrollbar { height: 3px; }
+    .settings-nav-menu::-webkit-scrollbar-track { background: transparent; margin: 0 16px; }
+    .settings-nav-menu::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+    .settings-nav-menu::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.18); }
     .settings-nav-menu li { flex-shrink: 0; }
     .settings-nav-menu .nav-group-label { display: none; }
     .settings-nav-menu .nav-item {
-        padding: 6px 14px !important;
+        padding: 7px 14px !important;
         border-radius: 20px !important;
         white-space: nowrap;
         font-size: 13px;
+        background: #F1F5F9 !important;
+        color: #64748B !important;
+    }
+    .settings-nav-menu .nav-item.active {
+        background: #ECFDF5 !important;
+        color: #059669 !important;
+        font-weight: 600 !important;
     }
     .settings-main {
         max-width: 100% !important;
         height: auto !important;
         overflow: visible !important;
-        padding: 16px 0 !important;
+        padding: 16px 12px !important;
         flex-direction: column !important;
     }
+
+    /* settings-section 内边距收窄 */
+    .settings-section {
+        padding: 18px 14px;
+        border-radius: 12px;
+        margin-bottom: 12px;
+    }
+    .settings-divider { margin: 16px 0; }
+
+    /* provider/prompt 列表项：垂直排列 */
+    .provider-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 14px;
+    }
+    .provider-actions { width: 100%; flex-wrap: wrap; }
+
+    /* 模态框（AI模型/指令弹窗）全宽适配 */
+    .modal-content {
+        width: calc(100vw - 24px) !important;
+        margin: 12px auto !important;
+        padding: 20px 16px !important;
+        max-height: 88vh;
+        overflow-y: auto;
+    }
+    .modal-footer { flex-wrap: wrap; }
+    .modal-footer .btn { flex: 1; min-width: 80px; justify-content: center; }
 }
 
 /* ============================================================
@@ -3553,4 +3623,33 @@ input:checked + .slider:before { transform: translateX(20px); }
     color: var(--slate-800);
     border-color: var(--slate-300);
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* 设置模态框 —— 移动端全屏 + 关闭按钮融合 */
+@media (max-width: 900px) {
+    .settings-modal-overlay { padding: 0; }
+    .settings-modal-box {
+        max-width: 100%;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0;
+    }
+    .settings-modal-close {
+        top: 10px;
+        right: 10px;
+        width: 30px;
+        height: 30px;
+        font-size: 13px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(0,0,0,0.05);
+        box-shadow: none;
+        color: #64748B;
+    }
+    .settings-modal-close:hover {
+        background: rgba(0,0,0,0.1);
+        color: #1E293B;
+        box-shadow: none;
+    }
 }

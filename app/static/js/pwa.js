@@ -3,9 +3,18 @@ import { showToast } from './modules/utils.js';
 export const pwa = {
     _deferredPrompt: null,
     _installDismissed: false,
+    _swInstallStatus: {
+        active: false,
+        lastAsset: '',
+        completed: 0,
+        total: 0,
+        watchdogId: null
+    },
+    _activationWatchdogId: null,
 
     init() {
         this._registerServiceWorker();
+        this._listenServiceWorkerMessages();
         this._listenInstallPrompt();
         this._listenNetworkStatus();
     },
@@ -15,39 +24,191 @@ export const pwa = {
     _registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
 
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js')
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            refreshing = true;
+            this._clearInstallWatchdog();
+            this._clearActivationWatchdog();
+            sessionStorage.removeItem('pwa-updating');
+            window.location.reload();
+        });
+
+        const onInstalledWorkerFound = (worker) => {
+            if (!navigator.serviceWorker.controller) return;
+
+            const updatingTs = parseInt(sessionStorage.getItem('pwa-updating') || '0');
+            if (Date.now() - updatingTs < 10000) {
+                sessionStorage.removeItem('pwa-updating');
+                worker.postMessage('skipWaiting');
+                return;
+            }
+
+            this._showUpdateToast(worker);
+        };
+
+        const bindUpdateWatcher = (registration) => {
+            if (registration._watched) return;
+            registration._watched = true;
+            registration.addEventListener('updatefound', () => {
+                const worker = registration.installing;
+                if (!worker) return;
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed') onInstalledWorkerFound(worker);
+                });
+            });
+        };
+
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.getRegistration().then(reg => {
+                if (!reg) return;
+                if (reg.waiting) onInstalledWorkerFound(reg.waiting);
+                bindUpdateWatcher(reg);
+            });
+        }
+
+        const registerSW = () => {
+            navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
                 .then(registration => {
                     console.log('[PWA] Service Worker registered:', registration.scope);
-
-                    if (registration.waiting) {
-                        this._showUpdateToast(registration.waiting);
-                    }
-
-                    registration.onupdatefound = () => {
-                        const installingWorker = registration.installing;
-                        installingWorker.onstatechange = () => {
-                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                this._showUpdateToast(installingWorker);
-                            }
-                        };
-                    };
+                    if (registration.waiting) onInstalledWorkerFound(registration.waiting);
+                    bindUpdateWatcher(registration);
                 })
                 .catch(error => {
                     console.error('[PWA] Registration failed:', error);
                 });
+        };
 
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
-            });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', registerSW);
+        } else {
+            registerSW();
+        }
+    },
+
+    _listenServiceWorkerMessages() {
+        if (!('serviceWorker' in navigator)) return;
+
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            const data = event.data;
+            if (!data || data.type !== 'sw-update-status') return;
+            this._handleServiceWorkerStatus(data);
         });
     },
 
-    _showUpdateToast(worker) {
-        if (document.querySelector('.pwa-update-toast')) return;
+    _handleServiceWorkerStatus(data) {
+        if (data.asset) {
+            this._swInstallStatus.lastAsset = data.asset;
+        }
+
+        if (data.status === 'start') {
+            this._swInstallStatus.active = true;
+            this._swInstallStatus.completed = 0;
+            this._swInstallStatus.total = data.total || 0;
+            this._scheduleInstallWatchdog();
+            return;
+        }
+
+        if (data.status === 'progress') {
+            this._swInstallStatus.active = true;
+            this._swInstallStatus.completed = data.completed || 0;
+            this._swInstallStatus.total = data.total || 0;
+            this._scheduleInstallWatchdog();
+
+            const hasUpdateToast = document.querySelector('.pwa-update-toast');
+            if (hasUpdateToast) {
+                const progressText = this._swInstallStatus.total
+                    ? `正在下载更新资源 (${this._swInstallStatus.completed}/${this._swInstallStatus.total})`
+                    : '正在准备更新资源...';
+                this._updateUpdateToastText({
+                    title: '正在后台更新',
+                    message: progressText,
+                    detail: `当前处理：${this._swInstallStatus.lastAsset || '未知文件'}`
+                });
+            }
+            return;
+        }
+
+        if (data.status === 'ready') {
+            this._swInstallStatus.active = false;
+            this._swInstallStatus.completed = data.completed || this._swInstallStatus.completed;
+            this._swInstallStatus.total = data.total || this._swInstallStatus.total;
+            this._clearInstallWatchdog();
+            return;
+        }
+
+        if (data.status === 'error') {
+            this._swInstallStatus.active = false;
+            this._clearInstallWatchdog();
+            sessionStorage.removeItem('pwa-updating');
+            this._showUpdateIssueToast({
+                title: '更新下载失败',
+                message: '由于网络原因，新版本未能完全下载。当前页面仍可正常使用。',
+                detail: `失败文件：${data.asset || '未知文件'}\n错误信息：${data.error || '未知错误'}`,
+                primaryLabel: '刷新重试',
+                secondaryLabel: '关闭',
+                primaryHandler: () => window.location.reload(),
+                secondaryHandler: () => this._removeUpdateToast(),
+                tone: 'error'
+            });
+        }
+    },
+
+    _scheduleInstallWatchdog() {
+        this._clearInstallWatchdog();
+        this._swInstallStatus.watchdogId = setTimeout(() => {
+            if (!this._swInstallStatus.active) return;
+
+            this._showUpdateIssueToast({
+                title: '更新下载缓慢',
+                message: '网络似乎有些拥堵，您可以继续正常使用，或尝试刷新页面。',
+                detail: this._swInstallStatus.lastAsset
+                    ? `当前卡在：${this._swInstallStatus.lastAsset}`
+                    : '当前未定位到具体文件',
+                primaryLabel: '刷新页面',
+                secondaryLabel: '继续等待',
+                primaryHandler: () => window.location.reload(),
+                secondaryHandler: () => this._removeUpdateToast(),
+                tone: 'warning'
+            });
+        }, 8000);
+    },
+
+    _clearInstallWatchdog() {
+        if (this._swInstallStatus.watchdogId) {
+            clearTimeout(this._swInstallStatus.watchdogId);
+            this._swInstallStatus.watchdogId = null;
+        }
+    },
+
+    _startActivationWatchdog() {
+        this._clearActivationWatchdog();
+        this._activationWatchdogId = setTimeout(() => {
+            this._showUpdateIssueToast({
+                title: '更新即将完成',
+                message: '新版本已就绪，但页面切换似乎遇到了阻碍。建议您手动刷新页面。',
+                detail: this._swInstallStatus.lastAsset
+                    ? `最后处理：${this._swInstallStatus.lastAsset}`
+                    : '无具体文件记录，可能卡在激活阶段。',
+                primaryLabel: '手动刷新',
+                secondaryLabel: '关闭',
+                primaryHandler: () => window.location.reload(),
+                secondaryHandler: () => this._removeUpdateToast(),
+                tone: 'warning'
+            });
+        }, 8000);
+    },
+
+    _clearActivationWatchdog() {
+        if (this._activationWatchdogId) {
+            clearTimeout(this._activationWatchdogId);
+            this._activationWatchdogId = null;
+        }
+    },
+
+    _ensureUpdateToast() {
+        let toast = document.querySelector('.pwa-update-toast');
+        if (toast) return toast;
 
         if (!document.getElementById('pwa-anim-styles')) {
             const style = document.createElement('style');
@@ -59,7 +220,7 @@ export const pwa = {
             document.head.appendChild(style);
         }
 
-        const toast = document.createElement('div');
+        toast = document.createElement('div');
         toast.className = 'pwa-update-toast';
         toast.style.cssText = `
             position: fixed; bottom: 24px; right: 24px;
@@ -67,32 +228,126 @@ export const pwa = {
             border-radius: 12px;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.1);
             z-index: 9999; display: flex; flex-direction: column; gap: 12px;
-            border: 1px solid #e2e8f0; max-width: 300px;
+            border: 1px solid #e2e8f0; max-width: 360px;
             animation: pwaSlideIn .3s ease-out;
             font-family: system-ui, -apple-system, sans-serif;
         `;
         toast.innerHTML = `
-            <div style="display:flex;align-items:center;gap:10px;">
-                <i class="fas fa-sparkles" style="color:#10B981;font-size:1.2em;"></i>
+            <div style="display:flex;align-items:flex-start;gap:12px;">
+                <i id="pwaUpdateIcon" class="fas fa-sparkles" style="color:#10B981;font-size:1.2em;margin-top:2px;"></i>
                 <div style="flex:1;">
-                    <h4 style="margin:0;font-size:14px;font-weight:600;">发现前端新版本</h4>
-                    <p style="margin:4px 0 0;font-size:12px;color:#64748b;">更新到浏览器缓存以快速使用最新特性</p>
+                    <h4 id="pwaUpdateTitle" style="margin:0;font-size:14px;font-weight:600;">发现新版本</h4>
+                    <p id="pwaUpdateMessage" style="margin:4px 0 0;font-size:12px;color:#64748b;line-height:1.5;">已在后台准备好更新，刷新页面即可体验新功能。</p>
+                    <details id="pwaUpdateDevBox" style="margin-top:8px;font-size:11px;color:#94a3b8;cursor:pointer;display:none;">
+                        <summary style="outline:none;user-select:none;">开发信息</summary>
+                        <div id="pwaUpdateDetail" style="margin-top:4px;white-space:pre-wrap;word-break:break-all;background:#f8fafc;padding:6px;border-radius:4px;border:1px solid #e2e8f0;"></div>
+                    </details>
                 </div>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button id="pwaLaterBtn" style="padding:6px 12px;font-size:12px;border:1px solid #e2e8f0;background:white;color:#64748b;border-radius:6px;cursor:pointer;">稍后</button>
-                <button id="pwaRefreshBtn" style="padding:6px 12px;font-size:12px;border:none;background:#10B981;color:white;border-radius:6px;cursor:pointer;font-weight:500;">立即刷新</button>
+                <button id="pwaLaterBtn" style="padding:6px 12px;font-size:12px;border:1px solid #e2e8f0;background:white;color:#64748b;border-radius:6px;cursor:pointer;transition:all .2s;">稍后</button>
+                <button id="pwaRefreshBtn" style="padding:6px 12px;font-size:12px;border:none;background:#10B981;color:white;border-radius:6px;cursor:pointer;font-weight:500;transition:all .2s;">立即刷新</button>
             </div>
         `;
         document.body.appendChild(toast);
+        return toast;
+    },
+
+    _updateUpdateToastText({ title, message, detail, tone = 'default' } = {}) {
+        const toast = this._ensureUpdateToast();
+        const icon = document.getElementById('pwaUpdateIcon');
+        const titleEl = document.getElementById('pwaUpdateTitle');
+        const messageEl = document.getElementById('pwaUpdateMessage');
+        const detailEl = document.getElementById('pwaUpdateDetail');
+
+        if (title !== undefined && titleEl) titleEl.textContent = title;
+        if (message !== undefined && messageEl) messageEl.textContent = message;
+        if (detail !== undefined && detailEl) {
+            detailEl.textContent = detail;
+            const devBox = document.getElementById('pwaUpdateDevBox');
+            if (devBox) devBox.style.display = detail ? 'block' : 'none';
+        }
+
+        if (toast) {
+            if (tone === 'error') {
+                toast.style.borderColor = '#fecaca';
+                toast.style.background = '#fff7f7';
+                if (icon) {
+                    icon.className = 'fas fa-triangle-exclamation';
+                    icon.style.color = '#dc2626';
+                }
+            } else if (tone === 'warning') {
+                toast.style.borderColor = '#fde68a';
+                toast.style.background = '#fffbeb';
+                if (icon) {
+                    icon.className = 'fas fa-clock';
+                    icon.style.color = '#d97706';
+                }
+            } else {
+                toast.style.borderColor = '#e2e8f0';
+                toast.style.background = 'white';
+                if (icon) {
+                    icon.className = 'fas fa-sparkles';
+                    icon.style.color = '#10B981';
+                }
+            }
+        }
+    },
+
+    _showUpdateIssueToast({ title, message, detail, primaryLabel, secondaryLabel, primaryHandler, secondaryHandler, tone }) {
+        this._updateUpdateToastText({ title, message, detail, tone });
+
+        const primaryBtn = document.getElementById('pwaRefreshBtn');
+        const secondaryBtn = document.getElementById('pwaLaterBtn');
+
+        if (primaryBtn) {
+            primaryBtn.disabled = false;
+            primaryBtn.textContent = primaryLabel || '确定';
+            primaryBtn.onclick = primaryHandler || null;
+            primaryBtn.style.background = tone === 'error' ? '#DC2626' : '#10B981';
+        }
+
+        if (secondaryBtn) {
+            secondaryBtn.textContent = secondaryLabel || '关闭';
+            secondaryBtn.onclick = secondaryHandler || (() => this._removeUpdateToast());
+            secondaryBtn.style.display = 'inline-block';
+        }
+    },
+
+    _removeUpdateToast() {
+        const toast = document.querySelector('.pwa-update-toast');
+        if (!toast) return;
+
+        this._clearActivationWatchdog();
+        toast.style.animation = 'pwaFadeOut .3s ease-in forwards';
+        setTimeout(() => toast.remove(), 300);
+    },
+
+    _showUpdateToast(worker) {
+        this._updateUpdateToastText({
+            title: '发现新版本',
+            message: '已在后台准备好更新，刷新页面即可体验新功能。',
+            detail: this._swInstallStatus.lastAsset
+                ? `版本就绪，最后处理：${this._swInstallStatus.lastAsset}`
+                : ''
+        });
 
         document.getElementById('pwaRefreshBtn').onclick = () => {
+            sessionStorage.setItem('pwa-updating', Date.now().toString());
             worker.postMessage('skipWaiting');
-            toast.innerHTML = '<div style="text-align:center;padding:10px;color:#64748b;"><i class="fas fa-spinner fa-spin"></i> 正在更新...</div>';
+            this._updateUpdateToastText({
+                title: '正在加载新版本',
+                message: '正在切换到最新版本，请稍候...',
+                detail: this._swInstallStatus.lastAsset
+                    ? `触发跳过等待，最后处理：${this._swInstallStatus.lastAsset}`
+                    : ''
+            });
+            document.getElementById('pwaRefreshBtn').disabled = true;
+            document.getElementById('pwaRefreshBtn').textContent = '加载中...';
+            this._startActivationWatchdog();
         };
         document.getElementById('pwaLaterBtn').onclick = () => {
-            toast.style.animation = 'pwaFadeOut .3s ease-in forwards';
-            setTimeout(() => toast.remove(), 300);
+            this._removeUpdateToast();
         };
     },
 

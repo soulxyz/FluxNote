@@ -6,6 +6,8 @@
     <title>设置 - 流光笔记</title>
     <link rel="stylesheet" href={{ static_v("css/style.css") }}>
     <link rel="stylesheet" href={{ static_v("lib/fontawesome/css/all.min.css") }}>
+    <script src={{ static_v("lib/marked/marked.min.js") }}></script>
+    <script src={{ static_v("lib/dompurify/purify.min.js") }}></script>
     <style>
         /* ====================================================
            iframe 模式：浅色左栏 + 白色内容区（与主站风格统一）
@@ -665,6 +667,64 @@
             color: var(--slate-600);
             line-height: 1.7;
         }
+        .update-status-body.markdown-body {
+            font-size: 13px;
+            color: var(--slate-600);
+        }
+        .update-status-body.markdown-body p {
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .update-status-body.markdown-body p:last-child {
+            margin-bottom: 0;
+        }
+        .update-status-body.markdown-body ul, 
+        .update-status-body.markdown-body ol {
+            margin-top: 0;
+            margin-bottom: 8px;
+            padding-left: 20px;
+        }
+        .update-status-body.markdown-body li {
+            margin-bottom: 4px;
+        }
+        .update-status-body.markdown-body h1,
+        .update-status-body.markdown-body h2,
+        .update-status-body.markdown-body h3,
+        .update-status-body.markdown-body h4 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--slate-800);
+        }
+        .update-status-body.markdown-body h1 { font-size: 16px; }
+        .update-status-body.markdown-body h2 { font-size: 15px; }
+        .update-status-body.markdown-body h3 { font-size: 14px; }
+        .update-status-body.markdown-body code {
+            background: rgba(15, 23, 42, 0.06);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+        }
+        .update-status-body.markdown-body pre {
+            background: rgba(15, 23, 42, 0.04);
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .update-status-body.markdown-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+        .update-status-body.markdown-body a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .update-status-body.markdown-body a:hover {
+            text-decoration: underline;
+        }
         .update-status-actions {
             margin-top: 14px;
         }
@@ -817,6 +877,31 @@
 
         /* ── 标准模式移动端补充 ── */
         @media (max-width: 900px) {
+            .update-status-actions {
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 12px;
+            }
+            .update-status-actions .btn {
+                width: auto;
+                flex: none;
+            }
+            
+            .mirror-item {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .mirror-item-main {
+                width: 100%;
+            }
+            .mirror-item-actions {
+                width: 100%;
+                justify-content: flex-end;
+                padding-top: 8px;
+                border-top: 1px dashed var(--slate-200);
+            }
             /* 评论筛选按钮均分一行 */
             #filter-all, #filter-pending, #filter-approved, #filter-spam {
                 flex: 1;
@@ -840,14 +925,12 @@
                 font-size: 11px;
             }
             .update-action-row,
-            .update-status-actions,
             .update-inline-row,
             .mirror-add-row,
             .update-config-actions {
                 width: 100%;
             }
             .update-action-row .btn,
-            .update-status-actions .btn,
             .update-config-actions .btn {
                 flex: 1;
                 justify-content: center;
@@ -1065,14 +1148,9 @@
             body.in-iframe .modal-footer { flex-wrap: wrap; }
             body.in-iframe .modal-footer .btn { flex: 1; min-width: 80px; justify-content: center; }
             body.in-iframe .update-status-head,
-            body.in-iframe .update-status-actions,
             body.in-iframe .update-inline-row,
             body.in-iframe .mirror-add-row {
                 align-items: flex-start;
-            }
-            body.in-iframe .update-status-actions .btn {
-                flex: 1;
-                justify-content: center;
             }
 
             /* 评论统计 2×2 */
@@ -1590,8 +1668,8 @@
                                 <span id="updateMd5Text"></span>
                             </div>
                             <div class="update-status-actions">
-                                <button class="btn btn-primary" id="applyUpdateBtn" onclick="applyUpdate()">
-                                    <i class="fas fa-download"></i> 下载并安装更新
+                                <button class="btn btn-secondary" id="applyUpdateBtn" onclick="applyUpdate()">
+                                    <i class="fas fa-download" style="color: var(--primary);"></i> 下载并安装更新
                                 </button>
                                 <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
                                     <i class="fab fa-github"></i> 在 GitHub 查看
@@ -2577,7 +2655,16 @@
         function _fillUpdateCard(data) {
             document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
             document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
-            document.getElementById('updateChangelog').textContent = data.changelog || '无更新说明';
+            
+            const changelogEl = document.getElementById('updateChangelog');
+            if (data.changelog && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                changelogEl.innerHTML = DOMPurify.sanitize(marked.parse(data.changelog));
+                changelogEl.classList.add('markdown-body');
+            } else {
+                changelogEl.textContent = data.changelog || '无更新说明';
+                changelogEl.classList.remove('markdown-body');
+            }
+            
             document.getElementById('updateHtmlUrl').href = data.html_url || '#';
             // MD5 信息
             const md5El = document.getElementById('updateMd5Info');
@@ -2605,7 +2692,7 @@
 
                 if (data.checked_at) {
                     const d = new Date(data.checked_at);
-                    checkedAtText.textContent = `上次检查: ${d.toLocaleString('zh-CN')}`;
+                    checkedAtText.textContent = d.toLocaleString('zh-CN');
                     checkedAtEl.style.display = 'inline-flex';
                 }
 

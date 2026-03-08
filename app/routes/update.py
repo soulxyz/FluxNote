@@ -28,7 +28,7 @@ update_bp = Blueprint('update', __name__)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 PRESERVE_PATHS = {'data', 'uploads', 'venv', '.venv', '.env', '.git', 'migrations',
-                  '__pycache__', '.cursor', '.vscode', '.idea'}
+                  '__pycache__', '.cursor', '.vscode', '.idea', 'settings.json'}
 
 DEFAULT_MIRRORS = [
     'https://gh-proxy.com/',
@@ -273,8 +273,10 @@ def _do_apply_update(download_url, target_version, expected_md5,
         dst = os.path.join(_BASE_DIR, item)
         if os.path.isdir(src):
             if os.path.exists(dst):
-                shutil.rmtree(dst)
-            shutil.copytree(src, dst)
+                # 使用 dirs_exist_ok=True 避免删除整个目录，从而保留用户自定义文件
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+            else:
+                shutil.copytree(src, dst)
         else:
             shutil.copy2(src, dst)
         updated_count += 1
@@ -516,8 +518,10 @@ def apply_update():
             dst = os.path.join(_BASE_DIR, item)
             if os.path.isdir(src):
                 if os.path.exists(dst):
-                    shutil.rmtree(dst)
-                shutil.copytree(src, dst)
+                    # 使用 dirs_exist_ok=True 避免删除整个目录，从而保留用户自定义文件
+                    shutil.copytree(src, dst, dirs_exist_ok=True)
+                else:
+                    shutil.copytree(src, dst)
             else:
                 shutil.copy2(src, dst)
             updated_count += 1

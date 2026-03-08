@@ -75,8 +75,8 @@ export const pwa = {
             <div style="display:flex;align-items:center;gap:10px;">
                 <i class="fas fa-sparkles" style="color:#10B981;font-size:1.2em;"></i>
                 <div style="flex:1;">
-                    <h4 style="margin:0;font-size:14px;font-weight:600;">发现新版本</h4>
-                    <p style="margin:4px 0 0;font-size:12px;color:#64748b;">更新以获取最新功能和修复</p>
+                    <h4 style="margin:0;font-size:14px;font-weight:600;">发现前端新版本</h4>
+                    <p style="margin:4px 0 0;font-size:12px;color:#64748b;">更新到浏览器缓存以快速使用最新特性</p>
                 </div>
             </div>
             <div style="display:flex;gap:8px;justify-content:flex-end;">

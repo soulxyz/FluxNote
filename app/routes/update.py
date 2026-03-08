@@ -32,7 +32,7 @@ PRESERVE_PATHS = {'data', 'uploads', 'venv', '.venv', '.env', '.git', 'migration
 
 
 def _github_repo():
-    return Config.get('github_repo', 'soulxyz/FlexNote').strip()
+    return Config.get('github_repo', 'soulxyz/FluxNote').strip()
 
 
 def _github_api(path, token=None):

@@ -793,7 +793,7 @@
 
                     <div class="form-row">
                         <label>GitHub 仓库 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
-                        <input type="text" id="githubRepo" placeholder="例如: username/my-blog" value="soulxyz/FlexNote">
+                        <input type="text" id="githubRepo" placeholder="例如: username/FluxNote" value="soulxyz/FluxNote">
                         <p class="help-text">填入你在 GitHub 上的仓库地址，系统将通过 GitHub Releases 检查更新。</p>
                     </div>
                     <div class="form-row">
@@ -1700,7 +1700,7 @@
                 const res = await response.json();
                 const data = res.data;
                 document.getElementById('currentVersion').textContent = data.version;
-                document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FlexNote';
+                document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FluxNote';
                 const settingsRes = await fetch('/api/settings');
                 const settings = await settingsRes.json();
                 if (settings.data?.github_token) {

@@ -54,8 +54,8 @@
 
 1. **克隆项目**
    ```bash
-   git clone https://github.com/yourusername/fluxnote.git
-   cd fluxnote
+   git clone https://github.com/soulxyz/FluxNote.git
+   cd FluxNote
    ```
 
 2. **安装依赖**

@@ -43,6 +43,10 @@ htmlcov/        export-ignore
 # 脚本工具（可选排除，开发辅助脚本）
 scripts/        export-ignore
 
+# 预览图（仅用于展示，运行时非必需）
+**/preview.png  export-ignore
+**/preview.jpg  export-ignore
+
 # 其他
 *.log           export-ignore
 .DS_Store       export-ignore

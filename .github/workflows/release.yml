@@ -1,0 +1,114 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'VERSION'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cat VERSION | tr -d '[:space:]')
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "Releasing version: ${VERSION}"
+
+      - name: Check if tag already exists
+        id: tag_check
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Tag ${TAG} already exists, skipping release."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Tag ${TAG} does not exist, proceeding."
+          fi
+
+      - name: Generate Changelog
+        id: changelog
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          CURRENT_TAG="v${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          # 获取上一个 tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # 没有历史 tag，取所有提交
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+            COMPARE_URL="https://github.com/${REPO}/commits/${CURRENT_TAG}"
+          else
+            COMMITS=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+            COMPARE_URL="https://github.com/${REPO}/compare/${PREV_TAG}...${CURRENT_TAG}"
+          fi
+
+          # 过滤掉纯 Merge 提交
+          COMMITS=$(echo "$COMMITS" | grep -v "^- Merge " || true)
+
+          # 写入 changelog 文件（避免多行变量问题）
+          {
+            echo "## What's Changed"
+            echo ""
+            if [ -n "$COMMITS" ]; then
+              echo "$COMMITS"
+            else
+              echo "- 版本更新"
+            fi
+            echo ""
+            echo "**Full Changelog**: ${COMPARE_URL}"
+          } > /tmp/changelog.md
+
+          cat /tmp/changelog.md
+
+      - name: Build release archive
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ARCHIVE_NAME="fluxnote-v${VERSION}"
+
+          # 使用 git archive 打包（会自动应用 .gitattributes export-ignore 规则）
+          git archive --format=zip --prefix="${ARCHIVE_NAME}/" -o "/tmp/${ARCHIVE_NAME}.zip" HEAD
+          git archive --format=tar.gz --prefix="${ARCHIVE_NAME}/" -o "/tmp/${ARCHIVE_NAME}.tar.gz" HEAD
+
+          echo "Archives created:"
+          ls -lh /tmp/${ARCHIVE_NAME}.*
+
+      - name: Create tag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        if: steps.tag_check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "FluxNote ${{ steps.version.outputs.tag }}"
+          body_path: /tmp/changelog.md
+          draft: false
+          prerelease: false
+          files: |
+            /tmp/fluxnote-v${{ steps.version.outputs.version }}.zip
+            /tmp/fluxnote-v${{ steps.version.outputs.version }}.tar.gz

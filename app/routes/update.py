@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import shutil
 import zipfile
 import tempfile
@@ -21,6 +22,8 @@ from app.utils.response import api_response
 logger = logging.getLogger(__name__)
 
 update_bp = Blueprint('update', __name__)
+
+_AUTO_CHECK_INTERVAL = 6 * 3600  # 每 6 小时自动检查一次
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -248,6 +251,20 @@ def get_update_logs():
     return api_response(data={'logs': logs})
 
 
+@update_bp.route('/api/update/status', methods=['GET'])
+@login_required
+def get_update_status():
+    """返回缓存的自动检查结果（不发起 GitHub 请求，供前端快速展示徽标）"""
+    cache_raw = Config.get('update_check_cache', '')
+    if not cache_raw:
+        return api_response(data={'has_update': False, 'checked_at': None})
+    try:
+        data = json.loads(cache_raw)
+        return api_response(data=data)
+    except Exception:
+        return api_response(data={'has_update': False, 'checked_at': None})
+
+
 @update_bp.route('/api/update/releases', methods=['GET'])
 @login_required
 def list_releases():
@@ -281,3 +298,47 @@ def list_releases():
         })
 
     return api_response(data=result)
+
+
+# ───── 后台自动检查 ─────
+
+def _do_background_check(app):
+    """后台线程：每隔 _AUTO_CHECK_INTERVAL 秒检查一次更新，结果存入 Config 缓存"""
+    # 启动时稍等，让 app 完全就绪后再检查
+    time.sleep(30)
+    while True:
+        try:
+            with app.app_context():
+                repo = _github_repo()
+                if repo:
+                    token = Config.get('github_token', '').strip() or None
+                    resp = _github_api(f'/repos/{repo}/releases/latest', token)
+                    if resp.status_code == 200:
+                        release = resp.json()
+                        remote_tag = release.get('tag_name', '')
+                        remote_ver = _parse_version(remote_tag)
+                        local_ver = _parse_version(get_app_version())
+                        has_update = bool(remote_ver and local_ver and remote_ver > local_ver)
+                        Config.set('update_check_cache', json.dumps({
+                            'has_update': has_update,
+                            'local_version': get_app_version(),
+                            'remote_version': remote_tag,
+                            'release_name': release.get('name', remote_tag),
+                            'changelog': release.get('body', ''),
+                            'published_at': release.get('published_at', ''),
+                            'zip_url': release.get('zipball_url', ''),
+                            'html_url': release.get('html_url', ''),
+                            'checked_at': datetime.now().isoformat(),
+                        }))
+                        logger.info(f'Background update check done: has_update={has_update}, remote={remote_tag}')
+        except Exception as e:
+            logger.debug(f'Background update check failed: {e}')
+        time.sleep(_AUTO_CHECK_INTERVAL)
+
+
+def start_background_update_checker(app):
+    """启动后台更新检查线程（应在 app 创建完成后调用）"""
+    t = threading.Thread(target=_do_background_check, args=(app,), daemon=True)
+    t.name = 'update-checker'
+    t.start()
+    logger.info('Background update checker started')

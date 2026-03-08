@@ -370,13 +370,14 @@ export const ui = {
 
     _preprocessBilibiliLinks(content) {
         // Match [any-text](bilibili-url) markdown link patterns
+        // Bilibili BV IDs use base58 encoding (excludes 0, O, I, l to avoid confusion)
         let result = content.replace(
-            /\[([^\]]*)\]\((https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[\w]+)[^)]*)\)/gi,
+            /\[([^\]]*)\]\((https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)[^)]*)\)/gi,
             (match, text, url, bvid) => `\n${this._createBilibiliCardHtml(bvid)}\n`
         );
         // Also match bare bilibili URLs on their own line (no markdown link wrapping)
         result = result.replace(
-            /(?<!\()(https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[\w]+)[^\s)]*)/gi,
+            /(?<!\()(https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)[^\s)]*)/gi,
             (match, url, bvid) => this._createBilibiliCardHtml(bvid)
         );
         return result;
@@ -385,7 +386,7 @@ export const ui = {
     _postprocessBilibiliLinks(html) {
         // Catch any bilibili <a href> tags rendered by marked (fallback)
         return html.replace(
-            /<a\s+href="https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[\w]+)[^"]*"[^>]*>(?:[^<]|<(?!\/a>))*<\/a>/gi,
+            /<a\s+href="https?:\/\/(?:www\.)?bilibili\.com\/video\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)[^"]*"[^>]*>(?:[^<]|<(?!\/a>))*<\/a>/gi,
             (match, bvid) => this._createBilibiliCardHtml(bvid)
         );
     },

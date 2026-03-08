@@ -314,7 +314,7 @@ class Note(db.Model):
             html = sanitize_html(html)
 
             html = re.sub(
-                r'<a\s+href="https?://(?:www\.)?bilibili\.com/video/(BV[\w]+)[^"]*"[^>]*>.*?</a>',
+                r'<a\s+href="https?://(?:www\.)?bilibili\.com/video/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)[^"]*"[^>]*>.*?</a>',
                 lambda m: _bilibili_card_html(m.group(1)), html)
             html = re.sub(
                 r'<a\s+href="https?://(?:www\.)?bilibili\.com/video/av(\d+)[^"]*"[^>]*>.*?</a>',

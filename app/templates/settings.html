@@ -6,431 +6,861 @@
     <title>设置 - 流光笔记</title>
     <link rel="stylesheet" href={{ static_v("css/style.css") }}>
     <link rel="stylesheet" href={{ static_v("lib/fontawesome/css/all.min.css") }}>
+    <style>
+        /* ====================================================
+           iframe 模式：浅色左栏 + 白色内容区（与主站风格统一）
+           ==================================================== */
+
+        /* ── 基础结构 ── */
+        body.in-iframe {
+            background: #fff;
+            overflow: hidden;
+        }
+
+        body.in-iframe .app-layout {
+            padding: 0;
+            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body.in-iframe .app-container {
+            gap: 0;
+            height: 100%;
+            max-width: none;
+        }
+
+        /* ── 左侧导航：浅色 ── */
+        body.in-iframe .settings-sidebar {
+            background: #FAFBFD;
+            border-right: 1px solid #EBF0F6;
+            height: 100vh;
+            top: 0;
+            width: 220px;
+            flex-shrink: 0;
+            padding: 0 14px;
+        }
+
+        body.in-iframe .settings-nav-header {
+            padding: 24px 10px 20px;
+            border-bottom: 1px solid #EBF0F6;
+            margin-bottom: 6px;
+        }
+
+        body.in-iframe .settings-nav-title {
+            background: linear-gradient(135deg, #1E293B 0%, #10B981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        body.in-iframe .back-btn {
+            display: none;
+        }
+
+        /* 分组标签 */
+        body.in-iframe .settings-nav-menu .nav-group-label {
+            color: #94A3B8;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            padding: 18px 10px 6px;
+            text-transform: uppercase;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-group-label:first-child {
+            padding-top: 12px;
+        }
+
+        /* 导航项 */
+        body.in-iframe .settings-nav-menu .nav-item {
+            color: #64748B !important;
+            border-radius: 9px !important;
+            padding: 9px 12px !important;
+            margin: 2px 0 !important;
+            font-size: 13.5px !important;
+            font-weight: 500 !important;
+            background: transparent !important;
+            transition: all 0.18s ease !important;
+            position: relative;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-item:hover {
+            color: #1E293B !important;
+            background: #F1F5F9 !important;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-item.active {
+            color: #10B981 !important;
+            background: #ECFDF5 !important;
+            font-weight: 600 !important;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 18px;
+            background: #10B981;
+            border-radius: 0 3px 3px 0;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-item.active i {
+            color: #10B981 !important;
+            opacity: 1 !important;
+        }
+
+        body.in-iframe .settings-nav-menu .nav-item i {
+            color: inherit !important;
+            opacity: 0.7;
+            font-size: 13px !important;
+            width: 18px !important;
+            transition: all 0.18s ease;
+        }
+
+        body.in-iframe .settings-nav-menu {
+            padding: 4px 0 20px;
+        }
+
+        /* ── 右侧内容区 ── */
+        body.in-iframe .settings-main {
+            background: #F5F7FA;
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: 100vh !important;
+            max-height: 100vh;
+            max-width: none !important;
+            padding: 32px 44px !important;
+            flex-direction: column !important;
+        }
+
+        body.in-iframe .settings-main::-webkit-scrollbar { width: 5px; }
+        body.in-iframe .settings-main::-webkit-scrollbar-track { background: transparent; }
+        body.in-iframe .settings-main::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        body.in-iframe .settings-main::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+        body.in-iframe .settings-section {
+            background: #ffffff;
+            border: 1px solid #E8EDF4;
+            border-radius: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.02);
+            padding: 28px 32px;
+            margin-bottom: 20px;
+        }
+
+        body.in-iframe .settings-section:last-child {
+            margin-bottom: 0;
+        }
+
+        body.in-iframe .settings-section .section-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1E293B;
+            border-bottom: 1px solid #F1F5F9;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+            letter-spacing: -0.2px;
+        }
+
+        body.in-iframe .settings-section .section-title i {
+            color: #10B981;
+            font-size: 14px;
+        }
+
+        /* 表单标签 */
+        body.in-iframe .settings-section .form-row label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 8px;
+        }
+
+        /* 开关行 */
+        body.in-iframe .settings-toggle-row {
+            background: #F8FAFC;
+            border: 1px solid #EEF2F7;
+            border-radius: 10px;
+        }
+
+        body.in-iframe .settings-toggle-row:hover {
+            background: #F1F5F9;
+            border-color: #E2E8F0;
+        }
+
+        /* 输入框 */
+        body.in-iframe input[type="text"],
+        body.in-iframe input[type="email"],
+        body.in-iframe input[type="number"],
+        body.in-iframe input[type="password"],
+        body.in-iframe .settings-textarea,
+        body.in-iframe .settings-select {
+            background: #F8FAFC;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 9px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: #334155;
+            transition: all 0.2s ease;
+        }
+
+        body.in-iframe input[type="text"]:hover,
+        body.in-iframe input[type="email"]:hover,
+        body.in-iframe input[type="number"]:hover,
+        body.in-iframe input[type="password"]:hover,
+        body.in-iframe .settings-textarea:hover,
+        body.in-iframe .settings-select:hover {
+            border-color: #CBD5E1;
+        }
+
+        body.in-iframe input[type="text"]:focus,
+        body.in-iframe input[type="email"]:focus,
+        body.in-iframe input[type="number"]:focus,
+        body.in-iframe input[type="password"]:focus,
+        body.in-iframe .settings-textarea:focus,
+        body.in-iframe .settings-select:focus {
+            background: #fff;
+            border-color: #10B981;
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+        }
+
+        /* 分割线 */
+        body.in-iframe .settings-divider {
+            border-top: 1px solid #F1F5F9;
+            margin: 28px 0;
+        }
+
+        /* 按钮 */
+        body.in-iframe .btn-primary {
+            border-radius: 9px;
+            font-weight: 600;
+            padding: 10px 20px;
+            box-shadow: 0 1px 3px rgba(16,185,129,0.2);
+            transition: all 0.2s ease;
+        }
+
+        body.in-iframe .btn-primary:hover {
+            box-shadow: 0 4px 12px rgba(16,185,129,0.25);
+            transform: translateY(-1px);
+        }
+
+        body.in-iframe .btn-secondary {
+            border-radius: 9px;
+            font-weight: 500;
+        }
+
+        /* help-text 优化 */
+        body.in-iframe .help-text {
+            font-size: 12.5px;
+            color: #94A3B8;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+
+        /* textarea 统一样式 */
+        body.in-iframe .settings-textarea,
+        body.in-iframe textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1.5px solid #E2E8F0;
+            border-radius: 9px;
+            font-family: inherit;
+            font-size: 14px;
+            color: #334155;
+            background: #F8FAFC;
+            outline: none;
+            transition: all 0.2s ease;
+            resize: vertical;
+        }
+
+        body.in-iframe .settings-textarea:focus,
+        body.in-iframe textarea:focus {
+            background: #fff;
+            border-color: #10B981;
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.1);
+        }
+
+        /* providers-list 优化 */
+        body.in-iframe .providers-list {
+            border: 1px solid #E8EDF4;
+            border-radius: 10px;
+        }
+
+        body.in-iframe .provider-item {
+            border-bottom-color: #F1F5F9;
+            transition: background 0.15s ease;
+        }
+
+        body.in-iframe .provider-item:hover {
+            background: #FAFBFC;
+        }
+
+        /* 统计卡片 */
+        body.in-iframe .stat-card {
+            border-radius: 12px;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        /* ====================================================
+           深色主题备用 —— 取消注释即可启用深色侧栏风格
+           ====================================================
+        body.in-iframe { background: #162038; }
+        body.in-iframe .settings-sidebar {
+            background: linear-gradient(180deg, #1B2B48 0%, #162038 100%);
+            border-right: 1px solid rgba(255,255,255,0.04);
+        }
+        body.in-iframe .settings-nav-header { border-bottom: 1px solid rgba(255,255,255,0.06); }
+        body.in-iframe .settings-nav-title {
+            background: linear-gradient(135deg, #FFFFFF 0%, #94B8E8 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        body.in-iframe .settings-nav-menu .nav-group-label { color: rgba(255,255,255,0.25); }
+        body.in-iframe .settings-nav-menu .nav-item { color: rgba(255,255,255,0.5) !important; }
+        body.in-iframe .settings-nav-menu .nav-item:hover {
+            color: rgba(255,255,255,0.9) !important; background: rgba(255,255,255,0.06) !important;
+        }
+        body.in-iframe .settings-nav-menu .nav-item.active {
+            color: #ffffff !important; background: rgba(16,185,129,0.15) !important;
+        }
+        body.in-iframe .settings-nav-menu .nav-item.active i { color: #34D399 !important; }
+        body.in-iframe .settings-nav-menu .nav-item i { color: inherit !important; }
+        */
+    </style>
 </head>
-<body>
-    <div class="settings-container">
-        <div class="settings-header">
-            <a href="/" class="back-btn"><i class="fas fa-arrow-left"></i></a>
-            <h1>系统设置</h1>
-        </div>
+<body><script>if(window.self!==window.top)document.body.classList.add('in-iframe');</script>
+    <div class="app-layout">
+        <div class="app-container">
 
-        <!-- 基本设置 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-sliders-h"></i> 基本设置</div>
-            <div class="form-row">
-                <label>网站标题</label>
-                <input type="text" id="siteTitle" placeholder="流光笔记">
-            </div>
-            <div class="form-row">
-                <label>SEO 描述</label>
-                <input type="text" id="siteDesc" placeholder="简单记录生活">
-            </div>
-            <div class="form-row">
-                <label>博客页脚 <span style="color:#999; font-weight:normal;">(支持HTML，可用于备案号等)</span></label>
-                <textarea id="blogFooter" placeholder='由 <a href="/">流光笔记</a> 提供支持' rows="2" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; font-family:inherit;"></textarea>
-            </div>
-            <div class="form-row" style="margin-top: 20px;">
-                <button class="btn btn-primary" onclick="saveBasicSettings()">
-                    <i class="fas fa-save"></i> 保存基本设置
-                </button>
-            </div>
-        </div>
+        <!-- ========== 设置侧边栏 ========== -->
+        <aside class="sidebar settings-sidebar">
 
-        <!-- 评论设置 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-comments"></i> 评论设置</div>
-
-            <div class="form-row">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div>
-                        <div style="font-weight:600; font-size:14px;">开启评论审核</div>
-                        <p class="help-text" style="margin-top:4px;">开启后，访客评论需要后台审核通过后才会显示。</p>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="commentAudit">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
+            <!-- 返回 + 标题 -->
+            <div class="settings-nav-header">
+                <a href="/" class="back-btn" title="返回笔记"><i class="fas fa-arrow-left"></i></a>
+                <span class="settings-nav-title">系统设置</span>
             </div>
 
-            <div class="form-row">
-                <label>头像源 (Avatar Source)</label>
-                <select id="avatarSource" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px;">
-                    <option value="cravatar">Cravatar (国内推荐)</option>
-                    <option value="gravatar">Gravatar (官方)</option>
-                    <option value="weavatar">WeAvatar</option>
-                </select>
-                <p class="help-text">选择访客头像的镜像源，Cravatar 在国内访问速度较快。</p>
-            </div>
-
-            <div class="form-row">
-                <label>博主头像 URL</label>
-                <input type="text" id="bloggerAvatar" placeholder="https://example.com/avatar.jpg">
-                <p class="help-text">设置后，博主评论将使用此图片作为头像，覆盖默认的 Gravatar。</p>
-            </div>
-
-            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
-
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 15px;">配置 SMTP 以启用邮件通知功能 (有人评论时通知你)。</p>
-                <label>SMTP 服务器</label>
-                <input type="text" id="smtpServer" placeholder="smtp.example.com">
-            </div>
-            <div class="form-row">
-                <label>SMTP 端口</label>
-                <input type="text" id="smtpPort" placeholder="465 (SSL) or 587 (TLS)">
-            </div>
-            <div class="form-row">
-                <label>发送邮箱 (User)</label>
-                <input type="text" id="smtpUser" placeholder="noreply@example.com">
-            </div>
-            <div class="form-row">
-                <label>邮箱密码 (Password/App Key)</label>
-                <input type="password" id="smtpPassword" placeholder="Your Password">
-            </div>
-            <div class="form-row">
-                <label>发件人名称</label>
-                <input type="text" id="smtpSenderName" placeholder="流光笔记">
-                <p class="help-text">邮件中显示的发件人名称，如"流光笔记"、"我的博客"等。</p>
-            </div>
-             <div class="form-row">
-                <label>接收通知邮箱</label>
-                <input type="text" id="notifyEmail" placeholder="admin@example.com">
-            </div>
-
-            <div class="form-row" style="margin-top: 20px;">
-                <button class="btn btn-primary" onclick="saveCommentSettings()">
-                    <i class="fas fa-save"></i> 保存评论配置
-                </button>
-                <button class="btn btn-secondary" onclick="testEmailSettings()" style="margin-left: 10px;">
-                    <i class="fas fa-paper-plane"></i> 发送测试邮件
-                </button>
-            </div>
-        </div>
-
-        <!-- 评论管理 -->
-        <div class="settings-section">
-            <div class="section-title" style="cursor: pointer; user-select: none; display: flex; align-items: center;" onclick="toggleCommentManagement()">
-                <i class="fas fa-comment-dots"></i> 评论管理
-                <i class="fas fa-chevron-down" id="comment-management-arrow" style="margin-left: auto; font-size: 14px; color: #9ca3af; transition: transform 0.2s;"></i>
-            </div>
-
-            <!-- 统计卡片（始终显示） -->
-            <div class="comment-stats" style="display: flex; gap: 16px; margin-top: 16px;">
-                <div class="stat-card stat-card-blue">
-                    <div class="stat-number" id="stat-total">0</div>
-                    <div class="stat-label">全部评论</div>
-                </div>
-                <div class="stat-card stat-card-yellow">
-                    <div class="stat-number" id="stat-pending">0</div>
-                    <div class="stat-label">待审核</div>
-                </div>
-                <div class="stat-card stat-card-green">
-                    <div class="stat-number" id="stat-approved">0</div>
-                    <div class="stat-label">已通过</div>
-                </div>
-                <div class="stat-card stat-card-red">
-                    <div class="stat-number" id="stat-spam">0</div>
-                    <div class="stat-label">垃圾评论</div>
-                </div>
-            </div>
-
-            <!-- 评论管理详情（可折叠） -->
-            <div id="comment-management-content" style="display: none; margin-top: 20px;">
-                <!-- 筛选标签 -->
-                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                    <button class="btn btn-sm btn-primary" id="filter-all" onclick="filterComments('all')">全部</button>
-                    <button class="btn btn-sm btn-outline" id="filter-pending" onclick="filterComments('pending')">待审核</button>
-                    <button class="btn btn-sm btn-outline" id="filter-approved" onclick="filterComments('approved')">已通过</button>
-                    <button class="btn btn-sm btn-outline" id="filter-spam" onclick="filterComments('spam')">垃圾</button>
-                </div>
-
-                <!-- 批量操作 -->
-                <div style="display: flex; gap: 10px; margin-bottom: 16px; align-items: center;">
-                    <input type="checkbox" id="selectAllComments" onchange="toggleSelectAll()" style="width: 18px; height: 18px;">
-                    <span style="font-size: 14px; color: #6b7280;">全选</span>
-                    <div style="flex:1;"></div>
-                    <button class="btn btn-sm btn-outline" onclick="batchAction('approve')" id="btn-batch-approve" disabled>
-                        <i class="fas fa-check"></i> 批量通过
+            <!-- 导航菜单 -->
+            <ul class="settings-nav-menu">
+                <li class="nav-group-label">站点</li>
+                <li>
+                    <button class="nav-item" data-panel="panel-basic" onclick="switchPanel('panel-basic')">
+                        <i class="fas fa-sliders-h"></i> 基本设置
                     </button>
-                    <button class="btn btn-sm btn-secondary" onclick="batchAction('spam')" id="btn-batch-spam" disabled>
-                        <i class="fas fa-ban"></i> 标记垃圾
+                </li>
+
+                <li class="nav-group-label">评论</li>
+                <li>
+                    <button class="nav-item" data-panel="panel-comment-settings" onclick="switchPanel('panel-comment-settings')">
+                        <i class="fas fa-comments"></i> 评论设置
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="batchAction('delete')" id="btn-batch-delete" disabled>
-                        <i class="fas fa-trash"></i> 批量删除
+                </li>
+                <li>
+                    <button class="nav-item" data-panel="panel-comment-manage" onclick="switchPanel('panel-comment-manage')">
+                        <i class="fas fa-comment-dots"></i> 评论管理
+                        <span class="nav-badge" id="nav-pending-badge" style="display:none;"></span>
                     </button>
-                </div>
+                </li>
 
-                <!-- 评论列表 -->
-                <div id="admin-comments-list">
-                    <div style="text-align: center; color: #888; padding: 2rem;">
-                        <i class="fas fa-spinner fa-spin"></i> 加载中...
-                    </div>
-                </div>
-
-                <!-- 分页 -->
-                <div id="comments-pagination" style="display: flex; justify-content: center; gap: 8px; margin-top: 20px;"></div>
-            </div>
-        </div>
-
-        <!-- 博客主题 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-palette"></i> 访客主题 (前台)</div>
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 20px;">
-                    选择访客访问你的博客时看到的外观。
-                </p>
-                <div id="blogThemesList" class="themes-list">
-                    <!-- 博客主题列表 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- 创作主题 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-pen-nib"></i> 创作主题 (后台)</div>
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 20px;">
-                    选择你登录后用于管理和写作的界面风格。只有支持创作模式的主题才会显示在此。
-                </p>
-                <div id="writerThemesList" class="themes-list">
-                    <!-- 创作主题列表 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- AI 设置 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-robot"></i> AI 模型管理</div>
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 20px;">
-                    配置 OpenAI 兼容的 API 模型（如 DeepSeek, ChatGPT, Local Ollama）。
-                    激活后的模型将用于自动摘要、润色和标签生成。
-                </p>
-                <div id="aiProvidersList" class="providers-list">
-                    <!-- Providers will be loaded here -->
-                </div>
-                <div style="margin-top: 20px;">
-                    <button class="btn btn-secondary" onclick="showAddProviderModal()">
-                        <i class="fas fa-plus"></i> 添加新模型
+                <li class="nav-group-label">外观</li>
+                <li>
+                    <button class="nav-item" data-panel="panel-blog-themes" onclick="switchPanel('panel-blog-themes')">
+                        <i class="fas fa-palette"></i> 访客主题
                     </button>
-                </div>
-            </div>
-            
-            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
-
-            <div class="form-row">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
-                    <i class="fas fa-microphone" style="color:var(--primary);"></i>
-                    <span style="font-weight:600; font-size:14px;">语音转写 (STT)</span>
-                </div>
-                <p class="help-text" style="margin-bottom:15px;">
-                    配置语音输入使用的转写服务。推荐使用 <a href="https://cloud.siliconflow.cn/" target="_blank" style="color:var(--primary);">SiliconFlow（硅基流动）</a>，
-                    免费额度充足，中文识别效果好。不配置时将使用上方激活的 AI 模型。
-                </p>
-                <div class="form-row">
-                    <label>API Base URL</label>
-                    <input type="text" id="sttBaseUrl" value="https://api.siliconflow.cn/v1">
-                </div>
-                <div class="form-row">
-                    <label>API Key <span style="color:#ef4444;">*</span></label>
-                    <input type="password" id="sttApiKey" placeholder="填入你的 SiliconFlow API Key">
-                </div>
-                <div class="form-row">
-                    <label>模型名称</label>
-                    <input type="text" id="sttModel" value="FunAudioLLM/SenseVoiceSmall">
-                    <p class="help-text">可选模型：FunAudioLLM/SenseVoiceSmall（免费、中文优秀）、TeleAI/TeleSpeechASR（方言支持）</p>
-                </div>
-                <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="saveSTTConfig()">
-                    <i class="fas fa-save"></i> 保存语音转写配置
-                </button>
-            </div>
-
-            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
-            
-            <div class="form-row">
-                <label>润色风格 (逗号分隔)</label>
-                <input type="text" id="polishStyles" placeholder="专业严谨, 简洁明了, 亲和力强">
-                <p class="help-text">定义“润色文本”功能生成的版本风格，用逗号分隔。</p>
-                <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="savePolishStyles()">
-                    保存风格配置
-                </button>
-            </div>
-        </div>
-
-        <!-- Custom Prompts Settings -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-magic"></i> 自定义 AI 指令</div>
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 20px;">
-                    定义出现在"魔术棒"菜单中的快捷指令。
-                </p>
-                <div id="customPromptsList" class="providers-list">
-                    <!-- Custom Prompts will be loaded here -->
-                </div>
-                <div style="margin-top: 20px;">
-                    <button class="btn btn-secondary" onclick="showAddPromptModal()">
-                        <i class="fas fa-plus"></i> 添加新指令
+                </li>
+                <li>
+                    <button class="nav-item" data-panel="panel-writer-themes" onclick="switchPanel('panel-writer-themes')">
+                        <i class="fas fa-pen-nib"></i> 创作主题
                     </button>
-                </div>
-            </div>
-        </div>
+                </li>
 
-        <!-- 安全设置 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-shield-alt"></i> 安全设置</div>
-            <div class="form-row">
-                <label>当前密码</label>
-                <input type="password" id="currentPassword">
-            </div>
-            <div class="form-row">
-                <label>新密码</label>
-                <input type="password" id="newPassword">
-            </div>
-            <div class="form-row" style="margin-top: 20px;">
-                <button class="btn btn-danger" onclick="changePassword()">
-                    <i class="fas fa-key"></i> 修改密码
-                </button>
-            </div>
-
-            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
-
-            <div class="form-row">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div>
-                        <div style="font-weight:600; font-size:14px;">调试模式</div>
-                        <p class="help-text" style="margin-top:4px;">开启后，API错误将返回详细信息，便于排查问题。<strong style="color:#dc2626;">生产环境建议关闭！</strong></p>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="debugModeToggle" onchange="toggleDebugMode()">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-
-        <!-- 数据管理 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-database"></i> 数据管理</div>
-            <div class="form-row">
-                <p class="help-text" style="margin-bottom: 10px;">将所有笔记导出为 JSON 格式进行备份。</p>
-                <button class="btn btn-outline" onclick="exportData()">
-                    <i class="fas fa-file-export"></i> 导出所有数据
-                </button>
-            </div>
-            
-            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
-            
-            <div class="form-row">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div>
-                        <div style="font-weight:600; font-size:14px;">保留历史版本</div>
-                        <p class="help-text" style="margin-top:4px;">关闭后，修改笔记时将不再产生新的历史记录。</p>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="keepHistoryToggle" onchange="toggleKeepHistory()">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
-            
-            <div class="form-row" style="margin-top: 20px;">
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <div>
-                        <div style="font-weight:600; font-size:14px;">清除所有历史版本</div>
-                        <p class="help-text" style="margin-top:4px;">此操作将永久删除当前所有笔记的历史记录，不可恢复。</p>
-                    </div>
-                    <button class="btn btn-danger btn-sm" onclick="clearAllHistory()">
-                        <i class="fas fa-trash-alt"></i> 立即清除
+                <li class="nav-group-label">AI</li>
+                <li>
+                    <button class="nav-item" data-panel="panel-ai-models" onclick="switchPanel('panel-ai-models')">
+                        <i class="fas fa-robot"></i> AI 模型
                     </button>
-                </div>
-            </div>
-        </div>
-        <!-- 系统更新 -->
-        <div class="settings-section">
-            <div class="section-title"><i class="fas fa-cloud-download-alt"></i> 系统更新</div>
+                </li>
+                <li>
+                    <button class="nav-item" data-panel="panel-ai-prompts" onclick="switchPanel('panel-ai-prompts')">
+                        <i class="fas fa-magic"></i> 自定义指令
+                    </button>
+                </li>
 
-            <div class="form-row">
-                <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-                    <div style="display:flex; align-items:center; gap:8px; background:var(--slate-50); padding:6px 14px; border-radius:8px; border:1px solid var(--slate-200);">
-                        <i class="fas fa-code-branch" style="color:var(--primary); font-size:13px;"></i>
-                        <span style="font-size:13px; color:var(--slate-500);">当前版本</span>
-                        <span style="font-weight:700; color:var(--slate-800); font-size:14px;" id="currentVersion">{{ app_semver }}</span>
+                <li class="nav-group-label">系统</li>
+                <li>
+                    <button class="nav-item" data-panel="panel-security" onclick="switchPanel('panel-security')">
+                        <i class="fas fa-shield-alt"></i> 安全设置
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-item" data-panel="panel-data" onclick="switchPanel('panel-data')">
+                        <i class="fas fa-database"></i> 数据管理
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-item" data-panel="panel-update" onclick="switchPanel('panel-update')">
+                        <i class="fas fa-cloud-download-alt"></i> 系统更新
+                        <span class="nav-badge" id="nav-update-badge" style="display:none;"></span>
+                    </button>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- ========== 主内容区 ========== -->
+        <main class="main-stream settings-main">
+
+            <!-- Panel: 基本设置 -->
+            <div id="panel-basic" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-sliders-h"></i> 基本设置</div>
+                    <div class="form-row">
+                        <label>网站标题</label>
+                        <input type="text" id="siteTitle" placeholder="流光笔记">
                     </div>
-                    <div id="updateBadge" style="display:none;">
-                        <span style="background:#dcfce7; color:#16a34a; font-size:12px; font-weight:600; padding:3px 10px; border-radius:12px;">
-                            <i class="fas fa-arrow-up" style="font-size:10px;"></i> 有新版本
-                        </span>
+                    <div class="form-row">
+                        <label>SEO 描述</label>
+                        <input type="text" id="siteDesc" placeholder="简单记录生活">
+                    </div>
+                    <div class="form-row">
+                        <label>博客页脚 <span style="color:var(--slate-400); font-weight:normal; font-size:12px;">(支持HTML，可用于备案号等)</span></label>
+                        <textarea id="blogFooter" class="settings-textarea" placeholder='由 <a href="/">流光笔记</a> 提供支持' rows="2"></textarea>
+                    </div>
+                    <div class="form-row" style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="saveBasicSettings()">
+                            <i class="fas fa-save"></i> 保存基本设置
+                        </button>
                     </div>
                 </div>
             </div>
 
-            <div class="form-row">
-                <label>GitHub 仓库 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
-                <input type="text" id="githubRepo" placeholder="例如: username/my-blog" value="soulxyz/FlexNote">
-                <p class="help-text">填入你在 GitHub 上的仓库地址，系统将通过 GitHub Releases 检查更新。</p>
-            </div>
-            <div class="form-row">
-                <label>GitHub Token <span style="color:#999; font-weight:normal;">(可选，私有仓库需要)</span></label>
-                <input type="password" id="githubToken" placeholder="ghp_xxxx...">
-                <p class="help-text">如果是私有仓库，需要填入具有 repo 权限的 Personal Access Token。公开仓库可留空。</p>
-            </div>
-            <div class="form-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="saveUpdateConfig()">
-                    <i class="fas fa-save"></i> 保存配置
-                </button>
-                <button class="btn btn-secondary" id="checkUpdateBtn" onclick="checkForUpdate()">
-                    <i class="fas fa-sync-alt"></i> 检查更新
-                </button>
+            <!-- Panel: 评论设置 -->
+            <div id="panel-comment-settings" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-comments"></i> 评论设置</div>
+
+                    <div class="form-row">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <div class="settings-toggle-label">开启评论审核</div>
+                                <div class="settings-toggle-desc">开启后，访客评论需要后台审核通过后才会显示。</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="commentAudit">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>头像源 (Avatar Source)</label>
+                        <select id="avatarSource" class="settings-select">
+                            <option value="cravatar">Cravatar (国内推荐)</option>
+                            <option value="gravatar">Gravatar (官方)</option>
+                            <option value="weavatar">WeAvatar</option>
+                        </select>
+                        <p class="help-text">选择访客头像的镜像源，Cravatar 在国内访问速度较快。</p>
+                    </div>
+
+                    <div class="form-row">
+                        <label>博主头像 URL</label>
+                        <input type="text" id="bloggerAvatar" placeholder="https://example.com/avatar.jpg">
+                        <p class="help-text">设置后，博主评论将使用此图片作为头像，覆盖默认的 Gravatar。</p>
+                    </div>
+
+                    <hr class="settings-divider">
+
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 15px;">配置 SMTP 以启用邮件通知功能 (有人评论时通知你)。</p>
+                        <label>SMTP 服务器</label>
+                        <input type="text" id="smtpServer" placeholder="smtp.example.com">
+                    </div>
+                    <div class="form-row">
+                        <label>SMTP 端口</label>
+                        <input type="text" id="smtpPort" placeholder="465 (SSL) or 587 (TLS)">
+                    </div>
+                    <div class="form-row">
+                        <label>发送邮箱 (User)</label>
+                        <input type="text" id="smtpUser" placeholder="noreply@example.com">
+                    </div>
+                    <div class="form-row">
+                        <label>邮箱密码 (Password/App Key)</label>
+                        <input type="password" id="smtpPassword" placeholder="Your Password">
+                    </div>
+                    <div class="form-row">
+                        <label>发件人名称</label>
+                        <input type="text" id="smtpSenderName" placeholder="流光笔记">
+                        <p class="help-text">邮件中显示的发件人名称，如"流光笔记"、"我的博客"等。</p>
+                    </div>
+                    <div class="form-row">
+                        <label>接收通知邮箱</label>
+                        <input type="text" id="notifyEmail" placeholder="admin@example.com">
+                    </div>
+
+                    <div class="form-row" style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="saveCommentSettings()">
+                            <i class="fas fa-save"></i> 保存评论配置
+                        </button>
+                        <button class="btn btn-secondary" onclick="testEmailSettings()" style="margin-left: 10px;">
+                            <i class="fas fa-paper-plane"></i> 发送测试邮件
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- 更新信息卡片 -->
-            <div id="updateInfo" style="display:none; margin-top:20px; background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1px solid #bbf7d0; border-radius:10px; padding:18px 20px;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                    <i class="fas fa-gift" style="color:#16a34a; font-size:18px;"></i>
-                    <span style="font-weight:700; font-size:16px; color:var(--slate-800);" id="updateReleaseName"></span>
-                    <span style="font-size:12px; color:var(--slate-400);" id="updatePublishedAt"></span>
-                </div>
-                <div id="updateChangelog" style="font-size:13px; color:var(--slate-600); line-height:1.7; max-height:200px; overflow-y:auto; margin-bottom:14px; white-space:pre-wrap;"></div>
-                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <button class="btn btn-primary" id="applyUpdateBtn" onclick="applyUpdate()">
-                        <i class="fas fa-download"></i> 下载并安装更新
-                    </button>
-                    <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
-                        <i class="fab fa-github"></i> 在 GitHub 查看
-                    </a>
+            <!-- Panel: 评论管理 -->
+            <div id="panel-comment-manage" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-comment-dots"></i> 评论管理</div>
+
+                    <!-- 统计卡片 -->
+                    <div class="comment-stats" style="display: flex; gap: 16px; margin-top: 16px;">
+                        <div class="stat-card stat-card-blue">
+                            <div class="stat-number" id="stat-total">0</div>
+                            <div class="stat-label">全部评论</div>
+                        </div>
+                        <div class="stat-card stat-card-yellow">
+                            <div class="stat-number" id="stat-pending">0</div>
+                            <div class="stat-label">待审核</div>
+                        </div>
+                        <div class="stat-card stat-card-green">
+                            <div class="stat-number" id="stat-approved">0</div>
+                            <div class="stat-label">已通过</div>
+                        </div>
+                        <div class="stat-card stat-card-red">
+                            <div class="stat-number" id="stat-spam">0</div>
+                            <div class="stat-label">垃圾评论</div>
+                        </div>
+                    </div>
+
+                    <!-- 评论列表操作区 -->
+                    <div style="margin-top: 20px;">
+                        <!-- 筛选标签 -->
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <button class="btn btn-sm btn-primary" id="filter-all" onclick="filterComments('all')">全部</button>
+                            <button class="btn btn-sm btn-outline" id="filter-pending" onclick="filterComments('pending')">待审核</button>
+                            <button class="btn btn-sm btn-outline" id="filter-approved" onclick="filterComments('approved')">已通过</button>
+                            <button class="btn btn-sm btn-outline" id="filter-spam" onclick="filterComments('spam')">垃圾</button>
+                        </div>
+
+                        <!-- 批量操作 -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 16px; align-items: center;">
+                            <input type="checkbox" id="selectAllComments" onchange="toggleSelectAll()" style="width: 18px; height: 18px;">
+                            <span style="font-size: 14px; color: #6b7280;">全选</span>
+                            <div style="flex:1;"></div>
+                            <button class="btn btn-sm btn-outline" onclick="batchAction('approve')" id="btn-batch-approve" disabled>
+                                <i class="fas fa-check"></i> 批量通过
+                            </button>
+                            <button class="btn btn-sm btn-secondary" onclick="batchAction('spam')" id="btn-batch-spam" disabled>
+                                <i class="fas fa-ban"></i> 标记垃圾
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="batchAction('delete')" id="btn-batch-delete" disabled>
+                                <i class="fas fa-trash"></i> 批量删除
+                            </button>
+                        </div>
+
+                        <!-- 评论列表 -->
+                        <div id="admin-comments-list">
+                            <div style="text-align: center; color: #888; padding: 2rem;">
+                                <i class="fas fa-spinner fa-spin"></i> 加载中...
+                            </div>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div id="comments-pagination" style="display: flex; justify-content: center; gap: 8px; margin-top: 20px;"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 无更新提示 -->
-            <div id="noUpdateInfo" style="display:none; margin-top:20px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px; padding:16px 20px; text-align:center;">
-                <i class="fas fa-check-circle" style="color:#16a34a; font-size:24px; margin-bottom:8px;"></i>
-                <div style="font-weight:600; color:var(--slate-700);">当前已是最新版本</div>
-                <div style="font-size:13px; color:var(--slate-400); margin-top:4px;" id="noUpdateVersionText"></div>
-            </div>
-
-            <!-- 更新进度 -->
-            <div id="updateProgress" style="display:none; margin-top:20px;">
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
-                    <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
-                </div>
-                <div style="background:var(--slate-200); border-radius:6px; height:6px; overflow:hidden;">
-                    <div id="updateProgressBar" style="background:var(--primary); height:100%; width:0%; transition:width 0.5s ease; border-radius:6px;"></div>
+            <!-- Panel: 访客主题 -->
+            <div id="panel-blog-themes" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-palette"></i> 访客主题 (前台)</div>
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 20px;">
+                            选择访客访问你的博客时看到的外观。
+                        </p>
+                        <div id="blogThemesList" class="themes-list">
+                            <!-- 博客主题列表 -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <!-- 更新日志 -->
-            <div style="border-top:1px solid #eee; margin:20px 0;"></div>
-            <div class="form-row">
-                <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="toggleUpdateLogs()">
-                    <div style="font-weight:600; font-size:14px;"><i class="fas fa-history" style="color:var(--slate-400); margin-right:6px;"></i>更新日志</div>
-                    <i class="fas fa-chevron-down" id="updateLogsArrow" style="font-size:12px; color:var(--slate-400); transition:transform 0.2s;"></i>
-                </div>
-                <div id="updateLogsContent" style="display:none; margin-top:12px;">
-                    <pre id="updateLogsText" style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:8px; padding:12px 16px; font-size:12px; color:var(--slate-600); line-height:1.6; max-height:300px; overflow-y:auto; white-space:pre-wrap; font-family:'SF Mono','Menlo','Consolas',monospace;">暂无日志</pre>
+            <!-- Panel: 创作主题 -->
+            <div id="panel-writer-themes" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-pen-nib"></i> 创作主题 (后台)</div>
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 20px;">
+                            选择你登录后用于管理和写作的界面风格。只有支持创作模式的主题才会显示在此。
+                        </p>
+                        <div id="writerThemesList" class="themes-list">
+                            <!-- 创作主题列表 -->
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <!-- Panel: AI 模型管理 -->
+            <div id="panel-ai-models" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-robot"></i> AI 模型管理</div>
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 20px;">
+                            配置 OpenAI 兼容的 API 模型（如 DeepSeek, ChatGPT, Local Ollama）。
+                            激活后的模型将用于自动摘要、润色和标签生成。
+                        </p>
+                        <div id="aiProvidersList" class="providers-list">
+                            <!-- Providers will be loaded here -->
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="btn btn-secondary" onclick="showAddProviderModal()">
+                                <i class="fas fa-plus"></i> 添加新模型
+                            </button>
+                        </div>
+                    </div>
+
+                    <hr class="settings-divider">
+
+                    <div class="form-row">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+                            <i class="fas fa-microphone" style="color:var(--primary);"></i>
+                            <span style="font-weight:600; font-size:14px;">语音转写 (STT)</span>
+                        </div>
+                        <p class="help-text" style="margin-bottom:15px;">
+                            配置语音输入使用的转写服务。推荐使用 <a href="https://cloud.siliconflow.cn/" target="_blank" style="color:var(--primary);">SiliconFlow（硅基流动）</a>，
+                            免费额度充足，中文识别效果好。不配置时将使用上方激活的 AI 模型。
+                        </p>
+                        <div class="form-row">
+                            <label>API Base URL</label>
+                            <input type="text" id="sttBaseUrl" value="https://api.siliconflow.cn/v1">
+                        </div>
+                        <div class="form-row">
+                            <label>API Key <span style="color:#ef4444;">*</span></label>
+                            <input type="password" id="sttApiKey" placeholder="填入你的 SiliconFlow API Key">
+                        </div>
+                        <div class="form-row">
+                            <label>模型名称</label>
+                            <input type="text" id="sttModel" value="FunAudioLLM/SenseVoiceSmall">
+                            <p class="help-text">可选模型：FunAudioLLM/SenseVoiceSmall（免费、中文优秀）、TeleAI/TeleSpeechASR（方言支持）</p>
+                        </div>
+                        <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="saveSTTConfig()">
+                            <i class="fas fa-save"></i> 保存语音转写配置
+                        </button>
+                    </div>
+
+                    <hr class="settings-divider">
+
+                    <div class="form-row">
+                        <label>润色风格 (逗号分隔)</label>
+                        <input type="text" id="polishStyles" placeholder="专业严谨, 简洁明了, 亲和力强">
+                        <p class="help-text">定义"润色文本"功能生成的版本风格，用逗号分隔。</p>
+                        <button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="savePolishStyles()">
+                            保存风格配置
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: 自定义 AI 指令 -->
+            <div id="panel-ai-prompts" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-magic"></i> 自定义 AI 指令</div>
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 20px;">
+                            定义出现在"魔术棒"菜单中的快捷指令。
+                        </p>
+                        <div id="customPromptsList" class="providers-list">
+                            <!-- Custom Prompts will be loaded here -->
+                        </div>
+                        <div style="margin-top: 20px;">
+                            <button class="btn btn-secondary" onclick="showAddPromptModal()">
+                                <i class="fas fa-plus"></i> 添加新指令
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: 安全设置 -->
+            <div id="panel-security" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-shield-alt"></i> 安全设置</div>
+                    <div class="form-row">
+                        <label>当前密码</label>
+                        <input type="password" id="currentPassword">
+                    </div>
+                    <div class="form-row">
+                        <label>新密码</label>
+                        <input type="password" id="newPassword">
+                    </div>
+                    <div class="form-row" style="margin-top: 20px;">
+                        <button class="btn btn-danger" onclick="changePassword()">
+                            <i class="fas fa-key"></i> 修改密码
+                        </button>
+                    </div>
+
+                    <hr class="settings-divider">
+
+                    <div class="form-row">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <div class="settings-toggle-label">调试模式</div>
+                                <div class="settings-toggle-desc">开启后，API错误将返回详细信息，便于排查问题。<strong style="color:#dc2626;">生产环境建议关闭！</strong></div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="debugModeToggle" onchange="toggleDebugMode()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: 数据管理 -->
+            <div id="panel-data" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-database"></i> 数据管理</div>
+                    <div class="form-row">
+                        <p class="help-text" style="margin-bottom: 10px;">将所有笔记导出为 JSON 格式进行备份。</p>
+                        <button class="btn btn-outline" onclick="exportData()">
+                            <i class="fas fa-file-export"></i> 导出所有数据
+                        </button>
+                    </div>
+
+                    <hr class="settings-divider">
+
+                    <div class="form-row" style="margin-top: 16px;">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <div class="settings-toggle-label">保留历史版本</div>
+                                <div class="settings-toggle-desc">关闭后，修改笔记时将不再产生新的历史记录。</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="keepHistoryToggle" onchange="toggleKeepHistory()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 12px;">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <div class="settings-toggle-label">清除所有历史版本</div>
+                                <div class="settings-toggle-desc">此操作将永久删除当前所有笔记的历史记录，不可恢复。</div>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="clearAllHistory()">
+                                <i class="fas fa-trash-alt"></i> 立即清除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel: 系统更新 -->
+            <div id="panel-update" class="settings-panel">
+                <div class="settings-section">
+                    <div class="section-title"><i class="fas fa-cloud-download-alt"></i> 系统更新</div>
+
+                    <div class="form-row">
+                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+                            <div style="display:flex; align-items:center; gap:8px; background:var(--slate-50); padding:6px 14px; border-radius:8px; border:1px solid var(--slate-200);">
+                                <i class="fas fa-code-branch" style="color:var(--primary); font-size:13px;"></i>
+                                <span style="font-size:13px; color:var(--slate-500);">当前版本</span>
+                                <span style="font-weight:700; color:var(--slate-800); font-size:14px;" id="currentVersion">{{ app_semver }}</span>
+                            </div>
+                            <div id="updateBadge" style="display:none;">
+                                <span style="background:#dcfce7; color:#16a34a; font-size:12px; font-weight:600; padding:3px 10px; border-radius:12px;">
+                                    <i class="fas fa-arrow-up" style="font-size:10px;"></i> 有新版本
+                                </span>
+                            </div>
+                            <div id="autoCheckedAt" style="display:none; font-size:11px; color:var(--slate-400);">
+                                <i class="fas fa-clock" style="font-size:10px;"></i> <span id="autoCheckedAtText"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 后台自动检测到有新版本时的提示条 -->
+                    <div id="autoBgUpdateBanner" style="display:none; margin-bottom:16px; background:linear-gradient(90deg,#fffbeb,#fef3c7); border:1px solid #fde68a; border-radius:8px; padding:10px 16px; display:none; align-items:center; gap:10px;">
+                        <i class="fas fa-bell" style="color:#d97706; font-size:15px;"></i>
+                        <span style="font-size:13px; color:#92400e; flex:1;">后台检测到新版本 <strong id="autoBgRemoteVersion"></strong>，点击"检查更新"查看详情。</span>
+                    </div>
+
+                    <div class="form-row">
+                        <label>GitHub 仓库 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
+                        <input type="text" id="githubRepo" placeholder="例如: username/my-blog" value="soulxyz/FlexNote">
+                        <p class="help-text">填入你在 GitHub 上的仓库地址，系统将通过 GitHub Releases 检查更新。</p>
+                    </div>
+                    <div class="form-row">
+                        <label>GitHub Token <span style="color:#999; font-weight:normal;">(可选，私有仓库需要)</span></label>
+                        <input type="password" id="githubToken" placeholder="ghp_xxxx...">
+                        <p class="help-text">如果是私有仓库，需要填入具有 repo 权限的 Personal Access Token。公开仓库可留空。</p>
+                    </div>
+                    <div class="form-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="saveUpdateConfig()">
+                            <i class="fas fa-save"></i> 保存配置
+                        </button>
+                        <button class="btn btn-secondary" id="checkUpdateBtn" onclick="checkForUpdate()">
+                            <i class="fas fa-sync-alt"></i> 检查更新
+                        </button>
+                    </div>
+
+                    <!-- 更新信息卡片 -->
+                    <div id="updateInfo" style="display:none; margin-top:20px; background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1px solid #bbf7d0; border-radius:10px; padding:18px 20px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+                            <i class="fas fa-gift" style="color:#16a34a; font-size:18px;"></i>
+                            <span style="font-weight:700; font-size:16px; color:var(--slate-800);" id="updateReleaseName"></span>
+                            <span style="font-size:12px; color:var(--slate-400);" id="updatePublishedAt"></span>
+                        </div>
+                        <div id="updateChangelog" style="font-size:13px; color:var(--slate-600); line-height:1.7; max-height:200px; overflow-y:auto; margin-bottom:14px; white-space:pre-wrap;"></div>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <button class="btn btn-primary" id="applyUpdateBtn" onclick="applyUpdate()">
+                                <i class="fas fa-download"></i> 下载并安装更新
+                            </button>
+                            <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
+                                <i class="fab fa-github"></i> 在 GitHub 查看
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- 无更新提示 -->
+                    <div id="noUpdateInfo" style="display:none; margin-top:20px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px; padding:16px 20px; text-align:center;">
+                        <i class="fas fa-check-circle" style="color:#16a34a; font-size:24px; margin-bottom:8px;"></i>
+                        <div style="font-weight:600; color:var(--slate-700);">当前已是最新版本</div>
+                        <div style="font-size:13px; color:var(--slate-400); margin-top:4px;" id="noUpdateVersionText"></div>
+                    </div>
+
+                    <!-- 更新进度 -->
+                    <div id="updateProgress" style="display:none; margin-top:20px;">
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                            <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
+                            <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
+                        </div>
+                        <div style="background:var(--slate-200); border-radius:6px; height:6px; overflow:hidden;">
+                            <div id="updateProgressBar" style="background:var(--primary); height:100%; width:0%; transition:width 0.5s ease; border-radius:6px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 更新日志 -->
+                    <hr class="settings-divider">
+                    <div class="form-row">
+                        <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" onclick="toggleUpdateLogs()">
+                            <div style="font-weight:600; font-size:14px;"><i class="fas fa-history" style="color:var(--slate-400); margin-right:6px;"></i>更新日志</div>
+                            <i class="fas fa-chevron-down" id="updateLogsArrow" style="font-size:12px; color:var(--slate-400); transition:transform 0.2s;"></i>
+                        </div>
+                        <div id="updateLogsContent" style="display:none; margin-top:12px;">
+                            <pre id="updateLogsText" style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:8px; padding:12px 16px; font-size:12px; color:var(--slate-600); line-height:1.6; max-height:300px; overflow-y:auto; white-space:pre-wrap; font-family:'SF Mono','Menlo','Consolas',monospace;">暂无日志</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
         </div>
     </div>
 
@@ -484,12 +914,12 @@
                 </div>
                 <div class="form-row">
                     <label>系统提示词 (System Prompt)</label>
-                    <textarea id="promptSystem" placeholder="例如: 你是一个专业的翻译助手。" rows="3" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                    <textarea id="promptSystem" placeholder="例如: 你是一个专业的翻译助手。" rows="3" class="settings-textarea"></textarea>
                 </div>
                 <div class="form-row">
                     <label>用户提示词模板 (User Prompt)</label>
                     <p class="help-text" style="font-size:0.8rem; margin-top:5px;">使用 {content} 代表选中的文本。</p>
-                    <textarea id="promptTemplate" placeholder="例如: 将以下文本翻译成英文：\n\n{content}" rows="4" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:6px;"></textarea>
+                    <textarea id="promptTemplate" placeholder="例如: 将以下文本翻译成英文：\n\n{content}" rows="4" class="settings-textarea"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -503,8 +933,41 @@
         import '/static/js/modules/utils.js?v={{ app_version }}';
     </script>
     <script>
-        // Load settings on init
+        // ========== 导航面板切换 ==========
+        const _panelLoadState = {};
+
+        function switchPanel(panelId) {
+            document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+
+            const panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('active');
+
+            const navItem = document.querySelector(`.nav-item[data-panel="${panelId}"]`);
+            if (navItem) navItem.classList.add('active');
+
+            history.replaceState(null, null, '#' + panelId.replace('panel-', ''));
+
+            if (!_panelLoadState[panelId]) {
+                _panelLoadState[panelId] = true;
+                if (panelId === 'panel-comment-manage') {
+                    loadAdminComments();
+                }
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function initNavigation() {
+            const hash = window.location.hash.replace('#', '');
+            const targetPanel = hash ? ('panel-' + hash) : 'panel-basic';
+            const exists = document.getElementById(targetPanel);
+            switchPanel(exists ? targetPanel : 'panel-basic');
+        }
+
+        // ========== 初始化 ==========
         document.addEventListener('DOMContentLoaded', () => {
+            initNavigation();
             loadSettings();
             loadProviders();
             loadCustomPrompts();
@@ -512,10 +975,10 @@
             loadCommentStats();
             loadSTTConfig();
             loadUpdateConfig();
+            loadUpdateStatus();
         });
 
-        // ... existing loadSettings ...
-
+        // ========== AI 模型管理 ==========
         async function loadProviders() {
             try {
                 const response = await fetch('/api/ai/providers');
@@ -568,8 +1031,6 @@
         function closeProviderModal() {
             document.getElementById('providerModal').style.display = 'none';
         }
-
-        let currentProviders = []; // Cache for edit
 
         async function saveProvider() {
             const id = document.getElementById('providerId').value;
@@ -627,7 +1088,21 @@
             }
         }
 
-        // === Custom Prompts Logic ===
+        async function editProvider(id) {
+            const response = await fetch('/api/ai/providers');
+            const providers = await response.json();
+            const p = providers.find(x => x.id === id);
+            if (p) {
+                document.getElementById('providerId').value = p.id;
+                document.getElementById('providerName').value = p.name;
+                document.getElementById('providerBaseUrl').value = p.base_url;
+                document.getElementById('providerApiKey').value = p.api_key;
+                document.getElementById('providerModel').value = p.model;
+                document.getElementById('providerModal').style.display = 'block';
+            }
+        }
+
+        // ========== 自定义 AI 指令 ==========
         async function loadCustomPrompts() {
             try {
                 const response = await fetch('/api/ai/custom_prompts');
@@ -649,7 +1124,7 @@
 
             prompts.forEach(p => {
                 const item = document.createElement('div');
-                item.className = 'provider-item'; // Reuse same style
+                item.className = 'provider-item';
                 item.innerHTML = `
                     <div class="provider-info">
                         <div class="provider-name">${p.name}</div>
@@ -717,39 +1192,19 @@
         }
 
         async function editPrompt(id) {
-             const response = await fetch('/api/ai/custom_prompts');
-             const prompts = await response.json();
-             const p = prompts.find(x => x.id === id);
-             if (p) {
+            const response = await fetch('/api/ai/custom_prompts');
+            const prompts = await response.json();
+            const p = prompts.find(x => x.id === id);
+            if (p) {
                 document.getElementById('promptId').value = p.id;
                 document.getElementById('promptName').value = p.name;
                 document.getElementById('promptSystem').value = p.system_prompt;
                 document.getElementById('promptTemplate').value = p.template;
                 document.getElementById('promptModal').style.display = 'block';
-             }
+            }
         }
 
-        // Edit helper needs cache or refetch. Since we don't have full list locally in robust way,
-        // let's fetch list again inside edit or store globally.
-        // For simplicity, let's just make get_providers return full objects and we rely on UI not having sensitive data visible?
-        // Actually our API returns full config including key. In a real app we might mask key.
-        // For personal app, it's fine.
-
-        async function editProvider(id) {
-             const response = await fetch('/api/ai/providers');
-             const providers = await response.json();
-             const p = providers.find(x => x.id === id);
-             if (p) {
-                document.getElementById('providerId').value = p.id;
-                document.getElementById('providerName').value = p.name;
-                document.getElementById('providerBaseUrl').value = p.base_url;
-                document.getElementById('providerApiKey').value = p.api_key;
-                document.getElementById('providerModel').value = p.model;
-                document.getElementById('providerModal').style.display = 'block';
-             }
-        }
-
-
+        // ========== 基础设置 ==========
         async function loadSettings() {
             try {
                 const response = await fetch('/api/settings');
@@ -761,7 +1216,6 @@
                 if (data.blog_footer) document.getElementById('blogFooter').value = data.blog_footer;
                 if (data.polish_styles) document.getElementById('polishStyles').value = data.polish_styles;
 
-                // Comment Settings（统一转小写比较，因为后端存储可能是 'True' 或 'true'）
                 document.getElementById('commentAudit').checked = data.comment_audit?.toLowerCase() === 'true';
                 if (data.avatar_source) document.getElementById('avatarSource').value = data.avatar_source;
                 if (data.blogger_avatar) document.getElementById('bloggerAvatar').value = data.blogger_avatar;
@@ -772,11 +1226,9 @@
                 if (data.smtp_sender_name) document.getElementById('smtpSenderName').value = data.smtp_sender_name;
                 if (data.notify_email) document.getElementById('notifyEmail').value = data.notify_email;
 
-                // History settings
-                const keepHistory = data.keep_history?.toLowerCase() !== 'false'; // Default to true
+                const keepHistory = data.keep_history?.toLowerCase() !== 'false';
                 document.getElementById('keepHistoryToggle').checked = keepHistory;
 
-                // Debug mode
                 const debugMode = data.debug_mode?.toLowerCase() === 'true';
                 document.getElementById('debugModeToggle').checked = debugMode;
             } catch (error) {
@@ -784,6 +1236,28 @@
             }
         }
 
+        async function saveBasicSettings() {
+            const siteTitle = document.getElementById('siteTitle').value;
+            const siteDesc = document.getElementById('siteDesc').value;
+            const blogFooter = document.getElementById('blogFooter').value;
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ site_title: siteTitle, site_desc: siteDesc, blog_footer: blogFooter })
+                });
+                if (response.ok) {
+                    showToast('设置已保存', 'success');
+                } else {
+                    showToast('保存失败', 'error');
+                }
+            } catch (error) {
+                showToast('保存失败', 'error');
+            }
+        }
+
+        // ========== 评论设置 ==========
         async function saveCommentSettings() {
             const audit = document.getElementById('commentAudit').checked;
             const avatarSource = document.getElementById('avatarSource').value;
@@ -811,7 +1285,6 @@
                         notify_email: notify
                     })
                 });
-
                 if (response.ok) {
                     showToast('评论配置已保存', 'success');
                 } else {
@@ -825,11 +1298,8 @@
         async function testEmailSettings() {
             try {
                 showToast('正在发送测试邮件...', 'info');
-                const response = await fetch('/api/settings/test-email', {
-                    method: 'POST'
-                });
+                const response = await fetch('/api/settings/test-email', { method: 'POST' });
                 const data = await response.json();
-
                 if (response.ok) {
                     showToast('测试邮件已发送，请检查收件箱', 'success');
                 } else {
@@ -840,23 +1310,32 @@
             }
         }
 
-        async function toggleKeepHistory() {
-            const enabled = document.getElementById('keepHistoryToggle').checked;
+        // ========== 安全设置 ==========
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+
+            if (!currentPassword || !newPassword) {
+                showToast('请填写完整', 'warning');
+                return;
+            }
+
             try {
-                const response = await fetch('/api/settings', {
+                const response = await fetch('/api/settings/password', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keep_history: enabled })
+                    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
                 });
+                const data = await response.json();
                 if (response.ok) {
-                    showToast(enabled ? '历史版本功能已启用' : '历史版本功能已禁用', 'success');
+                    showToast('密码修改成功', 'success');
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
                 } else {
-                    showToast('设置失败', 'error');
-                    document.getElementById('keepHistoryToggle').checked = !enabled;
+                    showToast(data.error || '修改失败', 'error');
                 }
-            } catch (e) {
-                showToast('网络错误', 'error');
-                document.getElementById('keepHistoryToggle').checked = !enabled;
+            } catch (error) {
+                showToast('修改失败', 'error');
             }
         }
 
@@ -880,13 +1359,35 @@
             }
         }
 
+        // ========== 数据管理 ==========
+        function exportData() {
+            window.location.href = '/api/notes?per_page=10000';
+        }
+
+        async function toggleKeepHistory() {
+            const enabled = document.getElementById('keepHistoryToggle').checked;
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keep_history: enabled })
+                });
+                if (response.ok) {
+                    showToast(enabled ? '历史版本功能已启用' : '历史版本功能已禁用', 'success');
+                } else {
+                    showToast('设置失败', 'error');
+                    document.getElementById('keepHistoryToggle').checked = !enabled;
+                }
+            } catch (e) {
+                showToast('网络错误', 'error');
+                document.getElementById('keepHistoryToggle').checked = !enabled;
+            }
+        }
+
         async function clearAllHistory() {
             if (!await showConfirm('清除历史版本', '确定要清除所有笔记的历史版本吗？<br><strong style="color:#dc2626;">此操作无法撤销！</strong>')) return;
-
             try {
-                const response = await fetch('/api/notes/history/clear_all', {
-                    method: 'POST'
-                });
+                const response = await fetch('/api/notes/history/clear_all', { method: 'POST' });
                 const data = await response.json();
                 if (response.ok) {
                     showToast(`清理成功，共删除 ${data.count} 条记录`, 'success');
@@ -898,6 +1399,7 @@
             }
         }
 
+        // ========== 语音转写 & 润色风格 ==========
         async function loadSTTConfig() {
             try {
                 const response = await fetch('/api/ai/stt/config');
@@ -918,11 +1420,7 @@
                 const response = await fetch('/api/ai/stt/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        base_url: baseUrl,
-                        api_key: apiKey,
-                        model: model
-                    })
+                    body: JSON.stringify({ base_url: baseUrl, api_key: apiKey, model: model })
                 });
                 if (response.ok) {
                     showToast('语音转写配置已保存', 'success');
@@ -946,84 +1444,15 @@
             } catch(e) { showToast('保存失败', 'error'); }
         }
 
-        async function saveBasicSettings() {
-            const siteTitle = document.getElementById('siteTitle').value;
-            const siteDesc = document.getElementById('siteDesc').value;
-            const blogFooter = document.getElementById('blogFooter').value;
-
-            try {
-                const response = await fetch('/api/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        site_title: siteTitle,
-                        site_desc: siteDesc,
-                        blog_footer: blogFooter
-                    })
-                });
-
-                if (response.ok) {
-                    showToast('设置已保存', 'success');
-                } else {
-                    showToast('保存失败', 'error');
-                }
-            } catch (error) {
-                showToast('保存失败', 'error');
-            }
-        }
-
-        async function changePassword() {
-            const currentPassword = document.getElementById('currentPassword').value;
-            const newPassword = document.getElementById('newPassword').value;
-
-            if (!currentPassword || !newPassword) {
-                showToast('请填写完整', 'warning');
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/settings/password', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword })
-                });
-                const data = await response.json();
-
-                if (response.ok) {
-                    showToast('密码修改成功', 'success');
-                    document.getElementById('currentPassword').value = '';
-                    document.getElementById('newPassword').value = '';
-                } else {
-                    showToast(data.error || '修改失败', 'error');
-                }
-            } catch (error) {
-                showToast('修改失败', 'error');
-            }
-        }
-
-        function exportData() {
-            // Simple export logic - fetch all notes and download as JSON
-            window.location.href = '/api/notes?per_page=10000'; // Reuse existing API or make a dedicated one
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.className = `toast show toast-${type}`;
-            setTimeout(() => { toast.className = 'toast'; }, 3000);
-        }
-
-        // === Theme Management ===
+        // ========== 主题管理 ==========
         async function loadThemes() {
             try {
                 const response = await fetch('/api/themes');
                 const res = await response.json();
                 const data = res.data;
-                
-                // 渲染前台主题
+
                 renderThemes(data.themes, data.current, 'blogThemesList', 'blog');
-                
-                // 渲染后台主题 (过滤 is_writer: true)
+
                 const writerThemes = Object.fromEntries(
                     Object.entries(data.themes).filter(([_, t]) => t.is_writer === true)
                 );
@@ -1043,10 +1472,8 @@
                 const item = document.createElement('div');
                 item.className = `theme-item ${isActive ? 'active' : ''}`;
 
-                // 动态构建预览图样式
                 let previewStyle = '';
                 const preview = theme.preview || {};
-
                 if (preview.type === 'gradient') {
                     previewStyle = `background: ${preview.value};`;
                 } else if (preview.type === 'image') {
@@ -1073,7 +1500,6 @@
             });
         }
 
-        // === Theme Config ===
         let currentConfigTheme = '';
         let themeConfigValues = {};
 
@@ -1090,10 +1516,8 @@
 
                 const settings = settingsData.data || [];
                 const config = configData.data || {};
-
                 themeConfigValues = { ...config };
 
-                // 构建配置表单
                 let formHtml = '';
                 settings.forEach(group => {
                     formHtml += `<div class="config-group" style="margin-bottom: 20px;">`;
@@ -1139,7 +1563,6 @@
 
                         formHtml += `</div>`;
                     });
-
                     formHtml += `</div>`;
                 });
 
@@ -1147,7 +1570,6 @@
                     formHtml = '<p style="text-align: center; color: #888; padding: 2rem;">该主题暂无可配置项</p>';
                 }
 
-                // 显示配置弹窗
                 showThemeConfigModal(themeName, formHtml);
 
             } catch (error) {
@@ -1181,7 +1603,6 @@
                     </div>
                 </div>
             `;
-
             document.body.appendChild(modal);
         }
 
@@ -1200,7 +1621,6 @@
                         config: themeConfigValues
                     })
                 });
-
                 if (response.ok) {
                     showToast('主题配置已保存，刷新页面后生效', 'success');
                     closeThemeConfigModal();
@@ -1230,8 +1650,49 @@
             }
         }
 
-        // === 系统更新 ===
+        // ========== 系统更新 ==========
         let _pendingUpdate = null;
+
+        async function loadUpdateStatus() {
+            try {
+                const res = await fetch('/api/update/status');
+                const json = await res.json();
+                const data = json.data;
+                if (!data) return;
+
+                const navBadge = document.getElementById('nav-update-badge');
+                const banner = document.getElementById('autoBgUpdateBanner');
+                const checkedAtEl = document.getElementById('autoCheckedAt');
+                const checkedAtText = document.getElementById('autoCheckedAtText');
+
+                if (data.checked_at) {
+                    const d = new Date(data.checked_at);
+                    checkedAtText.textContent = `上次检查: ${d.toLocaleString('zh-CN')}`;
+                    checkedAtEl.style.display = 'flex';
+                }
+
+                if (data.has_update) {
+                    // 侧边栏徽标
+                    if (navBadge) {
+                        navBadge.textContent = 'NEW';
+                        navBadge.style.display = 'inline-block';
+                    }
+                    // 面板提示条
+                    if (banner) {
+                        document.getElementById('autoBgRemoteVersion').textContent = data.remote_version || '';
+                        banner.style.display = 'flex';
+                    }
+                    // 也预填 _pendingUpdate，让用户直接可以点击安装
+                    _pendingUpdate = data;
+                    document.getElementById('updateBadge').style.display = 'inline-block';
+                    document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
+                    document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
+                    document.getElementById('updateChangelog').textContent = data.changelog || '无更新说明';
+                    document.getElementById('updateHtmlUrl').href = data.html_url || '#';
+                    document.getElementById('updateInfo').style.display = 'block';
+                }
+            } catch (e) {}
+        }
 
         async function loadUpdateConfig() {
             try {
@@ -1240,7 +1701,6 @@
                 const data = res.data;
                 document.getElementById('currentVersion').textContent = data.version;
                 document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FlexNote';
-                // 也尝试加载 github_token（如果有的话）
                 const settingsRes = await fetch('/api/settings');
                 const settings = await settingsRes.json();
                 if (settings.data?.github_token) {
@@ -1254,7 +1714,6 @@
             const token = document.getElementById('githubToken').value.trim();
 
             try {
-                // 保存仓库地址
                 const resp = await fetch('/api/update/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1266,7 +1725,6 @@
                     return;
                 }
 
-                // 保存 token（通过通用设置接口）
                 if (token && !token.includes('•')) {
                     await fetch('/api/settings', {
                         method: 'POST',
@@ -1286,7 +1744,6 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 检查中...';
 
-            // 隐藏之前的结果
             document.getElementById('updateInfo').style.display = 'none';
             document.getElementById('noUpdateInfo').style.display = 'none';
 
@@ -1300,8 +1757,13 @@
                 }
 
                 const data = res.data;
+                const navBadge = document.getElementById('nav-update-badge');
+                const banner = document.getElementById('autoBgUpdateBanner');
+
                 if (data.has_update) {
                     _pendingUpdate = data;
+                    if (navBadge) { navBadge.textContent = 'NEW'; navBadge.style.display = 'inline-block'; }
+                    if (banner) { document.getElementById('autoBgRemoteVersion').textContent = data.remote_version || ''; banner.style.display = 'flex'; }
                     document.getElementById('updateBadge').style.display = 'inline-block';
                     document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
                     document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
@@ -1309,10 +1771,15 @@
                     document.getElementById('updateHtmlUrl').href = data.html_url || '#';
                     document.getElementById('updateInfo').style.display = 'block';
                 } else {
+                    _pendingUpdate = null;
+                    if (navBadge) navBadge.style.display = 'none';
+                    if (banner) banner.style.display = 'none';
                     document.getElementById('updateBadge').style.display = 'none';
                     document.getElementById('noUpdateVersionText').textContent = `v${data.local_version}`;
                     document.getElementById('noUpdateInfo').style.display = 'block';
                 }
+                // 刷新"上次检查时间"
+                loadUpdateStatus();
             } catch (e) {
                 showToast('检查更新失败，请确认网络连接', 'error');
             } finally {
@@ -1332,7 +1799,6 @@
             applyBtn.disabled = true;
             applyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在更新...';
 
-            // 显示进度条
             document.getElementById('updateProgress').style.display = 'block';
             const progressBar = document.getElementById('updateProgressBar');
             const progressText = document.getElementById('updateProgressText');
@@ -1344,10 +1810,7 @@
                 const response = await fetch('/api/update/apply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        zip_url: _pendingUpdate.zip_url,
-                        version: _pendingUpdate.remote_version
-                    })
+                    body: JSON.stringify({ zip_url: _pendingUpdate.zip_url, version: _pendingUpdate.remote_version })
                 });
 
                 progressBar.style.width = '80%';
@@ -1366,12 +1829,9 @@
 
                 progressBar.style.width = '100%';
                 progressText.textContent = '更新完成，服务正在重启...';
-
-                // 等待服务重启后自动刷新页面
                 setTimeout(() => waitForRestart(), 3000);
 
             } catch (e) {
-                // 请求可能因服务重启而中断，这是正常的
                 progressBar.style.width = '100%';
                 progressText.textContent = '服务正在重启，请稍候...';
                 setTimeout(() => waitForRestart(), 3000);
@@ -1426,27 +1886,10 @@
             } catch (e) {}
         }
 
-        // === 评论管理 ===
+        // ========== 评论管理 ==========
         let currentCommentFilter = 'all';
         let currentCommentPage = 1;
         let selectedComments = new Set();
-        let commentManagementExpanded = false;
-
-        function toggleCommentManagement() {
-            commentManagementExpanded = !commentManagementExpanded;
-            const content = document.getElementById('comment-management-content');
-            const arrow = document.getElementById('comment-management-arrow');
-
-            if (commentManagementExpanded) {
-                content.style.display = 'block';
-                arrow.style.transform = 'rotate(180deg)';
-                // 展开时加载评论列表
-                loadAdminComments();
-            } else {
-                content.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
-            }
-        }
 
         async function loadCommentStats() {
             try {
@@ -1456,6 +1899,16 @@
                 document.getElementById('stat-pending').textContent = data.pending;
                 document.getElementById('stat-approved').textContent = data.approved;
                 document.getElementById('stat-spam').textContent = data.spam;
+
+                const badge = document.getElementById('nav-pending-badge');
+                if (badge) {
+                    if (data.pending > 0) {
+                        badge.textContent = data.pending;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
             } catch (error) {
                 console.error('Failed to load comment stats');
             }
@@ -1490,7 +1943,6 @@
                     list.appendChild(item);
                 });
 
-                // 分页
                 renderCommentsPagination(data.pages, page);
 
             } catch (error) {
@@ -1552,7 +2004,6 @@
         }
 
         function filterComments(status) {
-            // 更新筛选按钮状态
             ['all', 'pending', 'approved', 'spam'].forEach(s => {
                 const btn = document.getElementById(`filter-${s}`);
                 if (btn) {
@@ -1658,6 +2109,29 @@
                 showToast('网络错误', 'error');
             }
         }
+
+        // ========== Toast ==========
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show toast-${type}`;
+            setTimeout(() => { toast.className = 'toast'; }, 3000);
+        }
+    </script>
+
+    <script>
+        /* ---- iframe 模式：返回按钮改为关闭模态框 ---- */
+        (function () {
+            if (window.self === window.top) return;
+            document.querySelectorAll('.back-btn').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    if (window.parent && window.parent.closeSettingsModal) {
+                        window.parent.closeSettingsModal();
+                    }
+                });
+            });
+        })();
     </script>
 </body>
 </html>

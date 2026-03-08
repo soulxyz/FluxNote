@@ -278,9 +278,10 @@ const BILI_SVG_LG = `<svg viewBox="0 0 24 24" width="36" height="36" fill="rgba(
 
 export function extractBilibiliId(url) {
     if (!url) return null;
-    let m = url.match(/bilibili\.com\/video\/(BV[\w]+)/i);
+    // Bilibili BV IDs use base58 encoding (excludes 0, O, I, l to avoid confusion)
+    let m = url.match(/bilibili\.com\/video\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)/i);
     if (m) return m[1];
-    m = url.match(/b23\.tv\/(BV[\w]+)/i);
+    m = url.match(/b23\.tv\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)/i);
     if (m) return m[1];
     m = url.match(/bilibili\.com\/video\/av(\d+)/i);
     if (m) return `av${m[1]}`;

@@ -11,7 +11,7 @@ from .routes.auth_webauthn import webauthn_bp
 from .routes.share import share_bp
 from .routes.blog import blog_bp
 from .routes.comment import comment_bp
-from .routes.update import update_bp
+from .routes.update import update_bp, start_background_update_checker
 from .utils.version import get_static_hash
 import os
 import logging
@@ -168,5 +168,8 @@ def create_app():
         run_self_check(app)
         # 根据数据库配置更新调试模式
         app.config['DEBUG'] = is_debug_mode()
+
+    # 启动后台更新检查线程（非阻塞，守护线程）
+    start_background_update_checker(app)
 
     return app

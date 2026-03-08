@@ -42,9 +42,10 @@
                 const videoExts = /\.(mp4|webm|ogg|mov)$/i;
                 function extractBilibiliId(url) {
                     if (!url) return null;
-                    let m = url.match(/bilibili\.com\/video\/(BV[\w]+)/i);
+                    // Bilibili BV IDs use base58 encoding (excludes 0, O, I, l to avoid confusion)
+                    let m = url.match(/bilibili\.com\/video\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)/i);
                     if (m) return m[1];
-                    m = url.match(/b23\.tv\/(BV[\w]+)/i);
+                    m = url.match(/b23\.tv\/(BV[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+)/i);
                     if (m) return m[1];
                     m = url.match(/bilibili\.com\/video\/av(\d+)/i);
                     if (m) return 'av' + m[1];
@@ -122,7 +123,7 @@
                         </div>
                         <div class="user-actions-mini">
                              <a href="#" id="bindWebAuthnBtn" title="绑定指纹/面容登录"><i class="fas fa-fingerprint"></i></a>
-                             <a href="/settings" title="设置"><i class="fas fa-cog"></i></a>
+                             <a href="#" onclick="openSettingsModal(); return false;" title="设置"><i class="fas fa-cog"></i></a>
                              <a href="#" id="logoutBtn" title="退出"><i class="fas fa-sign-out-alt"></i></a>
                         </div>
                    </div>
@@ -540,6 +541,12 @@
                 // 检查是否已登录
                 const userProfile = document.getElementById('userProfile');
                 if (userProfile && userProfile.style.display !== 'none') {
+                    // 已登录，清除 URL 中的 show_login 参数
+                    const url = new URL(window.location);
+                    if (url.searchParams.has('show_login')) {
+                        url.searchParams.delete('show_login');
+                        window.history.replaceState({}, '', url);
+                    }
                     return; // 已登录，不需要显示登录框
                 }
 
@@ -577,5 +584,56 @@
         });
     </script>
     {% endif %}
+
+    <!-- ========== 设置模态框 ========== -->
+    <div id="settingsModal" class="settings-modal-overlay" onclick="handleSettingsOverlayClick(event)">
+        <div class="settings-modal-box">
+            <button class="settings-modal-close" onclick="closeSettingsModal()" title="关闭设置">
+                <i class="fas fa-times"></i>
+            </button>
+            <iframe id="settingsFrame" src="about:blank" class="settings-modal-iframe" allowtransparency="true"></iframe>
+        </div>
+    </div>
+
+    <script>
+        let _settingsLoaded = false;
+
+        function openSettingsModal() {
+            const modal = document.getElementById('settingsModal');
+            const frame = document.getElementById('settingsFrame');
+
+            // 首次打开才加载，之后复用
+            if (!_settingsLoaded) {
+                const hash = window.location.hash.replace('#', '');
+                frame.src = '/settings' + (hash ? '#' + hash : '');
+                _settingsLoaded = true;
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            // Esc 键关闭
+            document.addEventListener('keydown', onSettingsEsc);
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('active');
+            document.body.style.overflow = '';
+            document.removeEventListener('keydown', onSettingsEsc);
+        }
+
+        function handleSettingsOverlayClick(e) {
+            if (e.target === document.getElementById('settingsModal')) {
+                closeSettingsModal();
+            }
+        }
+
+        function onSettingsEsc(e) {
+            if (e.key === 'Escape') closeSettingsModal();
+        }
+
+        // 供 settings.html 内部调用（通过 parent.closeSettingsModal）
+        window.closeSettingsModal = closeSettingsModal;
+    </script>
 </body>
 </html>

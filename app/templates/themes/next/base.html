@@ -66,4 +66,17 @@
     <button class="next-menu-toggle" data-toggle-menu data-target="body" data-class="next-sidebar-open">
         <i class="fas fa-bars"></i>
     </button>
+
+    <!-- 自定义CSS -->
+    {% if theme_config.custom_css or theme_config.primary_color %}
+    <style>
+        {% if theme_config.primary_color %}
+        .theme-next {
+            --next-primary: {{ theme_config.primary_color }};
+            --next-link: {{ theme_config.primary_color }};
+        }
+        {% endif %}
+        {{ theme_config.custom_css if theme_config.custom_css else '' }}
+    </style>
+    {% endif %}
 {% endblock %}

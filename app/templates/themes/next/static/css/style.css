@@ -1,7 +1,8 @@
 /* Next 主题 - 仿 Hexo Next 风格 */
 
 /* === 基础变量 === */
-:root {
+.theme-next {
+    /* 重置全局变量，确保主题独立性 */
     --next-bg: #f5f7f9;
     --next-content-bg: #fff;
     --next-text: #555;
@@ -11,6 +12,11 @@
     --next-link: #0e83cd;
     --next-code-bg: #f5f5f5;
     --next-sidebar-width: 240px;
+    
+    /* 覆盖全局变量，防止渗透 */
+    --primary: #0e83cd;
+    --primary-hover: #0c6fb0;
+    --primary-light: #e0f2fe;
 }
 
 /* === 布局 === */
@@ -337,16 +343,24 @@
     border-radius: 4px;
 }
 
-.theme-next .next-prev,
-.theme-next .next-next {
+.theme-next .next-pagination a,
+.theme-next .next-pagination .disabled {
     color: var(--next-text-light);
     text-decoration: none;
     font-size: 14px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: all 0.2s;
 }
 
-.theme-next .next-prev:hover,
-.theme-next .next-next:hover {
+.theme-next .next-pagination a:hover {
     color: var(--next-primary);
+    background: var(--next-bg);
+}
+
+.theme-next .next-pagination .disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .theme-next .next-page-num {
@@ -394,6 +408,12 @@
 }
 
 /* === 归档 === */
+.theme-next .next-archive {
+    background: var(--next-content-bg);
+    border-radius: 4px;
+    padding: 20px 30px;
+}
+
 .theme-next .next-archive-year {
     margin-bottom: 30px;
 }
@@ -523,10 +543,29 @@
     .theme-next .next-sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.15);
     }
 
     .theme-next.next-sidebar-open .next-sidebar {
         transform: translateX(0);
+    }
+
+    /* 遮罩层 */
+    .theme-next.next-sidebar-open::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 99;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
     }
 
     .theme-next .next-main {

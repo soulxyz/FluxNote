@@ -23,24 +23,15 @@
 <!-- 标签云 -->
 <div class="notes-stream">
     {% if tags %}
-        <div class="archive-stats" style="margin-bottom: 20px; color: var(--slate-500); font-size: 14px;">
+        <div class="archive-stats">
             共 {{ tags|length }} 个话题
         </div>
 
-        <div class="note-card" style="padding: 40px;">
-            <div class="tags-cloud" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center;">
+        <div class="note-card tags-cloud-container">
+            <div class="tags-cloud">
                 {% for tag in tags %}
-                <a href="{{ url_for('blog.tag_notes', tag_name=tag.name) }}" class="note-tag" style="
-                    font-size: {{ 13 + (tag.count * 1.5) }}px; 
-                    padding: 8px 16px; 
-                    border-radius: 20px;
-                    border: 1px solid var(--slate-200);
-                    color: var(--slate-600);
-                    background: var(--slate-50);
-                    text-decoration: none;
-                    transition: all 0.2s;
-                ">
-                    #{{ tag.name }} <span style="font-size: 0.8em; opacity: 0.6; margin-left: 4px;">{{ tag.count }}</span>
+                <a href="{{ url_for('blog.tag_notes', tag_name=tag.name) }}" class="note-tag" style="font-size: {{ 13 + (tag.count * 1.5) }}px;">
+                    #{{ tag.name }} <span class="tag-count-label">{{ tag.count }}</span>
                 </a>
                 {% endfor %}
             </div>

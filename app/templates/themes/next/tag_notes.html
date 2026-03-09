@@ -26,8 +26,14 @@
                 <a href="{{ url_for('blog.post', note_id=note.id) }}">
                     <h2 class="next-post-title">{{ note.display_title or '无标题' }}</h2>
                     <div class="next-post-meta">
-                        <time>{{ note.created_at.strftime('%Y-%m-%d') }}</time>
-                        <span>{{ note.reading_time }} min</span>
+                        <time datetime="{{ note.created_at.strftime('%Y-%m-%d') }}">
+                            <i class="far fa-calendar-alt"></i>
+                            {{ note.created_at.strftime('%Y-%m-%d') }}
+                        </time>
+                        <span class="next-post-reading">
+                            <i class="far fa-clock"></i>
+                            {{ note.reading_time }} min
+                        </span>
                     </div>
                     {% if note.content %}
                     <div class="next-post-excerpt">

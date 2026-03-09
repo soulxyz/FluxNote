@@ -57,3 +57,37 @@
     </nav>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script type="module">
+    // 初始化代码高亮
+    if (typeof hljs !== 'undefined') {
+        document.querySelectorAll('.next-article-content pre code').forEach(block => {
+            hljs.highlightElement(block);
+        });
+    }
+
+    // 初始化图片查看器
+    if (typeof Viewer !== 'undefined') {
+        const images = document.querySelectorAll('.next-article-content img');
+        if (images.length > 0) {
+            new Viewer(document.querySelector('.next-article-content'), {
+                toolbar: true,
+                navbar: false,
+                title: false
+            });
+        }
+    }
+
+    // 初始化 Mermaid 图表（如果有）
+    const mermaidBlocks = document.querySelectorAll('.next-article-content .mermaid');
+    if (mermaidBlocks.length > 0) {
+        import('https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs')
+            .then(({ default: mermaid }) => {
+                mermaid.initialize({ startOnLoad: true, theme: 'default' });
+                mermaid.run({ nodes: mermaidBlocks });
+            })
+            .catch(err => console.warn('Mermaid加载失败:', err));
+    }
+</script>
+{% endblock %}

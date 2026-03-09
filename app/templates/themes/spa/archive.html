@@ -22,28 +22,22 @@
 
 <div class="notes-stream">
     {% if archives %}
-        <div class="archive-stats" style="margin-bottom: 20px; color: var(--slate-500); font-size: 14px;">
+        <div class="archive-stats">
             共 {{ total_count }} 篇公开笔记
         </div>
 
         {% for year, months in archives.items() %}
         <div class="note-card">
-            <h2 class="archive-year-title" style="border-bottom: 2px solid var(--primary-light); padding-bottom: 10px; margin-bottom: 20px; color: var(--slate-800);">
-                {{ year }}
-            </h2>
+            <h2 class="archive-year-title">{{ year }}</h2>
             
             {% for month, notes in months.items() %}
-            <div class="archive-month-block" style="margin-bottom: 24px;">
-                <h3 class="archive-month-title" style="font-size: 16px; color: var(--primary); margin-bottom: 12px; font-weight: 600;">
-                    {{ month }} 月
-                </h3>
-                <ul class="archive-list" style="list-style: none; padding: 0; margin: 0;">
+            <div class="archive-month-block">
+                <h3 class="archive-month-title">{{ month }} 月</h3>
+                <ul class="archive-list">
                     {% for note in notes %}
-                    <li class="archive-item" style="display: flex; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--slate-100);">
-                        <span class="archive-date" style="font-family: monospace; color: var(--slate-400); margin-right: 16px; width: 50px; flex-shrink: 0;">
-                            {{ note.created_at.strftime('%m-%d') }}
-                        </span>
-                        <a href="{{ url_for('blog.post', note_id=note.id) }}" class="archive-link" style="color: var(--slate-700); transition: color 0.2s; font-size: 15px;">
+                    <li class="archive-item">
+                        <span class="archive-date">{{ note.created_at.strftime('%m-%d') }}</span>
+                        <a href="{{ url_for('blog.post', note_id=note.id) }}" class="archive-link">
                             {{ note.display_title or '无标题' }}
                         </a>
                     </li>

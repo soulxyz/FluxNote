@@ -23,6 +23,7 @@ from app.utils.response import api_response
 
 logger = logging.getLogger(__name__)
 
+
 update_bp = Blueprint('update', __name__)
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -435,22 +436,34 @@ def check_update():
 @update_bp.route('/api/update/apply', methods=['POST'])
 @login_required
 def apply_update():
-    """下载并应用更新"""
+    """下载并应用最新版本更新，下载地址由服务端从 GitHub API 获取"""
     data = request.json or {}
-    download_url = (data.get('download_url') or data.get('zip_url', '')).strip()
-    target_version = data.get('version', '').strip()
-    expected_md5 = (data.get('md5') or '').strip().lower()
-    client_use_mirror = data.get('use_mirror', None)  # 前端可覆盖
-
-    if not download_url:
-        return api_response(code=400, message='缺少下载地址')
+    client_use_mirror = data.get('use_mirror', None)  # 前端可覆盖镜像开关
 
     repo = _github_repo()
     if not repo:
         return api_response(code=400, message='未配置 GitHub 仓库')
 
+    # 从 GitHub API 获取最新 release，下载地址完全由服务端决定
+    token = Config.get('github_token', '').strip() or None
+    resp = _github_api(f'/repos/{repo}/releases/latest', token)
+    if resp.status_code == 404:
+        return api_response(code=404, message='未找到任何 Release')
+    if resp.status_code == 403:
+        return api_response(code=403, message='GitHub API 速率限制，请稍后再试或配置 Token')
+    if resp.status_code != 200:
+        return api_response(code=502, message=f'获取 Release 信息失败 (HTTP {resp.status_code})')
+
+    release = resp.json()
+    target_version = release.get('tag_name', '')
+    download_url = _get_download_url(release, repo)
+    expected_md5, _ = _extract_md5(release)
+    expected_md5 = (expected_md5 or '').lower()
+
+    if not download_url:
+        return api_response(code=500, message='无法从 Release 获取下载地址')
+
     use_mirror, mirrors, timeout = _get_mirror_config()
-    # 允许前端在本次请求中覆盖镜像开关
     if client_use_mirror is not None:
         use_mirror = bool(client_use_mirror)
 
@@ -589,45 +602,6 @@ def get_update_status():
         return api_response(data=data)
     except Exception:
         return api_response(data={'has_update': False, 'checked_at': None})
-
-
-@update_bp.route('/api/update/releases', methods=['GET'])
-@login_required
-def list_releases():
-    """获取所有 Release 列表，用于查看历史版本"""
-    repo = _github_repo()
-    if not repo:
-        return api_response(code=400, message='请先配置 GitHub 仓库地址')
-
-    token = Config.get('github_token', '').strip() or None
-    resp = _github_api(f'/repos/{repo}/releases?per_page=10', token)
-
-    if resp.status_code != 200:
-        return api_response(code=502, message=f'GitHub API 错误 (HTTP {resp.status_code})')
-
-    releases = resp.json()
-    local_ver = _parse_version(get_app_version())
-
-    result = []
-    for r in releases:
-        tag = r.get('tag_name', '')
-        ver = _parse_version(tag)
-        download_url = _get_download_url(r, repo)
-        md5_hash, _ = _extract_md5(r)
-        result.append({
-            'tag': tag,
-            'name': r.get('name', tag),
-            'changelog': r.get('body', ''),
-            'published_at': r.get('published_at', ''),
-            'download_url': download_url,
-            'zip_url': download_url,  # 向后兼容
-            'html_url': r.get('html_url', ''),
-            'md5': md5_hash,
-            'is_current': (ver == local_ver) if ver and local_ver else False,
-            'is_newer': (ver > local_ver) if ver and local_ver else False,
-        })
-
-    return api_response(data=result)
 
 
 # ───── 后台自动检查 ─────

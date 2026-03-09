@@ -60,7 +60,11 @@
                             // marked v12 调用方式: link(href, title, text)
                             // 兼容新版对象参数: link({ href, title, tokens })
                             if (href && typeof href === 'object') {
-                                text = href.tokens ? (typeof this.parser !== 'undefined' && this.parser ? this.parser.parseInline(href.tokens) : '') : '';
+                                try {
+                                    text = href.tokens ? (typeof this.parser !== 'undefined' && this.parser ? this.parser.parseInline(href.tokens) : '') : '';
+                                } catch(e) {
+                                    text = '';
+                                }
                                 if (!text && href.tokens) text = href.tokens.map(function(t){ return t.raw || t.text || ''; }).join('');
                                 title = href.title;
                                 href = href.href;

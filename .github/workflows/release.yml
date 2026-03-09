@@ -91,6 +91,14 @@ jobs:
           echo "Archives created:"
           ls -lh /tmp/${ARCHIVE_NAME}.*
 
+          # 计算 ZIP 包的 MD5 并追加到 release body
+          ZIP_MD5=$(md5sum /tmp/${ARCHIVE_NAME}.zip | awk '{ print $1 }')
+          echo "ZIP MD5: ${ZIP_MD5}"
+          
+          echo "" >> /tmp/changelog.md
+          echo "### 校验信息" >> /tmp/changelog.md
+          echo "\`MD5: ${ZIP_MD5}\`" >> /tmp/changelog.md
+
       - name: Create tag
         if: steps.tag_check.outputs.exists == 'false'
         run: |

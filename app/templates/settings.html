@@ -2980,7 +2980,6 @@
             if (!_pendingUpdate) return;
 
             const useMirror = document.getElementById('useMirrorToggle').checked;
-            const md5Info = _pendingUpdate.md5 ? `<br><span style="font-size:12px;color:#888;">MD5 将自动校验: ${_pendingUpdate.md5}</span>` : '';
             const mirrorInfo = useMirror
                 ? `<br><span style="font-size:12px;color:#888;">将通过镜像源加速下载，失败自动回退直连</span>`
                 : `<br><span style="font-size:12px;color:#888;">将直连 GitHub 下载</span>`;
@@ -2988,7 +2987,7 @@
             if (!await showConfirm('确认更新',
                 `确定要更新到 <strong>${_pendingUpdate.remote_version}</strong> 吗？<br>` +
                 `<span style="font-size:13px;color:#666;">更新前会自动备份数据库。更新完成后服务将自动重启。</span>` +
-                mirrorInfo + md5Info
+                mirrorInfo
             )) return;
 
             const applyBtn = document.getElementById('applyUpdateBtn');
@@ -3006,12 +3005,7 @@
                 const response = await fetch('/api/update/apply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        download_url: _pendingUpdate.download_url || _pendingUpdate.zip_url,
-                        version: _pendingUpdate.remote_version,
-                        md5: _pendingUpdate.md5 || '',
-                        use_mirror: useMirror,
-                    })
+                    body: JSON.stringify({ use_mirror: useMirror })
                 });
 
                 progressBar.style.width = '80%';

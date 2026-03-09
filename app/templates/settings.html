@@ -7,6 +7,8 @@
     <link rel="stylesheet" href={{ static_v("css/style.css") }}>
     <link rel="stylesheet" href={{ static_v("css/tutorial.css") }}>
     <link rel="stylesheet" href={{ static_v("lib/fontawesome/css/all.min.css") }}>
+    <script src={{ static_v("lib/marked/marked.min.js") }}></script>
+    <script src={{ static_v("lib/dompurify/purify.min.js") }}></script>
     <style>
         /* ====================================================
            iframe 模式：浅色左栏 + 白色内容区（与主站风格统一）
@@ -331,6 +333,862 @@
         body.in-iframe .settings-nav-menu .nav-item.active i { color: #34D399 !important; }
         body.in-iframe .settings-nav-menu .nav-item i { color: inherit !important; }
         */
+
+        /* ====================================================
+           toggle-switch / toggle-slider（镜像/自动检查开关）
+           ==================================================== */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: #CBD5E1;
+            border-radius: 22px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 3px;
+            top: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-switch input:checked + .toggle-slider { background: #10B981; }
+        .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+        /* ====================================================
+           系统更新区域重构 (优化版)
+           ==================================================== */
+        .update-hero-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .update-hero-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .update-hero-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+        .update-hero-text h3 {
+            margin: 0 0 4px 0;
+            font-size: 13px;
+            color: var(--slate-500);
+            font-weight: 600;
+        }
+        .version-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .version-badge .v-text {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--slate-800);
+            line-height: 1;
+        }
+        .version-badge .v-status {
+            background: #dcfce7;
+            color: #16a34a;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .last-check {
+            font-size: 12px;
+            color: var(--slate-400);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .update-hero-actions {
+            display: flex;
+            gap: 12px;
+            margin-left: auto;
+        }
+        
+        .settings-group {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .settings-group-header {
+            background: #f8fafc;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .settings-group-header h4 {
+            margin: 0 0 4px 0;
+            font-size: 15px;
+            color: var(--slate-800);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+        }
+        .settings-group-header p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--slate-500);
+        }
+        .settings-group-content {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .settings-group-content .form-row {
+            margin-bottom: 0;
+        }
+        .settings-group-content .form-row label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--slate-700);
+        }
+        .settings-group-content .form-row input {
+            width: 100%;
+        }
+        .settings-group-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-end;
+            padding-top: 16px;
+            border-top: 1px dashed #e2e8f0;
+            margin-top: 4px;
+        }
+
+        .settings-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .settings-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+            overflow: hidden;
+        }
+        .settings-card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+        }
+        .settings-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--slate-800);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .settings-card-body {
+            padding: 20px;
+            flex: 1;
+        }
+        .settings-card-desc {
+            font-size: 13px;
+            color: var(--slate-500);
+            margin: 0 0 16px 0;
+            line-height: 1.5;
+        }
+        .mirror-settings-area {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+        }
+        .mirror-list-header {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--slate-500);
+            margin-bottom: 12px;
+        }
+        .mirror-add-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .mirror-add-row input {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 12px;
+            font-size: 13px;
+        }
+        .mirror-timeout-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px dashed #cbd5e1;
+            font-size: 13px;
+            color: var(--slate-600);
+        }
+        .mirror-timeout-row input {
+            width: 80px;
+            padding: 6px 10px;
+            text-align: center;
+        }
+        .auto-check-settings {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .auto-check-settings label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--slate-700);
+            margin: 0;
+        }
+        .auto-check-settings select {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            font-size: 13px;
+            color: var(--slate-700);
+            min-width: 120px;
+        }
+        .settings-bottom-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 12px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .update-status-head,
+        .update-status-actions,
+        .mirror-item-main,
+        .mirror-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .update-status-region {
+            display: grid;
+            gap: 12px;
+            margin: 18px 0 24px;
+        }
+        .update-banner,
+        .update-status-card,
+        .update-progress-card {
+            border-radius: 12px;
+            padding: 16px 18px;
+        }
+        .update-banner {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(90deg, #fffbeb, #fef3c7);
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+        .update-status-card {
+            display: none;
+            border: 1px solid #bbf7d0;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+        }
+        .update-status-card.is-latest {
+            border-color: var(--slate-200);
+            background: var(--slate-50);
+            text-align: left;
+        }
+        .update-status-card.is-latest .update-status-head {
+            justify-content: center;
+        }
+        .update-status-card.is-latest .update-status-body {
+            text-align: center;
+        }
+        .update-status-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--slate-800);
+        }
+        .update-status-meta {
+            font-size: 12px;
+            color: var(--slate-400);
+        }
+        .update-status-body {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--slate-600);
+            line-height: 1.7;
+        }
+        .update-status-body.markdown-body {
+            font-size: 13px;
+            color: var(--slate-600);
+        }
+        .update-status-body.markdown-body p {
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .update-status-body.markdown-body p:last-child {
+            margin-bottom: 0;
+        }
+        .update-status-body.markdown-body ul, 
+        .update-status-body.markdown-body ol {
+            margin-top: 0;
+            margin-bottom: 8px;
+            padding-left: 20px;
+        }
+        .update-status-body.markdown-body li {
+            margin-bottom: 4px;
+        }
+        .update-status-body.markdown-body h1,
+        .update-status-body.markdown-body h2,
+        .update-status-body.markdown-body h3,
+        .update-status-body.markdown-body h4 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--slate-800);
+        }
+        .update-status-body.markdown-body h1 { font-size: 16px; }
+        .update-status-body.markdown-body h2 { font-size: 15px; }
+        .update-status-body.markdown-body h3 { font-size: 14px; }
+        .update-status-body.markdown-body code {
+            background: rgba(15, 23, 42, 0.06);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 12px;
+        }
+        .update-status-body.markdown-body pre {
+            background: rgba(15, 23, 42, 0.04);
+            padding: 10px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-top: 0;
+            margin-bottom: 8px;
+        }
+        .update-status-body.markdown-body pre code {
+            background: transparent;
+            padding: 0;
+        }
+        .update-status-body.markdown-body a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .update-status-body.markdown-body a:hover {
+            text-decoration: underline;
+        }
+        .update-status-actions {
+            margin-top: 14px;
+        }
+        .update-md5 {
+            display: none;
+            margin-top: 12px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.04);
+            color: var(--slate-500);
+            font-size: 12px;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            word-break: break-all;
+        }
+        .update-progress-card {
+            display: none;
+            border: 1px solid #bfdbfe;
+            background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+        }
+        .update-progress-track {
+            margin-top: 12px;
+            background: var(--slate-200);
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .update-progress-fill {
+            background: linear-gradient(90deg, #10B981, #3B82F6);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            border-radius: 999px;
+        }
+        .mirror-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .mirror-empty {
+            padding: 12px 14px;
+            border: 1px dashed var(--slate-300);
+            border-radius: 10px;
+            font-size: 12px;
+            color: var(--slate-400);
+            background: rgba(255,255,255,0.6);
+        }
+        .mirror-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--slate-200);
+            border-radius: 10px;
+            background: #fff;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .mirror-item-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .mirror-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .mirror-item.drag-over {
+            border-color: #10B981;
+            box-shadow: 0 0 0 3px rgba(16,185,129,0.08);
+        }
+        .mirror-item.dragging {
+            opacity: 0.65;
+            transform: scale(0.99);
+        }
+        .mirror-order-badge {
+            flex-shrink: 0;
+            min-width: 30px;
+            height: 24px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: var(--slate-100);
+            color: var(--slate-500);
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mirror-handle {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 8px;
+            background: var(--slate-100);
+            color: var(--slate-400);
+            cursor: grab;
+        }
+        .mirror-url {
+            min-width: 0;
+            font-size: 12px;
+            color: var(--slate-700);
+            line-height: 1.5;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            word-break: break-all;
+        }
+        .icon-btn {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--slate-200);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--slate-500);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        .icon-btn:hover:not(:disabled) {
+            border-color: var(--slate-300);
+            color: var(--slate-800);
+            background: var(--slate-50);
+        }
+        .icon-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .icon-btn.danger:hover:not(:disabled) {
+            border-color: #fecaca;
+            color: #dc2626;
+            background: #fef2f2;
+        }
+        .update-config-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        /* ====================================================
+           移动端响应式（settings.html 页面专用）
+           ==================================================== */
+
+        /* ── 标准模式移动端补充 ── */
+        @media (max-width: 900px) {
+            .update-status-actions {
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 12px;
+            }
+            .update-status-actions .btn {
+                width: auto;
+                flex: none;
+            }
+            
+            .mirror-item {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .mirror-item-main {
+                width: 100%;
+            }
+            .mirror-item-actions {
+                width: 100%;
+                justify-content: flex-end;
+                padding-top: 8px;
+                border-top: 1px dashed var(--slate-200);
+            }
+            /* 评论筛选按钮均分一行 */
+            #filter-all, #filter-pending, #filter-approved, #filter-spam {
+                flex: 1;
+                text-align: center;
+                padding-left: 4px;
+                padding-right: 4px;
+            }
+            /* 批量操作按钮紧凑 */
+            #btn-batch-approve, #btn-batch-spam, #btn-batch-delete {
+                font-size: 12px;
+                padding: 5px 8px;
+            }
+            /* 更新日志字体 */
+            #updateLogsText {
+                padding: 10px 12px;
+                font-size: 11px;
+            }
+            /* MD5 长字符串换行 */
+            #updateMd5Info {
+                word-break: break-all;
+                font-size: 11px;
+            }
+            .update-action-row,
+            .update-inline-row,
+            .mirror-add-row,
+            .update-config-actions {
+                width: 100%;
+            }
+            .update-action-row .btn,
+            .update-config-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            /* 新版系统更新区域移动端适配 */
+            .settings-group-content {
+                grid-template-columns: 1fr;
+            }
+            .settings-cards-grid {
+                grid-template-columns: 1fr;
+            }
+            .mirror-timeout-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .auto-check-settings {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .auto-check-settings select {
+                width: 100%;
+            }
+            .settings-bottom-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .settings-bottom-actions .btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .mirror-add-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .mirror-add-row input {
+                width: 100% !important;
+            }
+            .update-inline-row {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .update-inline-row input {
+                flex: 1;
+            }
+            .update-inline-row span {
+                width: 100%;
+                margin-left: 0 !important;
+            }
+        }
+
+        /* ── iframe 弹窗模式：移动端响应 ── */
+        /* 与 style.css 的 900px 断点保持一致，避免 700-900px 区间仍显示桌面侧栏 */
+        @media (max-width: 900px) {
+            /* 容器变纵向，铺满 iframe 高度 */
+            /* style.css @media 900px 会把 .app-container 改成 display:block，
+               必须在这里强制改回 flex，否则 flex-direction 无意义 */
+            body.in-iframe .app-layout { padding: 0; }
+            body.in-iframe .app-container {
+                display: flex !important;
+                flex-direction: column !important;
+                height: 100vh;
+                max-width: none;
+            }
+
+            /* 侧栏变顶部横向 tab 栏 —— 统一头部 */
+            body.in-iframe .settings-sidebar {
+                display: flex !important;
+                flex-direction: column !important;
+                transform: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                position: sticky !important;
+                top: 0 !important;
+                left: 0 !important;
+                border-right: none !important;
+                border-bottom: none !important;
+                padding: 0 !important;
+                flex-shrink: 0;
+                overflow: visible;
+                background: #fff !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+                z-index: 12;
+            }
+
+            /* 标题行：与父页面关闭按钮同行对齐 */
+            body.in-iframe .settings-nav-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 14px 50px 6px 16px;
+                margin-bottom: 0;
+                border-bottom: none;
+            }
+            body.in-iframe .settings-nav-title {
+                display: block;
+                font-size: 15px;
+                font-weight: 700;
+                color: #1E293B;
+                background: none;
+                -webkit-text-fill-color: unset;
+                letter-spacing: -0.2px;
+            }
+
+            /* 标签栏外层容器 —— 渐隐遮罩 */
+            body.in-iframe .settings-nav-scroll-wrap {
+                position: relative;
+                overflow: hidden;
+            }
+            body.in-iframe .settings-nav-scroll-wrap::after {
+                content: '';
+                position: absolute;
+                top: 0; bottom: 0; right: 0;
+                width: 32px;
+                background: linear-gradient(to right, transparent, #fff);
+                pointer-events: none;
+                z-index: 2;
+                transition: opacity 0.2s;
+            }
+            body.in-iframe .settings-nav-scroll-wrap.scrolled-end::after {
+                opacity: 0;
+            }
+
+            /* 标签栏 */
+            body.in-iframe .settings-nav-menu {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding: 0 16px 6px !important;
+                gap: 6px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(0,0,0,0.12) transparent;
+                scroll-snap-type: x proximity;
+            }
+            body.in-iframe .settings-nav-menu::-webkit-scrollbar {
+                height: 3px;
+            }
+            body.in-iframe .settings-nav-menu::-webkit-scrollbar-track {
+                background: transparent;
+                margin: 0 16px;
+            }
+            body.in-iframe .settings-nav-menu::-webkit-scrollbar-thumb {
+                background: rgba(0,0,0,0.1);
+                border-radius: 3px;
+            }
+            body.in-iframe .settings-nav-menu::-webkit-scrollbar-thumb:hover {
+                background: rgba(0,0,0,0.18);
+            }
+            body.in-iframe .settings-nav-menu .nav-group-label { display: none !important; }
+            body.in-iframe .settings-nav-menu li { flex-shrink: 0; }
+            body.in-iframe .settings-nav-menu .nav-item {
+                width: auto !important;
+                padding: 7px 14px !important;
+                border-radius: 20px !important;
+                white-space: nowrap;
+                font-size: 12.5px !important;
+                font-weight: 500 !important;
+                margin: 0 !important;
+                scroll-snap-align: start;
+                background: #F1F5F9 !important;
+                color: #64748B !important;
+                border: none !important;
+                transition: all 0.2s ease !important;
+            }
+            body.in-iframe .settings-nav-menu .nav-item.active {
+                background: #ECFDF5 !important;
+                color: #059669 !important;
+                font-weight: 600 !important;
+            }
+            body.in-iframe .settings-nav-menu .nav-item.active i {
+                color: #059669 !important;
+            }
+            /* 激活项左侧条隐藏 */
+            body.in-iframe .settings-nav-menu .nav-item.active::before { display: none !important; }
+
+            /* 内容区：flex:1 撑满剩余高度，内部可滚动 */
+            body.in-iframe .settings-main {
+                flex: 1 !important;
+                min-height: 0 !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                padding: 16px 12px 24px !important;
+                flex-direction: column !important;
+            }
+            body.in-iframe .settings-section {
+                padding: 16px 14px !important;
+            }
+            body.in-iframe .settings-divider { margin: 14px 0 !important; }
+
+            /* 列表项垂直排列 */
+            body.in-iframe .provider-item {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+            }
+            body.in-iframe .provider-actions { width: 100% !important; }
+
+            /* 模态框全宽 */
+            body.in-iframe .modal-content {
+                width: calc(100vw - 24px) !important;
+                margin: 12px auto !important;
+                padding: 18px 14px !important;
+                max-height: 85vh;
+                overflow-y: auto;
+            }
+            body.in-iframe .modal-footer { flex-wrap: wrap; }
+            body.in-iframe .modal-footer .btn { flex: 1; min-width: 80px; justify-content: center; }
+            body.in-iframe .update-status-head,
+            body.in-iframe .update-inline-row,
+            body.in-iframe .mirror-add-row {
+                align-items: flex-start;
+            }
+
+            /* 评论统计 2×2 */
+            body.in-iframe .comment-stats {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px !important;
+            }
+
+            /* 评论筛选 */
+            body.in-iframe #filter-all,
+            body.in-iframe #filter-pending,
+            body.in-iframe #filter-approved,
+            body.in-iframe #filter-spam {
+                flex: 1;
+                text-align: center;
+                padding-left: 4px;
+                padding-right: 4px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body.in-iframe .settings-section { padding: 14px 10px !important; }
+            body.in-iframe .settings-main { padding: 12px 10px 20px !important; }
+            body.in-iframe .settings-nav-menu .nav-item {
+                font-size: 12px !important;
+                padding: 5px 12px !important;
+            }
+            body.in-iframe .update-banner,
+            body.in-iframe .update-status-card,
+            body.in-iframe .update-progress-card,
+            body.in-iframe .update-hero-card,
+            body.in-iframe .settings-group-content,
+            body.in-iframe .settings-card-body {
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body><script>if(window.self!==window.top)document.body.classList.add('in-iframe');</script>
@@ -347,6 +1205,7 @@
             </div>
 
             <!-- 导航菜单 -->
+            <div class="settings-nav-scroll-wrap">
             <ul class="settings-nav-menu">
                 <li class="nav-group-label">站点</li>
                 <li>
@@ -415,6 +1274,7 @@
                     </button>
                 </li>
             </ul>
+            </div>
         </aside>
 
         <!-- ========== 主内容区 ========== -->
@@ -773,83 +1633,167 @@
                 <div class="settings-section">
                     <div class="section-title"><i class="fas fa-cloud-download-alt"></i> 系统更新</div>
 
-                    <div class="form-row">
-                        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-                            <div style="display:flex; align-items:center; gap:8px; background:var(--slate-50); padding:6px 14px; border-radius:8px; border:1px solid var(--slate-200);">
-                                <i class="fas fa-code-branch" style="color:var(--primary); font-size:13px;"></i>
-                                <span style="font-size:13px; color:var(--slate-500);">当前版本</span>
-                                <span style="font-weight:700; color:var(--slate-800); font-size:14px;" id="currentVersion">{{ app_semver }}</span>
+                    <div class="update-hero-card">
+                        <div class="update-hero-info">
+                            <div class="update-hero-icon">
+                                <i class="fas fa-rocket"></i>
                             </div>
-                            <div id="updateBadge" style="display:none;">
-                                <span style="background:#dcfce7; color:#16a34a; font-size:12px; font-weight:600; padding:3px 10px; border-radius:12px;">
-                                    <i class="fas fa-arrow-up" style="font-size:10px;"></i> 有新版本
-                                </span>
-                            </div>
-                            <div id="autoCheckedAt" style="display:none; font-size:11px; color:var(--slate-400);">
-                                <i class="fas fa-clock" style="font-size:10px;"></i> <span id="autoCheckedAtText"></span>
+                            <div class="update-hero-text">
+                                <h3>当前版本</h3>
+                                <div class="version-badge">
+                                    <span class="v-text" id="currentVersion">{{ app_semver }}</span>
+                                    <span class="v-status" id="updateBadge" style="display:none;"><i class="fas fa-arrow-up" style="font-size:10px;"></i> 有新版本</span>
+                                </div>
+                                <div class="last-check" id="autoCheckedAt" style="display:none;">
+                                    <i class="fas fa-clock"></i> 上次检查: <span id="autoCheckedAtText"></span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- 后台自动检测到有新版本时的提示条 -->
-                    <div id="autoBgUpdateBanner" style="display:none; margin-bottom:16px; background:linear-gradient(90deg,#fffbeb,#fef3c7); border:1px solid #fde68a; border-radius:8px; padding:10px 16px; display:none; align-items:center; gap:10px;">
-                        <i class="fas fa-bell" style="color:#d97706; font-size:15px;"></i>
-                        <span style="font-size:13px; color:#92400e; flex:1;">后台检测到新版本 <strong id="autoBgRemoteVersion"></strong>，点击"检查更新"查看详情。</span>
-                    </div>
-
-                    <div class="form-row">
-                        <label>GitHub 仓库 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
-                        <input type="text" id="githubRepo" placeholder="例如: username/my-blog" value="soulxyz/FlexNote">
-                        <p class="help-text">填入你在 GitHub 上的仓库地址，系统将通过 GitHub Releases 检查更新。</p>
-                    </div>
-                    <div class="form-row">
-                        <label>GitHub Token <span style="color:#999; font-weight:normal;">(可选，私有仓库需要)</span></label>
-                        <input type="password" id="githubToken" placeholder="ghp_xxxx...">
-                        <p class="help-text">如果是私有仓库，需要填入具有 repo 权限的 Personal Access Token。公开仓库可留空。</p>
-                    </div>
-                    <div class="form-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <button class="btn btn-primary" onclick="saveUpdateConfig()">
-                            <i class="fas fa-save"></i> 保存配置
-                        </button>
-                        <button class="btn btn-secondary" id="checkUpdateBtn" onclick="checkForUpdate()">
-                            <i class="fas fa-sync-alt"></i> 检查更新
-                        </button>
-                    </div>
-
-                    <!-- 更新信息卡片 -->
-                    <div id="updateInfo" style="display:none; margin-top:20px; background:linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border:1px solid #bbf7d0; border-radius:10px; padding:18px 20px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
-                            <i class="fas fa-gift" style="color:#16a34a; font-size:18px;"></i>
-                            <span style="font-weight:700; font-size:16px; color:var(--slate-800);" id="updateReleaseName"></span>
-                            <span style="font-size:12px; color:var(--slate-400);" id="updatePublishedAt"></span>
-                        </div>
-                        <div id="updateChangelog" style="font-size:13px; color:var(--slate-600); line-height:1.7; max-height:200px; overflow-y:auto; margin-bottom:14px; white-space:pre-wrap;"></div>
-                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                            <button class="btn btn-primary" id="applyUpdateBtn" onclick="applyUpdate()">
-                                <i class="fas fa-download"></i> 下载并安装更新
+                        <div class="update-hero-actions">
+                            <button class="btn btn-secondary" id="checkUpdateBtn" onclick="checkForUpdate()">
+                                <i class="fas fa-sync-alt" style="color: var(--primary);"></i> 检查更新
                             </button>
-                            <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
-                                <i class="fab fa-github"></i> 在 GitHub 查看
-                            </a>
                         </div>
                     </div>
 
-                    <!-- 无更新提示 -->
-                    <div id="noUpdateInfo" style="display:none; margin-top:20px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px; padding:16px 20px; text-align:center;">
-                        <i class="fas fa-check-circle" style="color:#16a34a; font-size:24px; margin-bottom:8px;"></i>
-                        <div style="font-weight:600; color:var(--slate-700);">当前已是最新版本</div>
-                        <div style="font-size:13px; color:var(--slate-400); margin-top:4px;" id="noUpdateVersionText"></div>
+                    <div id="updateStatusRegion" class="update-status-region">
+                        <div id="autoBgUpdateBanner" class="update-banner">
+                            <i class="fas fa-bell" style="color:#d97706; font-size:15px;"></i>
+                            <span style="font-size:13px; flex:1;">后台检测到新版本 <strong id="autoBgRemoteVersion"></strong>，详情已显示在下方。</span>
+                        </div>
+
+                        <div id="updateInfo" class="update-status-card">
+                            <div class="update-status-head">
+                                <i class="fas fa-gift" style="color:#16a34a; font-size:18px;"></i>
+                                <span class="update-status-title" id="updateReleaseName"></span>
+                                <span class="update-status-meta" id="updatePublishedAt"></span>
+                            </div>
+                            <div class="update-status-body" id="updateChangelog"></div>
+                            <div id="updateMd5Info" class="update-md5">
+                                <i class="fas fa-shield-alt" style="margin-right:4px; color:#16a34a;"></i>
+                                <span id="updateMd5Text"></span>
+                            </div>
+                            <div class="update-status-actions">
+                                <button class="btn btn-secondary" id="applyUpdateBtn" onclick="applyUpdate()">
+                                    <i class="fas fa-download" style="color: var(--primary);"></i> 下载并安装更新
+                                </button>
+                                <a id="updateHtmlUrl" href="#" target="_blank" style="font-size:13px; color:var(--primary); text-decoration:none;">
+                                    <i class="fab fa-github"></i> 在 GitHub 查看
+                                </a>
+                            </div>
+                        </div>
+
+                        <div id="noUpdateInfo" class="update-status-card is-latest">
+                            <div class="update-status-head">
+                                <i class="fas fa-check-circle" style="color:#16a34a; font-size:22px;"></i>
+                            </div>
+                            <div class="update-status-body">
+                                <div style="font-weight:600; color:var(--slate-700);">当前已是最新版本</div>
+                                <div style="font-size:13px; color:var(--slate-400); margin-top:4px;" id="noUpdateVersionText"></div>
+                            </div>
+                        </div>
+
+                        <div id="updateProgress" class="update-progress-card">
+                            <div class="update-status-head">
+                                <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
+                                <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
+                            </div>
+                            <div class="update-progress-track">
+                                <div id="updateProgressBar" class="update-progress-fill"></div>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- 更新进度 -->
-                    <div id="updateProgress" style="display:none; margin-top:20px;">
-                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                            <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
-                            <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
+                    <!-- 仓库配置 -->
+                    <div class="settings-group">
+                        <div class="settings-group-header">
+                            <h4><i class="fab fa-github"></i> GitHub 仓库配置</h4>
+                            <p>配置用于获取更新的 GitHub Releases 仓库</p>
                         </div>
-                        <div style="background:var(--slate-200); border-radius:6px; height:6px; overflow:hidden;">
-                            <div id="updateProgressBar" style="background:var(--primary); height:100%; width:0%; transition:width 0.5s ease; border-radius:6px;"></div>
+                        <div class="settings-group-content">
+                            <div class="form-row">
+                                <label>仓库地址 <span style="color:#999; font-weight:normal;">(owner/repo)</span></label>
+                                <input type="text" id="githubRepo" placeholder="例如: username/FluxNote" value="soulxyz/FluxNote">
+                            </div>
+                            <div class="form-row">
+                                <label>Access Token <span style="color:#999; font-weight:normal;">(可选，私有仓库需填)</span></label>
+                                <input type="password" id="githubToken" placeholder="ghp_xxxx...">
+                            </div>
+                            <div class="settings-group-actions">
+                                <button class="btn btn-secondary" onclick="saveUpdateConfig()">
+                                    <i class="fas fa-save"></i> 保存仓库配置
+                                </button>
+                            </div>
                         </div>
+                    </div>
+
+                    <!-- 高级设置网格 -->
+                    <div class="settings-cards-grid">
+                        <!-- 下载加速 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i class="fas fa-bolt" style="color: #eab308;"></i> 下载加速设置
+                                </div>
+                                <label class="toggle-switch" style="margin:0;">
+                                    <input type="checkbox" id="useMirrorToggle" checked onchange="onMirrorToggleChange()">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-card-body">
+                                <p class="settings-card-desc">使用 GitHub 镜像源加速下载，推荐开启，镜像失败后会自动回退到 GitHub 直连。</p>
+                                
+                                <div id="mirrorSettingsContent" class="mirror-settings-area">
+                                    <div class="mirror-list-header">镜像源列表 (支持拖拽排序)</div>
+                                    <div id="mirrorList" class="mirror-list"></div>
+                                    <div class="mirror-add-row">
+                                        <input type="text" id="newMirrorInput" placeholder="https://gh-proxy.com/" onkeydown="if(event.key==='Enter'){event.preventDefault();addMirrorUrl();}">
+                                        <button class="btn btn-secondary" onclick="addMirrorUrl()" style="font-size:12px; padding:6px 12px; white-space:nowrap;">
+                                            <i class="fas fa-plus"></i> 添加
+                                        </button>
+                                    </div>
+                                    <div class="mirror-timeout-row">
+                                        <span>下载超时(秒)</span>
+                                        <input type="number" id="downloadTimeout" min="10" max="600" value="120">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 自动检查 -->
+                        <div class="settings-card">
+                            <div class="settings-card-header">
+                                <div class="settings-card-title">
+                                    <i class="fas fa-clock" style="color: #3b82f6;"></i> 自动检查更新
+                                </div>
+                                <label class="toggle-switch" style="margin:0;">
+                                    <input type="checkbox" id="autoCheckToggle" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="settings-card-body">
+                                <p class="settings-card-desc">后台会按设定间隔检查最新版本，并在这里直接显示结果。修改后重启应用生效。</p>
+                                <div class="auto-check-settings">
+                                    <label>检查间隔</label>
+                                    <select id="autoCheckInterval">
+                                        <option value="1">每小时</option>
+                                        <option value="3">每 3 小时</option>
+                                        <option value="6" selected>每 6 小时</option>
+                                        <option value="12">每 12 小时</option>
+                                        <option value="24">每天</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-bottom-actions">
+                        <button class="btn btn-secondary" onclick="saveMirrorConfig()">
+                            <i class="fas fa-save"></i> 保存加速与自动检查配置
+                        </button>
+                        <button class="btn btn-ghost" onclick="resetMirrorsToDefault()" style="font-size:13px; color:var(--slate-500);">
+                            <i class="fas fa-undo"></i> 恢复默认镜像
+                        </button>
                     </div>
 
                     <!-- 更新日志 -->
@@ -942,6 +1886,36 @@
         // ========== 导航面板切换 ==========
         const _panelLoadState = {};
 
+        function syncActiveNavIntoView() {
+            if (!window.matchMedia('(max-width: 900px)').matches) return;
+            const activeNavItem = document.querySelector('.settings-nav-menu .nav-item.active');
+            if (activeNavItem) {
+                activeNavItem.scrollIntoView({
+                    behavior: 'smooth',
+                    inline: 'center',
+                    block: 'nearest'
+                });
+            }
+            updateNavScrollFade();
+        }
+
+        function updateNavScrollFade() {
+            const wrap = document.querySelector('.settings-nav-scroll-wrap');
+            const menu = document.querySelector('.settings-nav-menu');
+            if (!wrap || !menu) return;
+            const atEnd = menu.scrollLeft + menu.clientWidth >= menu.scrollWidth - 4;
+            wrap.classList.toggle('scrolled-end', atEnd);
+        }
+
+        (function() {
+            const menu = document.querySelector('.settings-nav-menu');
+            if (menu) {
+                menu.addEventListener('scroll', updateNavScrollFade, { passive: true });
+                window.addEventListener('resize', updateNavScrollFade);
+                setTimeout(updateNavScrollFade, 100);
+            }
+        })();
+
         function switchPanel(panelId) {
             document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
@@ -953,6 +1927,7 @@
             if (navItem) navItem.classList.add('active');
 
             history.replaceState(null, null, '#' + panelId.replace('panel-', ''));
+            syncActiveNavIntoView();
 
             if (!_panelLoadState[panelId]) {
                 _panelLoadState[panelId] = true;
@@ -961,7 +1936,12 @@
                 }
             }
 
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const mainContainer = document.querySelector('.settings-main');
+            if (mainContainer) {
+                mainContainer.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
 
         function initNavigation() {
@@ -982,6 +1962,7 @@
             loadSTTConfig();
             loadUpdateConfig();
             loadUpdateStatus();
+            loadMirrorConfig();
         });
 
         // ========== AI 模型管理 ==========
@@ -1658,6 +2639,50 @@
 
         // ========== 系统更新 ==========
         let _pendingUpdate = null;
+        const _DEFAULT_MIRRORS = ['https://gh-proxy.com/', 'https://gh.llkk.cc/', 'https://ghproxy.net/'];
+        let _dragMirrorIndex = null;
+
+        function _escapeHtml(text) {
+            return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;',
+            }[ch]));
+        }
+
+        function _scrollUpdateStatusIntoView() {
+            const region = document.getElementById('updateStatusRegion');
+            if (!region) return;
+            region.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function _fillUpdateCard(data) {
+            document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
+            document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
+            
+            const changelogEl = document.getElementById('updateChangelog');
+            if (data.changelog && typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+                changelogEl.innerHTML = DOMPurify.sanitize(marked.parse(data.changelog));
+                changelogEl.classList.add('markdown-body');
+            } else {
+                changelogEl.textContent = data.changelog || '无更新说明';
+                changelogEl.classList.remove('markdown-body');
+            }
+            
+            document.getElementById('updateHtmlUrl').href = data.html_url || '#';
+            // MD5 信息
+            const md5El = document.getElementById('updateMd5Info');
+            const md5Text = document.getElementById('updateMd5Text');
+            if (data.md5) {
+                md5Text.textContent = `MD5: ${data.md5}`;
+                md5El.style.display = 'block';
+            } else {
+                md5El.style.display = 'none';
+            }
+            document.getElementById('updateInfo').style.display = 'block';
+        }
 
         async function loadUpdateStatus() {
             try {
@@ -1673,40 +2698,30 @@
 
                 if (data.checked_at) {
                     const d = new Date(data.checked_at);
-                    checkedAtText.textContent = `上次检查: ${d.toLocaleString('zh-CN')}`;
-                    checkedAtEl.style.display = 'flex';
+                    checkedAtText.textContent = d.toLocaleString('zh-CN');
+                    checkedAtEl.style.display = 'inline-flex';
                 }
 
                 if (data.has_update) {
-                    // 侧边栏徽标
-                    if (navBadge) {
-                        navBadge.textContent = 'NEW';
-                        navBadge.style.display = 'inline-block';
-                    }
-                    // 面板提示条
+                    if (navBadge) { navBadge.textContent = 'NEW'; navBadge.style.display = 'inline-block'; }
                     if (banner) {
                         document.getElementById('autoBgRemoteVersion').textContent = data.remote_version || '';
                         banner.style.display = 'flex';
                     }
-                    // 也预填 _pendingUpdate，让用户直接可以点击安装
                     _pendingUpdate = data;
                     document.getElementById('updateBadge').style.display = 'inline-block';
-                    document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
-                    document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
-                    document.getElementById('updateChangelog').textContent = data.changelog || '无更新说明';
-                    document.getElementById('updateHtmlUrl').href = data.html_url || '#';
-                    document.getElementById('updateInfo').style.display = 'block';
+                    _fillUpdateCard(data);
                 }
             } catch (e) {}
         }
 
         async function loadUpdateConfig() {
             try {
-                const response = await fetch('/api/update/current');
+                const response = await fetch(`/api/update/current?_=${Date.now()}`, { cache: 'no-store' });
                 const res = await response.json();
                 const data = res.data;
                 document.getElementById('currentVersion').textContent = data.version;
-                document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FlexNote';
+                document.getElementById('githubRepo').value = data.github_repo || 'soulxyz/FluxNote';
                 const settingsRes = await fetch('/api/settings');
                 const settings = await settingsRes.json();
                 if (settings.data?.github_token) {
@@ -1715,7 +2730,7 @@
             } catch (e) {}
         }
 
-        async function saveUpdateConfig() {
+        async function saveUpdateConfig({ silent = false } = {}) {
             const repo = document.getElementById('githubRepo').value.trim();
             const token = document.getElementById('githubToken').value.trim();
 
@@ -1727,23 +2742,186 @@
                 });
                 if (!resp.ok) {
                     const d = await resp.json();
-                    showToast(d.message || '保存失败', 'error');
-                    return;
+                    if (!silent) showToast(d.message || '保存失败', 'error');
+                    return false;
                 }
 
                 if (token && !token.includes('•')) {
-                    await fetch('/api/settings', {
+                    const tokenResp = await fetch('/api/settings', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ github_token: token })
                     });
+                    if (!tokenResp.ok) {
+                        if (!silent) showToast('Token 保存失败', 'error');
+                        return false;
+                    }
                 }
 
-                showToast('更新配置已保存', 'success');
+                if (!silent) showToast('更新配置已保存', 'success');
+                return true;
+            } catch (e) {
+                if (!silent) showToast('保存失败', 'error');
+                return false;
+            }
+        }
+
+        // ── 镜像源管理 ──
+
+        let _currentMirrors = [..._DEFAULT_MIRRORS];
+
+        function _renderMirrorList(mirrors) {
+            const list = document.getElementById('mirrorList');
+            list.innerHTML = '';
+            mirrors.forEach((url, idx) => {
+                const row = document.createElement('div');
+                row.className = 'mirror-item';
+                row.draggable = true;
+                row.dataset.index = idx;
+                row.addEventListener('dragstart', () => _handleMirrorDragStart(idx, row));
+                row.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    row.classList.add('drag-over');
+                });
+                row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+                row.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    _handleMirrorDrop(idx);
+                    row.classList.remove('drag-over');
+                });
+                row.addEventListener('dragend', () => {
+                    _dragMirrorIndex = null;
+                    document.querySelectorAll('.mirror-item').forEach(item => item.classList.remove('drag-over', 'dragging'));
+                });
+                row.innerHTML = `
+                    <div class="mirror-item-main">
+                        <button type="button" class="mirror-handle" title="拖拽排序">
+                            <i class="fas fa-grip-lines"></i>
+                        </button>
+                        <span class="mirror-order-badge">#${idx + 1}</span>
+                        <span class="mirror-url">${_escapeHtml(url)}</span>
+                    </div>
+                    <div class="mirror-item-actions">
+                        <button type="button" class="icon-btn" onclick="moveMirrorUrl(${idx}, -1)" title="上移" ${idx === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                        <button type="button" class="icon-btn" onclick="moveMirrorUrl(${idx}, 1)" title="下移" ${idx === mirrors.length - 1 ? 'disabled' : ''}>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <button type="button" class="icon-btn danger" onclick="removeMirrorUrl(${idx})" title="删除">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+                list.appendChild(row);
+            });
+            if (mirrors.length === 0) {
+                list.innerHTML = '<div class="mirror-empty">暂无镜像源，将使用 GitHub 直连。</div>';
+            }
+        }
+
+        function _handleMirrorDragStart(index, row) {
+            _dragMirrorIndex = index;
+            row.classList.add('dragging');
+        }
+
+        function _handleMirrorDrop(targetIndex) {
+            if (_dragMirrorIndex === null || _dragMirrorIndex === targetIndex) return;
+            const moved = _currentMirrors.splice(_dragMirrorIndex, 1)[0];
+            _currentMirrors.splice(targetIndex, 0, moved);
+            _renderMirrorList(_currentMirrors);
+        }
+
+        function onMirrorToggleChange() {
+            const enabled = document.getElementById('useMirrorToggle').checked;
+            document.getElementById('mirrorSettingsContent').style.opacity = enabled ? '1' : '0.45';
+            document.getElementById('mirrorSettingsContent').style.pointerEvents = enabled ? '' : 'none';
+        }
+
+        function addMirrorUrl() {
+            const input = document.getElementById('newMirrorInput');
+            const url = input.value.trim();
+            if (!url) return;
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                showToast('镜像 URL 必须以 http:// 或 https:// 开头', 'error');
+                return;
+            }
+            if (_currentMirrors.includes(url)) {
+                showToast('该镜像源已存在', 'error');
+                return;
+            }
+            _currentMirrors.push(url);
+            _renderMirrorList(_currentMirrors);
+            input.value = '';
+        }
+
+        function removeMirrorUrl(idx) {
+            _currentMirrors.splice(idx, 1);
+            _renderMirrorList(_currentMirrors);
+        }
+
+        function moveMirrorUrl(idx, delta) {
+            const nextIdx = idx + delta;
+            if (nextIdx < 0 || nextIdx >= _currentMirrors.length) return;
+            const moved = _currentMirrors.splice(idx, 1)[0];
+            _currentMirrors.splice(nextIdx, 0, moved);
+            _renderMirrorList(_currentMirrors);
+        }
+
+        function resetMirrorsToDefault() {
+            _currentMirrors = [..._DEFAULT_MIRRORS];
+            _renderMirrorList(_currentMirrors);
+            showToast('已恢复默认镜像源', 'success');
+        }
+
+        async function loadMirrorConfig() {
+            try {
+                const res = await fetch('/api/update/mirror-config');
+                const json = await res.json();
+                if (!json.data) return;
+                const d = json.data;
+                document.getElementById('useMirrorToggle').checked = d.use_mirror;
+                onMirrorToggleChange();
+                _currentMirrors = d.mirrors && d.mirrors.length ? d.mirrors : [..._DEFAULT_MIRRORS];
+                _renderMirrorList(_currentMirrors);
+                document.getElementById('downloadTimeout').value = d.download_timeout || 120;
+                document.getElementById('autoCheckToggle').checked = d.auto_check_enabled;
+                const intervalSel = document.getElementById('autoCheckInterval');
+                const val = String(d.auto_check_interval || 6);
+                const opt = [...intervalSel.options].find(o => o.value === val);
+                if (opt) opt.selected = true;
+            } catch (e) {}
+        }
+
+        async function saveMirrorConfig() {
+            const use_mirror = document.getElementById('useMirrorToggle').checked;
+            const download_timeout = parseInt(document.getElementById('downloadTimeout').value) || 120;
+            const auto_check_enabled = document.getElementById('autoCheckToggle').checked;
+            const auto_check_interval = parseInt(document.getElementById('autoCheckInterval').value) || 6;
+
+            try {
+                const resp = await fetch('/api/update/mirror-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        use_mirror,
+                        mirrors: _currentMirrors,
+                        download_timeout,
+                        auto_check_enabled,
+                        auto_check_interval,
+                    })
+                });
+                const res = await resp.json();
+                if (!resp.ok) {
+                    showToast(res.message || '保存失败', 'error');
+                    return;
+                }
+                showToast('加速与自动检查配置已保存', 'success');
             } catch (e) {
                 showToast('保存失败', 'error');
             }
         }
+
+        // ── 检查与安装更新 ──
 
         async function checkForUpdate() {
             const btn = document.getElementById('checkUpdateBtn');
@@ -1752,8 +2930,15 @@
 
             document.getElementById('updateInfo').style.display = 'none';
             document.getElementById('noUpdateInfo').style.display = 'none';
+            document.getElementById('updateProgress').style.display = 'none';
 
             try {
+                const saved = await saveUpdateConfig({ silent: true });
+                if (!saved) {
+                    showToast('仓库配置保存失败，请检查后重试', 'error');
+                    return;
+                }
+
                 const response = await fetch('/api/update/check');
                 const res = await response.json();
 
@@ -1771,11 +2956,8 @@
                     if (navBadge) { navBadge.textContent = 'NEW'; navBadge.style.display = 'inline-block'; }
                     if (banner) { document.getElementById('autoBgRemoteVersion').textContent = data.remote_version || ''; banner.style.display = 'flex'; }
                     document.getElementById('updateBadge').style.display = 'inline-block';
-                    document.getElementById('updateReleaseName').textContent = data.release_name || data.remote_version;
-                    document.getElementById('updatePublishedAt').textContent = data.published_at ? new Date(data.published_at).toLocaleDateString('zh-CN') : '';
-                    document.getElementById('updateChangelog').textContent = data.changelog || '无更新说明';
-                    document.getElementById('updateHtmlUrl').href = data.html_url || '#';
-                    document.getElementById('updateInfo').style.display = 'block';
+                    _fillUpdateCard(data);
+                    _scrollUpdateStatusIntoView();
                 } else {
                     _pendingUpdate = null;
                     if (navBadge) navBadge.style.display = 'none';
@@ -1783,8 +2965,8 @@
                     document.getElementById('updateBadge').style.display = 'none';
                     document.getElementById('noUpdateVersionText').textContent = `v${data.local_version}`;
                     document.getElementById('noUpdateInfo').style.display = 'block';
+                    _scrollUpdateStatusIntoView();
                 }
-                // 刷新"上次检查时间"
                 loadUpdateStatus();
             } catch (e) {
                 showToast('检查更新失败，请确认网络连接', 'error');
@@ -1796,9 +2978,17 @@
 
         async function applyUpdate() {
             if (!_pendingUpdate) return;
+
+            const useMirror = document.getElementById('useMirrorToggle').checked;
+            const md5Info = _pendingUpdate.md5 ? `<br><span style="font-size:12px;color:#888;">MD5 将自动校验: ${_pendingUpdate.md5}</span>` : '';
+            const mirrorInfo = useMirror
+                ? `<br><span style="font-size:12px;color:#888;">将通过镜像源加速下载，失败自动回退直连</span>`
+                : `<br><span style="font-size:12px;color:#888;">将直连 GitHub 下载</span>`;
+
             if (!await showConfirm('确认更新',
                 `确定要更新到 <strong>${_pendingUpdate.remote_version}</strong> 吗？<br>` +
-                `<span style="font-size:13px;color:#666;">更新前会自动备份数据库。更新完成后服务将自动重启。</span>`
+                `<span style="font-size:13px;color:#666;">更新前会自动备份数据库。更新完成后服务将自动重启。</span>` +
+                mirrorInfo + md5Info
             )) return;
 
             const applyBtn = document.getElementById('applyUpdateBtn');
@@ -1810,17 +3000,22 @@
             const progressText = document.getElementById('updateProgressText');
 
             progressBar.style.width = '10%';
-            progressText.textContent = '正在下载更新包...';
+            progressText.textContent = useMirror ? '正在通过镜像源下载更新包...' : '正在直连 GitHub 下载更新包...';
 
             try {
                 const response = await fetch('/api/update/apply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ zip_url: _pendingUpdate.zip_url, version: _pendingUpdate.remote_version })
+                    body: JSON.stringify({
+                        download_url: _pendingUpdate.download_url || _pendingUpdate.zip_url,
+                        version: _pendingUpdate.remote_version,
+                        md5: _pendingUpdate.md5 || '',
+                        use_mirror: useMirror,
+                    })
                 });
 
                 progressBar.style.width = '80%';
-                progressText.textContent = '正在安装...';
+                progressText.textContent = '正在解压并安装...';
 
                 const res = await response.json();
 
@@ -1834,19 +3029,25 @@
                 }
 
                 progressBar.style.width = '100%';
-                progressText.textContent = '更新完成，服务正在重启...';
-                setTimeout(() => waitForRestart(), 3000);
+                const srcDesc = res.data?.source ? `（来源: ${res.data.source}）` : '';
+                progressText.textContent = `更新完成${srcDesc}，服务正在重启...`;
+                setTimeout(() => waitForRestart(_pendingUpdate.remote_version), 3000);
 
             } catch (e) {
                 progressBar.style.width = '100%';
                 progressText.textContent = '服务正在重启，请稍候...';
-                setTimeout(() => waitForRestart(), 3000);
+                setTimeout(() => waitForRestart(_pendingUpdate.remote_version), 3000);
             }
         }
 
-        async function waitForRestart(attempt = 0) {
+        function normalizeVersion(version) {
+            return String(version || '').trim().replace(/^v/i, '');
+        }
+
+        async function waitForRestart(expectedVersion, attempt = 0) {
             const maxAttempts = 30;
             const progressText = document.getElementById('updateProgressText');
+            const normalizedExpectedVersion = normalizeVersion(expectedVersion);
 
             if (attempt >= maxAttempts) {
                 progressText.textContent = '重启超时，请手动刷新页面';
@@ -1854,18 +3055,24 @@
             }
 
             try {
-                const resp = await fetch('/api/update/current', { cache: 'no-store' });
+                const resp = await fetch(`/api/update/current?_=${Date.now()}`, { cache: 'no-store' });
                 if (resp.ok) {
-                    progressText.textContent = '重启成功！正在刷新...';
-                    setTimeout(() => window.location.reload(), 1000);
-                    return;
+                    const res = await resp.json();
+                    const currentVersion = normalizeVersion(res.data?.version);
+                    if (!normalizedExpectedVersion || currentVersion === normalizedExpectedVersion) {
+                        progressText.textContent = '重启成功！正在刷新...';
+                        setTimeout(() => window.location.reload(), 1000);
+                        return;
+                    }
                 }
             } catch (e) {
                 // 服务还没起来，继续等
             }
 
-            progressText.textContent = `等待服务重启... (${attempt + 1}/${maxAttempts})`;
-            setTimeout(() => waitForRestart(attempt + 1), 2000);
+            progressText.textContent = normalizedExpectedVersion
+                ? `等待服务切换到 v${normalizedExpectedVersion}... (${attempt + 1}/${maxAttempts})`
+                : `等待服务重启... (${attempt + 1}/${maxAttempts})`;
+            setTimeout(() => waitForRestart(expectedVersion, attempt + 1), 2000);
         }
 
         let updateLogsExpanded = false;

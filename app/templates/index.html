@@ -56,8 +56,17 @@
                     gfm: true,
                     breaks: true,
                     renderer: {
-                        link: function({ href, title, tokens }) {
-                            // 先判断特殊类型，不需要解析 tokens 文本
+                        link: function(href, title, text) {
+                            // marked v12 调用方式: link(href, title, text)
+                            // 兼容新版对象参数: link({ href, title, tokens })
+                            if (href && typeof href === 'object') {
+                                text = href.tokens ? (typeof this.parser !== 'undefined' && this.parser ? this.parser.parseInline(href.tokens) : '') : '';
+                                if (!text && href.tokens) text = href.tokens.map(function(t){ return t.raw || t.text || ''; }).join('');
+                                title = href.title;
+                                href = href.href;
+                            }
+                            if (!text) text = href;
+
                             var bvid = extractBilibiliId(href);
                             if (bvid) {
                                 var src = bvid.startsWith('av')
@@ -71,15 +80,8 @@
                             if (videoExts.test(href)) {
                                 return '<div class="video-wrapper"><video controls preload="metadata" src="' + href + '"></video></div>';
                             }
-                            // 普通链接才解析文本，防御 this.parser 未注入的情况
-                            var text;
-                            try {
-                                text = this.parser && tokens ? this.parser.parseInline(tokens) : null;
-                            } catch(_) { text = null; }
-                            if (!text) text = (tokens && tokens.map) ? tokens.map(function(t){ return t.raw || t.text || ''; }).join('') : '';
-                            text = text || href;
                             var titleAttr = title ? ' title="' + title + '"' : '';
-                            return '<a href="' + href + '"' + titleAttr + '>' + text + '</a>';
+                            return '<a href="' + href + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + text + '</a>';
                         }
                     }
                 });

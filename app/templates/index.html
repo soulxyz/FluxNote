@@ -20,6 +20,7 @@
     <meta name="msapplication-TileColor" content="#10B981">
     <meta name="msapplication-config" content="/static/browserconfig.xml">
     <link rel="stylesheet" href={{ static_v("css/style.css") }}>
+    <link rel="stylesheet" href={{ static_v("css/tutorial.css") }}>
     <!-- Preload critical fonts for faster rendering -->
     <link rel="preload" href="/static/lib/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/static/lib/fontawesome/webfonts/fa-regular-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -55,17 +56,8 @@
                     gfm: true,
                     breaks: true,
                     renderer: {
-                        link: function(href, title, text) {
-                            // marked v12 调用方式: link(href, title, text)
-                            // 兼容新版对象参数: link({ href, title, tokens })
-                            if (href && typeof href === 'object') {
-                                text = href.tokens ? (typeof this.parser !== 'undefined' && this.parser ? this.parser.parseInline(href.tokens) : '') : '';
-                                if (!text && href.tokens) text = href.tokens.map(function(t){ return t.raw || t.text || ''; }).join('');
-                                title = href.title;
-                                href = href.href;
-                            }
-                            if (!text) text = href;
-
+                        link: function({ href, title, tokens }) {
+                            // 先判断特殊类型，不需要解析 tokens 文本
                             var bvid = extractBilibiliId(href);
                             if (bvid) {
                                 var src = bvid.startsWith('av')
@@ -79,8 +71,15 @@
                             if (videoExts.test(href)) {
                                 return '<div class="video-wrapper"><video controls preload="metadata" src="' + href + '"></video></div>';
                             }
+                            // 普通链接才解析文本，防御 this.parser 未注入的情况
+                            var text;
+                            try {
+                                text = this.parser && tokens ? this.parser.parseInline(tokens) : null;
+                            } catch(_) { text = null; }
+                            if (!text) text = (tokens && tokens.map) ? tokens.map(function(t){ return t.raw || t.text || ''; }).join('') : '';
+                            text = text || href;
                             var titleAttr = title ? ' title="' + title + '"' : '';
-                            return '<a href="' + href + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + text + '</a>';
+                            return '<a href="' + href + '"' + titleAttr + '>' + text + '</a>';
                         }
                     }
                 });
@@ -534,6 +533,25 @@
     <script type="module" src={{ static_v("js/pwa.js") }}></script>
 
     <script type="module" src={{ static_v("js/main.js") }}></script>
+
+    <!-- 新手教程模块 -->
+    <script type="module">
+        import { tutorial } from '/static/js/modules/tutorial.js?v={{ app_version }}';
+
+        // 将教程实例暴露到全局，以便其他模块调用
+        window.tutorial = tutorial;
+
+        // 检查是否是首次访问，如果是则启动主页教程
+        document.addEventListener('DOMContentLoaded', () => {
+            // 检查是否已完成主页教程
+            if (!tutorial.isTutorialCompleted('home')) {
+                // 延迟启动教程，确保页面元素已加载
+                setTimeout(() => {
+                    tutorial.startTutorial('home');
+                }, 1000);
+            }
+        });
+    </script>
     {% if show_login %}
     <script>
         // Auto show login modal when redirected from blog login link

@@ -164,6 +164,7 @@ export async function renderContent(container, content, options = {}) {
         // 5.5 B站链接 → 卡片（在 DOMPurify 之后操作 DOM，卡片 HTML 可信）
         convertBilibiliLinksToCards(container);
         loadBilibiliCards(container);
+        
 
         // 6. 渲染 Mermaid 图表（按需懒加载）
         if (enableMermaid) {
@@ -369,6 +370,7 @@ function convertBilibiliLinksToCards(container) {
     });
 }
 
+
 // ==================== Marked 渲染器 ====================
 
 function mediaRenderer() {
@@ -376,25 +378,30 @@ function mediaRenderer() {
     const videoExts = /\.(mp4|webm|ogg|mov)$/i;
 
     return {
-        link({ href, title, tokens }) {
+        // marked v12 调用方式: link(href, title, text)
+        // 兼容新版对象参数: link({ href, title, tokens })
+        link(href, title, text) {
+            if (href && typeof href === 'object') {
+                const token = href;
+                try {
+                    text = (this.parser && token.tokens) ? this.parser.parseInline(token.tokens) : '';
+                } catch (_) { text = ''; }
+                if (!text && token.tokens) {
+                    text = token.tokens.map(t => t.raw || t.text || '').join('');
+                }
+                title = token.title;
+                href = token.href;
+            }
+            if (!text) text = href;
+
             if (audioExts.test(href)) {
                 return `<audio controls preload="metadata" src="${href}"></audio>`;
             }
             if (videoExts.test(href)) {
                 return `<div class="video-wrapper"><video controls preload="metadata" src="${href}"></video></div>`;
             }
-            let text;
-            try {
-                text = this.parser && tokens ? this.parser.parseInline(tokens) : null;
-            } catch (_) {
-                text = null;
-            }
-            if (!text) {
-                text = (tokens && tokens.map) ? tokens.map(t => t.raw ?? t.text ?? '').join('') : '';
-                text = text || href;
-            }
             const titleAttr = title ? ` title="${title}"` : '';
-            return `<a href="${href}"${titleAttr}>${text}</a>`;
+            return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
         }
     };
 }

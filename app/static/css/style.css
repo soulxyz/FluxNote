@@ -2164,6 +2164,17 @@ input:checked + .slider:before { transform: translateX(20px); }
     line-height: 1.7;
     word-break: break-word;
 }
+.markdown-body a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-decoration-color: rgba(16, 185, 129, 0.35);
+    text-underline-offset: 2px;
+    transition: color 0.15s, text-decoration-color 0.15s;
+}
+.markdown-body a:hover {
+    color: var(--primary-hover);
+    text-decoration-color: var(--primary);
+}
 .markdown-body p { margin: 0 0 0.6em; }
 .markdown-body p:last-child { margin-bottom: 0; }
 .markdown-body h1, .markdown-body h2, .markdown-body h3,

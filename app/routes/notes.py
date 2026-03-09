@@ -285,13 +285,15 @@ def create_note():
                 if new_note.capsule_date <= datetime.now():
                     return jsonify({'error': '时光胶囊的解锁时间必须在未来'}), 400
 
+        db.session.add(new_note)
+        db.session.flush()  # 确保 new_note.id 已生成，供 _sync_note_references 使用
+
         # Update Tags Relation
         update_note_tags(new_note, tags)
         
         # Update Backlinks Relation (ID-based)
         _sync_note_references(new_note, links)
 
-        db.session.add(new_note)
         db.session.commit()
         invalidate_stats_cache()
 

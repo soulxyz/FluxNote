@@ -1728,13 +1728,12 @@
                                 <span class="update-status-meta" id="updatePublishedAt"></span>
                             </div>
                             <div class="update-status-body" id="updateChangelog"></div>
-                            <div id="updateMd5Info" class="update-md5">
-                                <i class="fas fa-shield-alt" style="margin-right:4px; color:#16a34a;"></i>
+                            <div id="updateMd5Info" class="update-md5" style="display:none;">
+                                <i class="fas fa-shield-alt" style="margin-right:4px; color:#64748b;"></i>
                                 <span id="updateMd5Text"></span>
-                            </div>
-                            <div id="updateCachedBadge" class="update-cached-badge verified" style="display:none;">
-                                <i class="fas fa-check-circle"></i>
-                                <span id="updateCachedBadgeText">已下载 (MD5 校验通过)</span>
+                                <span id="updateMd5VerifiedTag" style="display:none; margin-left:10px; color:#16a34a; font-weight:600; font-family:inherit;">
+                                    <i class="fas fa-check-circle"></i> 本地已验证
+                                </span>
                             </div>
                             <div id="updateCountdownBar" class="update-countdown-bar">
                                 <div class="countdown-text">
@@ -1780,7 +1779,7 @@
 
                         <div id="updateProgress" class="update-progress-card">
                             <div class="update-status-head">
-                                <i class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
+                                <i id="updateProgressIcon" class="fas fa-spinner fa-spin" style="color:var(--primary);"></i>
                                 <span style="font-weight:600; color:var(--slate-700);" id="updateProgressText">正在更新...</span>
                             </div>
                             <div class="update-progress-track">
@@ -2758,9 +2757,10 @@
             
             document.getElementById('updateHtmlUrl').href = data.html_url || '#';
 
-            // MD5 信息
+            // MD5 信息（合并：哈希值 + 本地已验证标识）
             const md5El = document.getElementById('updateMd5Info');
             const md5Text = document.getElementById('updateMd5Text');
+            const md5VerifiedTag = document.getElementById('updateMd5VerifiedTag');
             if (data.md5) {
                 md5Text.textContent = `MD5: ${data.md5}`;
                 md5El.style.display = 'block';
@@ -2768,38 +2768,35 @@
                 md5El.style.display = 'none';
             }
 
-            // 已下载缓存徽标与按钮状态
+            // 已下载且通过本地校验时，在 MD5 行追加标识
+            if (md5VerifiedTag) {
+                md5VerifiedTag.style.display = (data.is_downloaded && data.md5_verified) ? 'inline' : 'none';
+            }
+
+            // 按钮状态
             _refreshDownloadedUI(data.is_downloaded, data.md5_verified);
 
             document.getElementById('updateInfo').style.display = 'block';
         }
 
         function _refreshDownloadedUI(isDownloaded, md5Verified) {
-            const cachedBadge = document.getElementById('updateCachedBadge');
-            const cachedBadgeText = document.getElementById('updateCachedBadgeText');
             const dlAndInstallBtn = document.getElementById('downloadAndInstallBtn');
             const dlOnlyBtn = document.getElementById('downloadOnlyBtn');
             const installNowBtn = document.getElementById('installNowBtn');
+            const md5VerifiedTag = document.getElementById('updateMd5VerifiedTag');
 
             if (isDownloaded) {
-                // 显示已下载徽标
-                cachedBadge.style.display = 'inline-flex';
-                if (md5Verified) {
-                    cachedBadge.className = 'update-cached-badge verified';
-                    cachedBadgeText.textContent = '已下载 (MD5 校验通过)';
-                } else {
-                    cachedBadge.className = 'update-cached-badge unverified';
-                    cachedBadgeText.textContent = '已下载 (无 MD5 校验信息)';
-                }
                 // 切换按钮：仅显示"立即安装"
                 dlAndInstallBtn.style.display = 'none';
                 dlOnlyBtn.style.display = 'none';
                 installNowBtn.style.display = '';
+                // 更新 MD5 行的已验证标识
+                if (md5VerifiedTag) md5VerifiedTag.style.display = md5Verified ? 'inline' : 'none';
             } else {
-                cachedBadge.style.display = 'none';
                 dlAndInstallBtn.style.display = '';
                 dlOnlyBtn.style.display = '';
                 installNowBtn.style.display = 'none';
+                if (md5VerifiedTag) md5VerifiedTag.style.display = 'none';
             }
         }
 
@@ -3086,7 +3083,13 @@
                     document.getElementById('noUpdateInfo').style.display = 'block';
                     _scrollUpdateStatusIntoView();
                 }
-                loadUpdateStatus();
+                // 更新"上次检查"时间戳，不调用 loadUpdateStatus() 以避免旧缓存覆盖当前结果
+                const checkedAtEl = document.getElementById('autoCheckedAt');
+                const checkedAtText = document.getElementById('autoCheckedAtText');
+                if (checkedAtEl && checkedAtText) {
+                    checkedAtText.textContent = new Date().toLocaleString('zh-CN');
+                    checkedAtEl.style.display = 'inline-flex';
+                }
             } catch (e) {
                 showToast('检查更新失败，请确认网络连接', 'error');
             } finally {
@@ -3144,10 +3147,25 @@
                 }
 
                 progressBar.style.width = '100%';
-                progressText.textContent = `下载完成，MD5 校验${res.data.md5_verified ? '通过' : '（无校验信息）'}`;
+                const md5Label = res.data.md5_verified ? '通过 ✓' : '（无校验信息）';
+                progressText.textContent = `下载完成，MD5 校验${md5Label}`;
 
-                // 更新缓存徽标
+                // 切换 spinner → checkmark
+                const icon = document.getElementById('updateProgressIcon');
+                if (icon) {
+                    icon.className = 'fas fa-check-circle';
+                    icon.style.color = '#16a34a';
+                }
+
+                // 更新缓存徽标与按钮
                 _refreshDownloadedUI(true, res.data.md5_verified);
+
+                // 2 秒后隐藏进度卡
+                setTimeout(() => {
+                    document.getElementById('updateProgress').style.display = 'none';
+                    // 还原图标，供后续安装流程复用
+                    if (icon) { icon.className = 'fas fa-spinner fa-spin'; icon.style.color = 'var(--primary)'; }
+                }, 2000);
 
                 return res.data;
             } catch (e) {

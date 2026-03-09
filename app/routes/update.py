@@ -599,8 +599,9 @@ def apply_update():
             except Exception as e:
                 _append_update_log(f'依赖安装异常: {e}')
 
-        # 7. 清理临时目录
+        # 7. 清理临时目录，并清空自动检查缓存
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        Config.set('update_check_cache', '')
 
         _append_update_log(f'更新完成! 版本: {target_version}，服务即将重启...')
 
@@ -798,6 +799,9 @@ def install_update():
             _append_update_log('已清理安装包缓存')
         except Exception:
             pass
+
+        # 清空自动检查缓存，防止重启后再次显示旧的"有更新/已下载"状态
+        Config.set('update_check_cache', '')
 
         _append_update_log(f'安装完成! 版本: {target_version}，服务即将重启...')
 

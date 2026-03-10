@@ -337,7 +337,7 @@ begin
     else
     begin
       WizardForm.StatusLabel.Caption := '数据库初始化超时';
-      MsgBox('数据化初始化耗时过长。' + #13#10#13#10 + 
+      MsgBox('数据库初始化耗时过长。' + #13#10#13#10 + 
              '不过不用担心，这通常不会影响软件的运行。' + #13#10 + 
              '首次运行 FluxNote 时可能需要更多时间，大约为5-10秒。', 
              mbError, MB_OK);

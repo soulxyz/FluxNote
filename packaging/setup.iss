@@ -205,7 +205,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     AppPath := ExpandConstant('{app}');
-    RuntimePath := AppPath + '\runtime\FluxNotecore.exe';
+    RuntimePath := AppPath + '\runtime\FluxNoteCore.exe';
     LogFile := AppPath + '\fluxnote_runtime.log';
     TempLogFile := ExpandConstant('{tmp}\fluxnote_startup_read.log'); 
     TarFlagFile := ExpandConstant('{tmp}\tar_done.flag');

@@ -40,7 +40,7 @@ def create_app():
     DB_DIR = os.path.join(BASE_DIR, 'data')
     os.makedirs(DB_DIR, exist_ok=True)
 
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'data', 'uploads')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DB_DIR, 'notes.db')

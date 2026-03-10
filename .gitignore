@@ -23,7 +23,7 @@ venv/
 
 # Flask / 数据库
 instance/
-migrations/
+migrations/versions/
 *.sqlite3
 *.db
 *.db-journal
@@ -52,10 +52,23 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-uploads/*.*
+data/uploads/
 $PROFILE.txt
 GEMINI.md
 app/templates/themes/anheyu/
 nul
 cl.ps1
 ge.ps1
+
+# 启动器 / 安装包构建产物
+Output/
+FluxNote.exe
+runtime/
+runtime.zip
+logo.ico
+icon.o
+icon.rc
+rcedit.exe
+get-pip.py
+ChineseSimplified.isl
+packaging/Output/

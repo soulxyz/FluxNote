@@ -31,6 +31,14 @@ def is_debug_mode():
         return False
 
 def create_app():
+    """
+    Create and configure the Flask application for the project.
+    
+    Initializes configuration (database and upload paths, security and server settings), registers extensions and blueprints, installs global template context helpers, and registers application-wide error handlers. Performs an application self-check, adjusts debug mode from persistent configuration, and starts the background update checker before returning the app.
+    
+    Returns:
+        Flask: A configured Flask application instance.
+    """
     app = Flask(__name__)
 
     # Configuration
@@ -40,7 +48,7 @@ def create_app():
     DB_DIR = os.path.join(BASE_DIR, 'data')
     os.makedirs(DB_DIR, exist_ok=True)
 
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'data', 'uploads')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DB_DIR, 'notes.db')

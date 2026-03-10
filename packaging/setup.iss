@@ -54,6 +54,12 @@ Type: dirifempty; Name: "{app}"
 function GetTickCount: Cardinal;
   external 'GetTickCount@kernel32.dll stdcall';
 
+function TerminateProcess(hProcess: THandle; uExitCode: UINT): BOOL;
+  external 'TerminateProcess@kernel32.dll stdcall';
+
+function CloseHandle(hObject: THandle): BOOL;
+  external 'CloseHandle@kernel32.dll stdcall';
+
 var
   DeleteUserData: Boolean;
   DirHintLabel: TNewStaticText; // 用于在选择目录界面显示的文字标签
@@ -201,6 +207,7 @@ var
   StartTime, CurrentTime, ElapsedTime: Cardinal;
   TimeoutSec, CheckCounter, EstimatedTarSec, TempPos: Integer;
   Found: Boolean;
+  TarProcHandle: THandle;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -225,11 +232,15 @@ begin
     Exec('taskkill.exe', '/F /IM FluxNotecore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
     // 异步执行解压，完成后写入 flag 文件
+    // ResultCode 在 ewNoWait 模式下返回的是进程句柄
     if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
     begin
-      MsgBox('解压命令启动失败，安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
+      MsgBox('解压命令启动失败,安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
       Abort;
     end;
+    
+    // 保存进程句柄以便超时时终止进程
+    TarProcHandle := ResultCode;
 
     StartTime := GetTickCount;
     EstimatedTarSec := 8; // 预估解压时间（秒），可根据实际情况微调
@@ -245,6 +256,27 @@ begin
       if ElapsedTime > (Cardinal(EstimatedTarSec) * 3000) then
       begin
         MsgBox('解压运行环境超时，可能解压失败。请检查磁盘空间和权限后重试安装。', mbError, MB_OK);
+        
+        // 尝试终止后台解压进程
+        if TarProcHandle <> 0 then
+        begin
+          // 先等待一小段时间看进程是否自行退出
+          Sleep(500);
+          
+          // 如果进程仍在运行，强制终止
+          if not TerminateProcess(TarProcHandle, 1) then
+          begin
+            // 如果 TerminateProcess 失败，尝试用 taskkill 强制结束
+            // 注意：这里无法直接从句柄获取 PID，所以我们尝试杀死所有 cmd.exe 的 tar 子进程
+            Exec('taskkill.exe', '/F /IM tar.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+            Exec('taskkill.exe', '/F /IM cmd.exe /FI "WINDOWTITLE eq C:\WINDOWS\system32\cmd.exe*" /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+          end;
+          
+          // 关闭进程句柄
+          CloseHandle(TarProcHandle);
+          TarProcHandle := 0;
+        end;
+        
         DeleteFile(TarFlagFile); // 清理可能的残留文件
         Abort;
       end;
@@ -258,7 +290,13 @@ begin
       Sleep(100); // 10FPS 刷新
     end;
     
-    DeleteFile(TarFlagFile); // 解压完成，清理 flag 文件
+    // 解压完成，清理进程句柄和 flag 文件
+    if TarProcHandle <> 0 then
+    begin
+      CloseHandle(TarProcHandle);
+      TarProcHandle := 0;
+    end;
+    DeleteFile(TarFlagFile);
 
 
     // ====================================================

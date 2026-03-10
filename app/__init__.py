@@ -43,6 +43,26 @@ def create_app():
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'data', 'uploads')
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+    # 兼容迁移：将旧路径 uploads/ 的历史附件搬移到新路径 data/uploads/
+    OLD_UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    if os.path.isdir(OLD_UPLOAD_FOLDER) and os.listdir(OLD_UPLOAD_FOLDER):
+        try:
+            import shutil
+            for item in os.listdir(OLD_UPLOAD_FOLDER):
+                src = os.path.join(OLD_UPLOAD_FOLDER, item)
+                dst = os.path.join(UPLOAD_FOLDER, item)
+                if os.path.exists(dst):
+                    logger.warning(f"[upload migration] 跳过 '{item}'：新路径已存在同名文件")
+                else:
+                    shutil.move(src, dst)
+            # 迁移完成后若旧目录已空则清除
+            if not os.listdir(OLD_UPLOAD_FOLDER):
+                os.rmdir(OLD_UPLOAD_FOLDER)
+                logger.info("[upload migration] 旧目录 uploads/ 已清除")
+            logger.info("[upload migration] 历史附件已成功迁移至 data/uploads/")
+        except Exception:
+            logger.error("[upload migration] 迁移失败，旧附件仍保留在 uploads/ 目录：", exc_info=True)
+
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(DB_DIR, 'notes.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

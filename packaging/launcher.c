@@ -16,6 +16,9 @@ int g_serverPort  = 0;
 BOOL g_restarting = FALSE;
 volatile BOOL g_quit = FALSE;   // 用户主动退出标志，供所有循环检测
 
+// 保护 hBackendProcess 和 g_restarting 的跨线程访问
+static CRITICAL_SECTION g_cs;
+
 void OpenBrowser() {
     if (g_serverPort > 0) {
         wchar_t url[256];
@@ -89,17 +92,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if (LOWORD(wParam) == IDM_OPEN) {
                 OpenBrowser();
             } else if (LOWORD(wParam) == IDM_RESTART) {
+                // 在 CreateThread 之前，在临界区内原子地检查并设置 g_restarting，
+                // 避免两次快速点击之间存在窗口期导致双重启动
+                BOOL doStart = FALSE;
+                EnterCriticalSection(&g_cs);
                 if (!g_restarting) {
+                    g_restarting = TRUE;
+                    doStart = TRUE;
+                }
+                LeaveCriticalSection(&g_cs);
+                if (doStart) {
                     extern DWORD WINAPI RestartThread(LPVOID);
                     HANDLE hThread = CreateThread(NULL, 0, RestartThread, NULL, 0, NULL);
                     if (hThread) CloseHandle(hThread);
                 }
             } else if (LOWORD(wParam) == IDM_EXIT) {
                 g_quit = TRUE;          // 先设标志，让等待循环得知是主动退出
-                if (hBackendProcess) {
-                    TerminateProcess(hBackendProcess, 0);
-                    CloseHandle(hBackendProcess);
-                    hBackendProcess = NULL; // 置 NULL，防止循环误判为崩溃
+                // 在临界区内取走句柄并置 NULL，防止 RestartThread 并发访问
+                EnterCriticalSection(&g_cs);
+                HANDLE hProc = hBackendProcess;
+                hBackendProcess = NULL; // 置 NULL，防止循环误判为崩溃
+                LeaveCriticalSection(&g_cs);
+                if (hProc) {
+                    TerminateProcess(hProc, 0);
+                    CloseHandle(hProc);
                 }
                 remove(".port");
                 Shell_NotifyIconW(NIM_DELETE, &nid);
@@ -120,15 +136,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 DWORD WINAPI RestartThread(LPVOID lpParam) {
-    g_restarting = TRUE;
+    // g_restarting 已由 IDM_RESTART 处理器在 CreateThread 前设置为 TRUE，此处无需重复设置
     UpdateTip(L"FluxNote 正在重启...");
     ShowBalloon(L"FluxNote 正在重启", L"服务重启中，请稍候...", NIIF_INFO);
 
-    if (hBackendProcess) {
-        TerminateProcess(hBackendProcess, 0);
-        WaitForSingleObject(hBackendProcess, 5000);
-        CloseHandle(hBackendProcess);
-        hBackendProcess = NULL;
+    // 在临界区内取走旧进程句柄并置 NULL，防止与 IDM_EXIT 并发 TerminateProcess/CloseHandle
+    EnterCriticalSection(&g_cs);
+    HANDLE hOld = hBackendProcess;
+    hBackendProcess = NULL;
+    LeaveCriticalSection(&g_cs);
+
+    if (hOld) {
+        TerminateProcess(hOld, 0);
+        WaitForSingleObject(hOld, 5000);
+        CloseHandle(hOld);
     }
 
     remove(".port");
@@ -146,11 +167,16 @@ DWORD WINAPI RestartThread(LPVOID lpParam) {
         UpdateTip(L"FluxNote 重启失败");
         Sleep(2000);
         OpenLogFile();
+        EnterCriticalSection(&g_cs);
         g_restarting = FALSE;
+        LeaveCriticalSection(&g_cs);
         return 1;
     }
 
+    // 在临界区内写入新进程句柄
+    EnterCriticalSection(&g_cs);
     hBackendProcess = pi.hProcess;
+    LeaveCriticalSection(&g_cs);
     CloseHandle(pi.hThread);
 
     int max_retries = 1500;
@@ -158,14 +184,26 @@ DWORD WINAPI RestartThread(LPVOID lpParam) {
     DWORD startTick = GetTickCount();
 
     for (int i = 0; i < max_retries; i++) {
-        if (g_quit) { g_restarting = FALSE; return 0; }  // 主线程已退出，立即跟随
+        if (g_quit) {
+            EnterCriticalSection(&g_cs);
+            g_restarting = FALSE;
+            LeaveCriticalSection(&g_cs);
+            return 0;  // 主线程已退出，立即跟随
+        }
 
-        if (hBackendProcess && WaitForSingleObject(hBackendProcess, 0) == WAIT_OBJECT_0) {
+        // 在临界区内读取句柄的快照，避免与 IDM_EXIT 并发 CloseHandle
+        EnterCriticalSection(&g_cs);
+        HANDLE hCur = hBackendProcess;
+        LeaveCriticalSection(&g_cs);
+
+        if (hCur && WaitForSingleObject(hCur, 0) == WAIT_OBJECT_0) {
             ShowBalloon(L"FluxNote 重启失败", L"Python 核心意外崩溃，即将打开日志...", NIIF_ERROR);
             UpdateTip(L"FluxNote 重启失败");
             Sleep(2000);
             OpenLogFile();
+            EnterCriticalSection(&g_cs);
             g_restarting = FALSE;
+            LeaveCriticalSection(&g_cs);
             return 1;
         }
 
@@ -196,7 +234,9 @@ DWORD WINAPI RestartThread(LPVOID lpParam) {
         UpdateTip(L"FluxNote 重启超时");
         Sleep(2000);
         OpenLogFile();
+        EnterCriticalSection(&g_cs);
         g_restarting = FALSE;
+        LeaveCriticalSection(&g_cs);
         return 1;
     }
 
@@ -205,7 +245,9 @@ DWORD WINAPI RestartThread(LPVOID lpParam) {
     UpdateTip(tip);
     ShowBalloon(L"FluxNote 重启完成", L"服务已恢复，正在打开浏览器...", NIIF_INFO);
     OpenBrowser();
+    EnterCriticalSection(&g_cs);
     g_restarting = FALSE;
+    LeaveCriticalSection(&g_cs);
     return 0;
 }
 
@@ -223,6 +265,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     remove(".port");
+    InitializeCriticalSection(&g_cs);
 
     // ── 1. 立刻创建窗口和托盘图标，给用户即时反馈 ──────────────────────
     WNDCLASSW wc = {0};
@@ -262,6 +305,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         UpdateTip(L"FluxNote 启动失败");
         Sleep(3000);
         Shell_NotifyIconW(NIM_DELETE, &nid);
+        DeleteCriticalSection(&g_cs);
         CloseHandle(hMutex);
         return 1;
     }
@@ -284,13 +328,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         }
         if (got_quit || g_quit) break;  // 用户主动退出，立即离开等待循环
 
+        // 在临界区内读取句柄快照，防止 RestartThread（由启动期间的菜单触发）并发 CloseHandle
         // hBackendProcess 为 NULL 说明是 IDM_EXIT 主动关闭的，不视为崩溃
-        if (hBackendProcess && WaitForSingleObject(hBackendProcess, 0) == WAIT_OBJECT_0) {
+        EnterCriticalSection(&g_cs);
+        HANDLE hCur = hBackendProcess;
+        LeaveCriticalSection(&g_cs);
+
+        if (hCur && WaitForSingleObject(hCur, 0) == WAIT_OBJECT_0) {
             ShowBalloon(L"FluxNote 启动失败", L"Python 核心意外崩溃，即将打开日志...", NIIF_ERROR);
             UpdateTip(L"FluxNote 启动失败");
             Sleep(2000);
             Shell_NotifyIconW(NIM_DELETE, &nid);
             OpenLogFile();
+            DeleteCriticalSection(&g_cs);
             CloseHandle(hMutex);
             return 1;
         }
@@ -318,6 +368,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     // 用户在启动期间主动退出——IDM_EXIT 已做完所有清理，直接结束
     if (g_quit) {
+        DeleteCriticalSection(&g_cs);
         if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
         return 0;
     }
@@ -328,7 +379,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         Sleep(2000);
         Shell_NotifyIconW(NIM_DELETE, &nid);
         OpenLogFile();
-        if (hBackendProcess) TerminateProcess(hBackendProcess, 0);
+        // 在临界区内取走句柄后再 Terminate，防止与可能的 RestartThread 并发
+        EnterCriticalSection(&g_cs);
+        HANDLE hProc = hBackendProcess;
+        hBackendProcess = NULL;
+        LeaveCriticalSection(&g_cs);
+        if (hProc) TerminateProcess(hProc, 0);
+        DeleteCriticalSection(&g_cs);
         CloseHandle(hMutex);
         return 1;
     }
@@ -348,6 +405,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DispatchMessageW(&msg);
     }
 
+    DeleteCriticalSection(&g_cs);
     if (hMutex) {
         ReleaseMutex(hMutex);
         CloseHandle(hMutex);

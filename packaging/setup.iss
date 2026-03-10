@@ -148,8 +148,6 @@ begin
 
     if FileExists(FlagPath) then
     begin
-      Exec('taskkill.exe', '/F /IM python.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      Exec('taskkill.exe', '/F /IM pythonw.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec('taskkill.exe', '/F /IM FluxNote.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec('taskkill.exe', '/F /IM FluxNoteCore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
@@ -168,8 +166,13 @@ begin
   end
   else if CurUninstallStep = usPostUninstall then
   begin
-    AppPath := ExpandConstant('{app}');
-    Exec('cmd.exe', '/C rmdir /s /q "' + AppPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // 仅当用户在卸载向导中明确选择了"删除所有数据"时，才整体清除安装目录；
+    // 若用户选择保留数据，跳过此步，{app}\data 及其他用户文件会原样留存。
+    if DeleteUserData then
+    begin
+      AppPath := ExpandConstant('{app}');
+      Exec('cmd.exe', '/C rmdir /s /q "' + AppPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
   end;
 end;
 
@@ -190,7 +193,7 @@ begin
   begin
     AppPath := ExpandConstant('{app}');
     RuntimePath := AppPath + '\runtime\FluxNotecore.exe';
-    LogFile := ExpandConstant('{tmp}\fluxnote_startup.log');
+    LogFile := AppPath + '\fluxnote_runtime.log';
     TempLogFile := ExpandConstant('{tmp}\fluxnote_startup_read.log'); 
     TarFlagFile := ExpandConstant('{tmp}\tar_done.flag');
 
@@ -208,7 +211,7 @@ begin
     DeleteFile(TarFlagFile); // 确保没有上次残留的 flag
     Exec('taskkill.exe', '/F /IM FluxNotecore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     // 异步执行解压，完成后写入 flag 文件
-    Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" & del /q "' + AppPath + '\runtime.zip" & echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode);
+    Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode);
 
     StartTime := GetTickCount;
     EstimatedTarSec := 8; // 预估解压时间（秒），可根据实际情况微调
@@ -239,47 +242,54 @@ begin
     WizardForm.StatusLabel.Caption := '正在初始化数据库...';
     WizardForm.Refresh;
 
-    Exec('cmd.exe', '/C ""' + RuntimePath + '" -u server.py --prewarm > "' + LogFile + '" 2>&1"', 
-         AppPath, SW_HIDE, ewNoWait, ResultCode);
-
-    TimeoutSec := 20; 
-    StartTime := GetTickCount;
+    DeleteFile(LogFile);
     Found := False;
-    CheckCounter := 0; 
-    
-    while True do
+
+    if not Exec('cmd.exe', '/C ""' + RuntimePath + '" -u server.py --prewarm"',
+         AppPath, SW_HIDE, ewNoWait, ResultCode) then
     begin
-      CurrentTime := GetTickCount;
-      if CurrentTime < StartTime then StartTime := CurrentTime; 
-      ElapsedTime := CurrentTime - StartTime;
-
-      if ElapsedTime > (Cardinal(TimeoutSec) * 1000) then Break;
-
-      // 870 走到 950，跨度是 80 个单位
-      WizardForm.ProgressGauge.Position := 870 + ((ElapsedTime * 80) div (Cardinal(TimeoutSec) * 1000));
-      WizardForm.Refresh; 
-
-      // 读写分离，防止频繁读取磁盘卡顿
-      if (CheckCounter mod 5) = 0 then
+      WizardForm.StatusLabel.Caption := '无法启动初始化进程';
+    end
+    else
+    begin
+      TimeoutSec := 20; 
+      StartTime := GetTickCount;
+      CheckCounter := 0; 
+      
+      while True do
       begin
-        if FileCopy(LogFile, TempLogFile, False) then
+        CurrentTime := GetTickCount;
+        if CurrentTime < StartTime then StartTime := CurrentTime; 
+        ElapsedTime := CurrentTime - StartTime;
+
+        if ElapsedTime > (Cardinal(TimeoutSec) * 1000) then Break;
+
+        WizardForm.ProgressGauge.Position := 870 + ((ElapsedTime * 80) div (Cardinal(TimeoutSec) * 1000));
+        WizardForm.Refresh; 
+
+        if (CheckCounter mod 5) = 0 then
         begin
-          if LoadStringFromFile(TempLogFile, OutputText) then
+          if FileCopy(LogFile, TempLogFile, False) then
           begin
-            LowerOutput := Lowercase(String(OutputText));
-            if (Pos('starting production server', LowerOutput) > 0) or 
-               (Pos('0.0.0.0:50', LowerOutput) > 0) or
-               (Pos('prewarm finished successfully', LowerOutput) > 0) then
+            if LoadStringFromFile(TempLogFile, OutputText) then
             begin
-              Found := True;
-              Break;
+              LowerOutput := Lowercase(String(OutputText));
+              if (Pos('prewarm finished successfully', LowerOutput) > 0) or
+                 (Pos('starting production server', LowerOutput) > 0) or
+                 (Pos('0.0.0.0:50', LowerOutput) > 0) then
+              begin
+                Found := True;
+                Break;
+              end;
+              if Pos('fatal crash', LowerOutput) > 0 then
+                Break;
             end;
           end;
         end;
+        
+        Inc(CheckCounter); 
+        Sleep(100); 
       end;
-      
-      Inc(CheckCounter); 
-      Sleep(100); 
     end;
 
 

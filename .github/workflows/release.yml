@@ -175,7 +175,7 @@ jobs:
           copy "app\static\favicon.ico" "logo.ico" /Y
           echo 1 ICON "logo.ico" > icon.rc
           windres icon.rc -o icon.o
-          gcc packaging\launcher.c icon.o -o FluxNote.exe -mwindows
+          gcc packaging\launcher.c icon.o -o FluxNote.exe -mwindows -lshell32
 
       - name: Rebrand Python runtime executable
         shell: cmd

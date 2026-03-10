@@ -22,7 +22,7 @@ Name: "chinesesimp"; MessagesFile: "..\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
-Name: "startmenu"; Description: "创建开始菜单快捷方式"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "startmenu"; Description: "创建开始菜单快捷方式"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
 Source: "..\FluxNote.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -128,6 +128,8 @@ begin
     IDNO:
       begin
         DeleteUserData := False;
+        // 删除任何现有的标志文件，防止之前取消/失败的卸载留下的标志影响当前决定
+        DeleteFile(ExpandConstant('{app}\delete_user_data.flag'));
         Result := True;
       end;
 
@@ -146,7 +148,8 @@ begin
     FlagPath := ExpandConstant('{app}\delete_user_data.flag');
     AppPath := ExpandConstant('{app}');
 
-    if FileExists(FlagPath) then
+    // 只有当用户当前明确选择删除数据且标志文件存在时才执行删除
+    if DeleteUserData and FileExists(FlagPath) then
     begin
       Exec('taskkill.exe', '/F /IM FluxNote.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec('taskkill.exe', '/F /IM FluxNoteCore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -168,10 +171,20 @@ begin
   begin
     // 仅当用户在卸载向导中明确选择了"删除所有数据"时，才整体清除安装目录；
     // 若用户选择保留数据，跳过此步，{app}\data 及其他用户文件会原样留存。
+    //
+    // 将清理脚本写入系统 %TEMP%，由独立 cmd 进程在卸载器退出后延迟执行。
     if DeleteUserData then
     begin
       AppPath := ExpandConstant('{app}');
-      Exec('cmd.exe', '/C rmdir /s /q "' + AppPath + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      SaveStringToFile(ExpandConstant('{%TEMP}\fluxnote_cleanup.bat'),
+        '@echo off' + #13#10 +
+        'cd /d "%TEMP%"' + #13#10 +
+        'timeout /t 3 /nobreak > nul' + #13#10 +
+        'rmdir /s /q "' + AppPath + '" 2>nul' + #13#10 +
+        '(goto) 2>nul & del "%~f0"', False);
+      Exec('cmd.exe',
+        '/C start "" /B cmd.exe /C "' + ExpandConstant('{%TEMP}\fluxnote_cleanup.bat') + '"',
+        '', SW_HIDE, ewNoWait, ResultCode);
     end;
   end;
 end;
@@ -210,18 +223,31 @@ begin
     
     DeleteFile(TarFlagFile); // 确保没有上次残留的 flag
     Exec('taskkill.exe', '/F /IM FluxNotecore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    
     // 异步执行解压，完成后写入 flag 文件
-    Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode);
+    if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
+    begin
+      MsgBox('解压命令启动失败，安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
+      Abort;
+    end;
 
     StartTime := GetTickCount;
     EstimatedTarSec := 8; // 预估解压时间（秒），可根据实际情况微调
     
-    // 循环等待 flag 文件出现，期间平滑推动进度条
+    // 循环等待 flag 文件出现，期间平滑推动进度条，设置超时防止无限等待
     while not FileExists(TarFlagFile) do
     begin
       CurrentTime := GetTickCount;
       if CurrentTime < StartTime then StartTime := CurrentTime;
       ElapsedTime := CurrentTime - StartTime;
+
+      // 超时检查：如果等待时间超过预估时间的3倍，则认为解压失败
+      if ElapsedTime > (Cardinal(EstimatedTarSec) * 3000) then
+      begin
+        MsgBox('解压运行环境超时，可能解压失败。请检查磁盘空间和权限后重试安装。', mbError, MB_OK);
+        DeleteFile(TarFlagFile); // 清理可能的残留文件
+        Abort;
+      end;
 
       // 进度条从 800 推进，跨度为 70
       TempPos := 800 + ((ElapsedTime * 70) div (EstimatedTarSec * 1000));

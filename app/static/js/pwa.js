@@ -16,10 +16,11 @@ export const pwa = {
     async init() {
         this._registerServiceWorker();
         this._listenServiceWorkerMessages();
-        // 页面加载时只请求一次设置
-        this._installPromptEnabled = await this._fetchInstallPromptSetting();
+        // 立即注册监听，确保不错过 beforeinstallprompt 事件
         this._listenInstallPrompt();
         this._listenNetworkStatus();
+        // 异步读取设置，完成后再决定是否显示弹窗
+        this._installPromptEnabled = await this._fetchInstallPromptSetting();
     },
 
     // ── Service Worker 注册与更新 ──
@@ -429,6 +430,8 @@ export const pwa = {
     },
 
     _showInstallPrompt() {
+        // 二次检查：_installPromptEnabled 可能在 setTimeout 期间被设置更新
+        if (!this._installPromptEnabled) return;
         if (!this._deferredPrompt || document.querySelector('.pwa-install-prompt')) return;
 
         const prompt = document.createElement('div');
@@ -440,9 +443,9 @@ export const pwa = {
                 <div class="pwa-install-desc">添加到桌面，获得原生应用体验</div>
             </div>
             <div class="pwa-install-actions">
-                <button class="btn pwa-never-btn" style="background:transparent;color:var(--slate-400);border:none;font-size:12px;padding:4px 8px;" title="不再提醒">×</button>
-                <button class="btn pwa-dismiss-btn" style="background:transparent;color:var(--slate-500);border:1px solid var(--slate-200);">稍后</button>
-                <button class="btn pwa-accept-btn" style="background:var(--primary);color:white;">安装</button>
+                <button class="btn pwa-never-btn" title="不再提醒">×</button>
+                <button class="btn pwa-dismiss-btn">稍后</button>
+                <button class="btn pwa-accept-btn">安装</button>
             </div>
         `;
         document.body.appendChild(prompt);

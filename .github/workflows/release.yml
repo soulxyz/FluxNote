@@ -14,6 +14,10 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release_flag.outputs.released }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - name: Checkout repository
@@ -120,3 +124,76 @@ jobs:
           files: |
             /tmp/fluxnote-v${{ steps.version.outputs.version }}.zip
             /tmp/fluxnote-v${{ steps.version.outputs.version }}.tar.gz
+
+      - name: Mark release success
+        id: release_flag
+        if: steps.tag_check.outputs.exists == 'false'
+        run: echo "released=true" >> $GITHUB_OUTPUT
+
+  windows-installer:
+    name: Build Windows Installer
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install MinGW
+        shell: cmd
+        run: choco install mingw -y
+
+      - name: Download Inno Setup Chinese language pack
+        shell: cmd
+        run: curl -L -o ChineseSimplified.isl https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl
+
+      - name: Build embedded Python runtime
+        shell: cmd
+        run: |
+          curl -L -o python-embed.zip https://www.python.org/ftp/python/3.12.2/python-3.12.2-embed-amd64.zip
+          mkdir runtime
+          tar -xf python-embed.zip -C runtime
+          del python-embed.zip
+          echo ..>> runtime\python312._pth
+          echo import site>> runtime\python312._pth
+          curl -L -o get-pip.py https://bootstrap.pypa.io/get-pip.py
+          runtime\python.exe get-pip.py
+          runtime\python.exe -m pip install -r requirements.txt
+
+      - name: Slim down runtime
+        shell: cmd
+        run: |
+          for /d /r runtime %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d" >nul 2>&1
+          del /s /q "runtime\*.pyc" >nul 2>&1
+          if exist "runtime\pip-cache" rd /s /q "runtime\pip-cache"
+
+      - name: Compile C tray launcher
+        shell: cmd
+        run: |
+          copy "app\static\favicon.ico" "logo.ico" /Y
+          echo 1 ICON "logo.ico" > icon.rc
+          windres icon.rc -o icon.o
+          gcc packaging\launcher.c icon.o -o FluxNote.exe -mwindows -lshell32
+
+      - name: Rebrand Python runtime executable
+        shell: cmd
+        run: |
+          rename "runtime\python.exe" "FluxNoteCore.exe"
+          curl -L -o rcedit.exe https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe
+          rcedit.exe "runtime\FluxNoteCore.exe" --set-version-string "FileDescription" "FluxNote 网络核心服务" --set-version-string "ProductName" "FluxNote" --set-version-string "CompanyName" "Soulxyz" --set-icon "logo.ico"
+
+      - name: Compress runtime
+        shell: cmd
+        run: tar.exe -a -c -f runtime.zip runtime
+
+      - name: Build installer with Inno Setup
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DAppVer=${{ needs.release.outputs.version }} packaging\setup.iss
+
+      - name: Upload installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release.outputs.tag }}
+          files: Output/FluxNote_Setup_v${{ needs.release.outputs.version }}.exe

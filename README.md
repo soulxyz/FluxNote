@@ -16,7 +16,7 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python Version">
+    <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python Version">
     <img src="https://img.shields.io/badge/framework-Flask-green.svg" alt="Flask">
     <img src="https://img.shields.io/badge/database-SQLite-lightgrey.svg" alt="SQLite">
     <img src="https://img.shields.io/badge/license-MIT-orange.svg" alt="License">
@@ -47,7 +47,7 @@
 
 ### 环境要求
 
-- Python 3.8+
+- Python 3.9+
 - Git
 
 ### 安装步骤

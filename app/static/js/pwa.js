@@ -514,7 +514,7 @@ export const pwa = {
 
     // 当设置页切换开关时同步内存状态
     onSettingChanged(settingKey, value) {
-        if (settingKey === 'install_prompt') {
+        if (settingKey === 'pwa_install_prompt') {
             this._installPromptEnabled = value;
             if (!value) this._removeInstallPrompt();
         }

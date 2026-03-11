@@ -196,6 +196,20 @@ def _verify_md5(content: bytes, expected_md5: str) -> bool:
     return actual == expected_md5.lower()
 
 
+def _sanitize_version(version: str) -> str:
+    """
+    校验并清洗版本号，防止路径遍历等问题。
+    仅允许可见的版本字符，例如: v1.2.3, 1.0.0-beta 等。
+    """
+    version = (version or "").strip()
+    if not version:
+        raise ValueError("版本号不能为空")
+    # 允许可选的前缀 v/V，后面是由数字/字母/点/下划线/中划线组成
+    if not re.fullmatch(r"[vV]?[0-9A-Za-z._-]+", version):
+        raise ValueError("非法的版本号格式")
+    return version
+
+
 def _get_cached_zip_path(version: str) -> str:
     """返回指定版本 ZIP 缓存文件的完整路径"""
     tag = version.lstrip('vV')
@@ -712,10 +726,12 @@ def download_update():
 def install_update():
     """从本地缓存安装已下载的更新包"""
     data = request.json or {}
-    target_version = data.get('version', '').strip()
+    raw_version = data.get('version', '')
 
-    if not target_version:
-        return api_response(code=400, message='缺少 version 参数')
+    try:
+        target_version = _sanitize_version(raw_version)
+    except ValueError as e:
+        return api_response(code=400, message=str(e))
 
     zip_path = _get_cached_zip_path(target_version)
     if not os.path.exists(zip_path):

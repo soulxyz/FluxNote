@@ -64,9 +64,14 @@ function CloseHandle(hObject: THandle): BOOL;
 
 const
   PROCESS_TERMINATE = $0001;
+  SYNCHRONIZE       = $00100000;
+  WAIT_OBJECT_0     = $00000000;
 
 function OpenProcess(dwDesiredAccess: LongWord; bInheritHandle: LongBool; dwProcessId: LongWord): THandle;
   external 'OpenProcess@kernel32.dll stdcall';
+
+function WaitForSingleObject(hHandle: THandle; dwMilliseconds: LongWord): LongWord;
+  external 'WaitForSingleObject@kernel32.dll stdcall';
 
 var
   DeleteUserData: Boolean;
@@ -233,6 +238,11 @@ end;
 
 function InitializeUninstall(): Boolean;
 begin
+  // 卸载程序是独立进程，不继承安装时的 InstallLogFile，需在此处重新指定
+  InstallLogFile := ExpandConstant('{tmp}\fluxnote_uninstall.log');
+  SaveStringToFile(InstallLogFile, '', False); // 清空/创建文件
+  Log2('====== FluxNote 卸载初始化 ======');
+
   DeleteUserData := False;
   Result := False;
 
@@ -274,6 +284,13 @@ var
   FlagPath, AppPath: String;
   ResultCode: Integer;
 begin
+  // 防止 InitializeUninstall 未执行（如静默卸载）导致日志失效
+  if InstallLogFile = '' then
+  begin
+    InstallLogFile := ExpandConstant('{tmp}\fluxnote_uninstall.log');
+    SaveStringToFile(InstallLogFile, '', False);
+  end;
+
   if CurUninstallStep = usUninstall then
   begin
     FlagPath := ExpandConstant('{app}\delete_user_data.flag');
@@ -372,25 +389,26 @@ begin
     DeleteFile(TarFlagFile); // 确保没有上次残留的 flag
     ExecLog('解压前终止 FluxNoteCore', 'taskkill.exe', '/F /IM FluxNotecore.exe /T', '', ResultCode);
 
-    // 异步执行解压，完成后写入 flag 文件；ewNoWait 时 ResultCode 可能为进程 ID，用 OpenProcess 取得句柄以便超时时 TerminateProcess
-    if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
+    // 异步启动 tar 仅做解压；flag 写入和 zip 删除在解压成功后单独处理，避免删除失败污染退出码
+    // cmd /C "tar ... && echo 1 > flag" —— 只让 tar 负责解压并在成功后写 flag，删除 zip 是后续最佳努力步骤
+    if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
     begin
       Log2('[阶段1] 错误：解压命令启动失败，退出码：' + IntToStr(ResultCode));
       MsgBox('解压命令启动失败,安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
       Abort;
     end;
     Log2('[阶段1] 解压进程已启动，PID/ResultCode：' + IntToStr(ResultCode));
-    
-    // 若 Exec 返回进程 ID，则取得句柄以便超时时终止；否则 TarProcHandle=0，超时仅靠 taskkill
+
+    // 若 Exec 返回进程 ID，则取得句柄：用于超时强制终止，也用于提前检测进程意外退出
     TarProcHandle := 0;
     if ResultCode <> 0 then
-      TarProcHandle := OpenProcess(PROCESS_TERMINATE, False, LongWord(ResultCode));
+      TarProcHandle := OpenProcess(PROCESS_TERMINATE or SYNCHRONIZE, False, LongWord(ResultCode));
 
     StartTime := GetTickCount;
     EstimatedTarSec := 20; // 预估解压时间（秒），U盘/慢速存储可能需要更长时间
-    
+
     // 循环等待 flag 文件出现，期间平滑推动进度条，设置超时防止无限等待
-    // 超时上限设为 100 秒（，兼容U盘等慢速存储设备
+    // 超时上限设为 300 秒，兼容U盘等慢速存储设备
     while not FileExists(TarFlagFile) do
     begin
       CurrentTime := GetTickCount;
@@ -398,12 +416,26 @@ begin
       if CurrentTime < StartTime then StartTime := CurrentTime;
       ElapsedTime := CurrentTime - StartTime;
 
+      // 提前失败检测：若 tar/cmd 进程已退出但 flag 尚未出现，说明解压失败
+      if TarProcHandle <> 0 then
+      begin
+        if WaitForSingleObject(TarProcHandle, 0) = WAIT_OBJECT_0 then
+        begin
+          Log2('[阶段1] 错误：tar 进程已提前退出但未产生 flag 文件，解压失败');
+          CloseHandle(TarProcHandle);
+          TarProcHandle := 0;
+          ExecLog('清理 tar.exe', 'taskkill.exe', '/F /IM tar.exe /T', '', ResultCode);
+          DeleteFile(TarFlagFile);
+          MsgBox('解压运行环境失败，请检查磁盘空间和权限后重试安装。', mbError, MB_OK);
+          Abort;
+        end;
+      end;
+
       // 超时检查：硬超时 300 秒，兼顾U盘等慢速设备
       if ElapsedTime > 300000 then
       begin
         Log2('[阶段1] 错误：解压超时（已等待 ' + IntToStr(ElapsedTime div 1000) + ' 秒），中止安装');
         MsgBox('解压运行环境超时，如果您安装在U盘等设备，可能需要多等一小会。若非本情况，可能解压失败，请检查磁盘空间和权限后重试安装。', mbError, MB_OK);
-        
 
         // 先尝试用句柄终止主进程，再始终用 taskkill 结束 tar/cmd 子进程，确保不留后台进程
         if TarProcHandle <> 0 then
@@ -440,6 +472,12 @@ begin
     end;
     DeleteFile(TarFlagFile);
     Log2('[阶段1] runtime.zip 解压完成');
+
+    // 最佳努力删除 runtime.zip；删除失败不中止安装（磁盘空间已用，不影响运行）
+    if not DeleteFile(AppPath + '\runtime.zip') then
+      Log2('[阶段1] 提示：runtime.zip 删除失败，可手动清理，不影响程序运行')
+    else
+      Log2('[阶段1] runtime.zip 已清理');
 
 
     // ====================================================

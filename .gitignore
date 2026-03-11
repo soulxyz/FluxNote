@@ -72,3 +72,6 @@ rcedit.exe
 get-pip.py
 ChineseSimplified.isl
 packaging/Output/
+data/*
+.port
+

@@ -73,7 +73,7 @@ def update_settings_batch():
     ALLOWED_KEYS = {
         'site_title', 'site_desc', 'blog_footer', 
         'notify_email', 'smtp_server', 'smtp_port', 'smtp_user', 'smtp_password',
-        'keep_history', 'debug_mode'
+        'keep_history', 'debug_mode', 'pwa_install_prompt'
     }
     
     try:

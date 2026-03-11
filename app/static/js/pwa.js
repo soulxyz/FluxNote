@@ -3,6 +3,20 @@ import { showToast } from './modules/utils.js';
 export const pwa = {
     _deferredPrompt: null,
     _installDismissed: false,
+    _installPromptEnabled: true,  // 缓存设置，避免重复请求
+
+    // 隐私模式或存储被禁用时的安全存储访问辅助
+    _safeStorage: {
+        get(storage, key, fallback = null) {
+            try { return storage.getItem(key); } catch { return fallback; }
+        },
+        set(storage, key, value) {
+            try { storage.setItem(key, value); } catch { /* ignore */ }
+        },
+        remove(storage, key) {
+            try { storage.removeItem(key); } catch { /* ignore */ }
+        },
+    },
     _swInstallStatus: {
         active: false,
         lastAsset: '',
@@ -12,11 +26,14 @@ export const pwa = {
     },
     _activationWatchdogId: null,
 
-    init() {
+    async init() {
         this._registerServiceWorker();
         this._listenServiceWorkerMessages();
+        // 立即注册监听，确保不错过 beforeinstallprompt 事件
         this._listenInstallPrompt();
         this._listenNetworkStatus();
+        // 异步读取设置，完成后再决定是否显示弹窗
+        this._installPromptEnabled = await this._fetchInstallPromptSetting();
     },
 
     // ── Service Worker 注册与更新 ──
@@ -359,21 +376,80 @@ export const pwa = {
             this._deferredPrompt = e;
 
             if (this._installDismissed) return;
+            if (!this._shouldShowInstallPrompt()) return;
 
-            const dismissed = sessionStorage.getItem('pwa-install-dismissed');
-            if (dismissed) return;
-
-            setTimeout(() => this._showInstallPrompt(), 3000);
+            setTimeout(() => this._showInstallPrompt(), 5000);
         });
 
         window.addEventListener('appinstalled', () => {
             this._deferredPrompt = null;
+            this._installPromptEnabled = false;
             this._removeInstallPrompt();
-            showToast('应用安装成功');
+            localStorage.setItem('pwa-app-installed', 'true');
+            // 清除不再需要的提示状态
+            localStorage.removeItem('pwa-install-dismiss-time');
+            localStorage.removeItem('pwa-visit-count');
+            sessionStorage.removeItem('pwa-install-session-dismissed');
+            showToast('应用安装成功！现在可以从桌面快速访问了');
         });
     },
 
+    _shouldShowInstallPrompt() {
+        try {
+            // 已安装（standalone模式）— beforeinstallprompt本身不会触发，双重保险
+            if (localStorage.getItem('pwa-app-installed') === 'true') return false;
+
+            // 设置开关已关闭
+            if (!this._installPromptEnabled) {
+                console.log('[PWA] Install prompt disabled in settings');
+                return false;
+            }
+
+            // 7天冷却期
+            const dismissTime = parseInt(localStorage.getItem('pwa-install-dismiss-time') || '0');
+            if (dismissTime && (Date.now() - dismissTime < 7 * 24 * 60 * 60 * 1000)) return false;
+
+            // 会话内已拒绝
+            if (sessionStorage.getItem('pwa-install-session-dismissed')) return false;
+
+            // 至少访问3次才显示
+            let visitCount = parseInt(localStorage.getItem('pwa-visit-count') || '0');
+            visitCount++;
+            localStorage.setItem('pwa-visit-count', visitCount.toString());
+            if (visitCount < 3) return false;
+
+            return true;
+        } catch (e) {
+            console.warn('[PWA] localStorage unavailable, skipping install prompt');
+            return false;
+        }
+    },
+
+    async _fetchInstallPromptSetting() {
+        try {
+            const response = await fetch('/api/settings/get-by-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keys: ['pwa_install_prompt'] })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                const raw = data.data?.pwa_install_prompt;
+                // 键不存在时 raw 为 undefined，默认启用；
+                // 后端可能返回布尔或字符串，统一处理两种类型
+                if (raw === undefined || raw === null) return true;
+                if (typeof raw === 'boolean') return raw;
+                return String(raw).toLowerCase() !== 'false';
+            }
+        } catch (e) {
+            console.warn('[PWA] Error fetching install prompt setting:', e);
+        }
+        return true;
+    },
+
     _showInstallPrompt() {
+        // 二次检查：_installPromptEnabled 可能在 setTimeout 期间被设置更新
+        if (!this._installPromptEnabled) return;
         if (!this._deferredPrompt || document.querySelector('.pwa-install-prompt')) return;
 
         const prompt = document.createElement('div');
@@ -385,27 +461,41 @@ export const pwa = {
                 <div class="pwa-install-desc">添加到桌面，获得原生应用体验</div>
             </div>
             <div class="pwa-install-actions">
-                <button class="btn pwa-dismiss-btn" style="background:transparent;color:var(--slate-500);border:1px solid var(--slate-200);">忽略</button>
-                <button class="btn pwa-accept-btn" style="background:var(--primary);color:white;">安装</button>
+                <button class="btn pwa-never-btn" title="不再提醒">×</button>
+                <button class="btn pwa-dismiss-btn">稍后</button>
+                <button class="btn pwa-accept-btn">安装</button>
             </div>
         `;
         document.body.appendChild(prompt);
 
+        // 安装按钮
         prompt.querySelector('.pwa-accept-btn').onclick = async () => {
             if (!this._deferredPrompt) return;
-            this._deferredPrompt.prompt();
-            const { outcome } = await this._deferredPrompt.userChoice;
-            if (outcome === 'accepted') {
-                console.log('[PWA] User accepted install');
+            try {
+                this._deferredPrompt.prompt();
+                const { outcome } = await this._deferredPrompt.userChoice;
+                console.log('[PWA] Install prompt result:', outcome);
+            } catch (e) {
+                console.warn('[PWA] Install prompt failed:', e);
             }
             this._deferredPrompt = null;
             this._removeInstallPrompt();
         };
 
+        // 稍后按钮（本次会话内不再显示）
         prompt.querySelector('.pwa-dismiss-btn').onclick = () => {
             this._installDismissed = true;
-            sessionStorage.setItem('pwa-install-dismissed', '1');
+            this._safeStorage.set(sessionStorage, 'pwa-install-session-dismissed', '1');
             this._removeInstallPrompt();
+        };
+
+        // 不再提醒按钮（设置7天冷却期）
+        prompt.querySelector('.pwa-never-btn').onclick = () => {
+            this._installDismissed = true;
+            this._safeStorage.set(localStorage, 'pwa-install-dismiss-time', Date.now().toString());
+            this._safeStorage.set(sessionStorage, 'pwa-install-session-dismissed', '1');
+            this._removeInstallPrompt();
+            showToast('7天内不再提醒');
         };
     },
 
@@ -415,6 +505,46 @@ export const pwa = {
             el.style.animation = 'slideUp .3s ease-in reverse forwards';
             setTimeout(() => el.remove(), 300);
         }
+    },
+
+    // 公开方法：手动触发安装提示
+    showInstallDialog() {
+        if (!this._deferredPrompt) {
+            showToast('当前浏览器不支持应用安装，或应用已经安装');
+            return false;
+        }
+        
+        // 清除会话拒绝标记，允许手动显示
+        this._safeStorage.remove(sessionStorage, 'pwa-install-session-dismissed');
+        this._installDismissed = false;
+        this._showInstallPrompt();
+        return true;
+    },
+
+    // 公开方法：重置安装提示设置
+    resetInstallPromptSettings() {
+        this._safeStorage.remove(localStorage, 'pwa-install-dismiss-time');
+        this._safeStorage.remove(localStorage, 'pwa-visit-count');
+        this._safeStorage.remove(sessionStorage, 'pwa-install-session-dismissed');
+        this._installDismissed = false;
+        showToast('安装提示设置已重置');
+    },
+
+    // 当设置页切换开关时同步内存状态
+    onSettingChanged(settingKey, value) {
+        if (settingKey === 'pwa_install_prompt') {
+            this._installPromptEnabled = value;
+            if (!value) this._removeInstallPrompt();
+        }
+    },
+
+    getInstallStatus() {
+        return {
+            isInstalled: this._safeStorage.get(localStorage, 'pwa-app-installed') === 'true',
+            promptEnabled: this._installPromptEnabled,
+            hasDeferred: !!this._deferredPrompt,
+            dismissed: this._installDismissed
+        };
     },
 
     // ── 网络状态指示器 ──
@@ -468,3 +598,10 @@ export const pwa = {
 };
 
 pwa.init();
+
+window.PWA = {
+    showInstallDialog:  () => pwa.showInstallDialog(),
+    resetSettings:      () => pwa.resetInstallPromptSettings(),
+    onSettingChanged:   (key, value) => pwa.onSettingChanged(key, value),
+    getInstallStatus:   () => pwa.getInstallStatus(),
+};

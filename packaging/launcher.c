@@ -4,6 +4,7 @@
 #include <shellapi.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <string.h>
 
 #define WM_TRAYICON (WM_USER + 1)
 #define IDM_OPEN    1001

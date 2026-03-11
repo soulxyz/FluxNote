@@ -4,6 +4,19 @@ export const pwa = {
     _deferredPrompt: null,
     _installDismissed: false,
     _installPromptEnabled: true,  // 缓存设置，避免重复请求
+
+    // 隐私模式或存储被禁用时的安全存储访问辅助
+    _safeStorage: {
+        get(storage, key, fallback = null) {
+            try { return storage.getItem(key); } catch { return fallback; }
+        },
+        set(storage, key, value) {
+            try { storage.setItem(key, value); } catch { /* ignore */ }
+        },
+        remove(storage, key) {
+            try { storage.removeItem(key); } catch { /* ignore */ }
+        },
+    },
     _swInstallStatus: {
         active: false,
         lastAsset: '',
@@ -467,15 +480,15 @@ export const pwa = {
         // 稍后按钮（本次会话内不再显示）
         prompt.querySelector('.pwa-dismiss-btn').onclick = () => {
             this._installDismissed = true;
-            sessionStorage.setItem('pwa-install-session-dismissed', '1');
+            this._safeStorage.set(sessionStorage, 'pwa-install-session-dismissed', '1');
             this._removeInstallPrompt();
         };
 
         // 不再提醒按钮（设置7天冷却期）
         prompt.querySelector('.pwa-never-btn').onclick = () => {
             this._installDismissed = true;
-            localStorage.setItem('pwa-install-dismiss-time', Date.now().toString());
-            sessionStorage.setItem('pwa-install-session-dismissed', '1');
+            this._safeStorage.set(localStorage, 'pwa-install-dismiss-time', Date.now().toString());
+            this._safeStorage.set(sessionStorage, 'pwa-install-session-dismissed', '1');
             this._removeInstallPrompt();
             showToast('7天内不再提醒');
         };
@@ -497,7 +510,7 @@ export const pwa = {
         }
         
         // 清除会话拒绝标记，允许手动显示
-        sessionStorage.removeItem('pwa-install-session-dismissed');
+        this._safeStorage.remove(sessionStorage, 'pwa-install-session-dismissed');
         this._installDismissed = false;
         this._showInstallPrompt();
         return true;
@@ -505,9 +518,9 @@ export const pwa = {
 
     // 公开方法：重置安装提示设置
     resetInstallPromptSettings() {
-        localStorage.removeItem('pwa-install-dismiss-time');
-        localStorage.removeItem('pwa-visit-count');
-        sessionStorage.removeItem('pwa-install-session-dismissed');
+        this._safeStorage.remove(localStorage, 'pwa-install-dismiss-time');
+        this._safeStorage.remove(localStorage, 'pwa-visit-count');
+        this._safeStorage.remove(sessionStorage, 'pwa-install-session-dismissed');
         this._installDismissed = false;
         showToast('安装提示设置已重置');
     },
@@ -522,7 +535,7 @@ export const pwa = {
 
     getInstallStatus() {
         return {
-            isInstalled: localStorage.getItem('pwa-app-installed') === 'true',
+            isInstalled: this._safeStorage.get(localStorage, 'pwa-app-installed') === 'true',
             promptEnabled: this._installPromptEnabled,
             hasDeferred: !!this._deferredPrompt,
             dismissed: this._installDismissed

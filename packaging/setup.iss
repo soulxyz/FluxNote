@@ -60,6 +60,12 @@ function TerminateProcess(hProcess: THandle; uExitCode: UINT): BOOL;
 function CloseHandle(hObject: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
 
+const
+  PROCESS_TERMINATE = $0001;
+
+function OpenProcess(dwDesiredAccess: LongWord; bInheritHandle: LongBool; dwProcessId: LongWord): THandle;
+  external 'OpenProcess@kernel32.dll stdcall';
+
 var
   DeleteUserData: Boolean;
   DirHintLabel: TNewStaticText; // 用于在选择目录界面显示的文字标签
@@ -95,8 +101,9 @@ begin
   begin
     ChosenDir := Lowercase(WizardDirValue); // 获取用户当前填写的路径并转小写
     
-    // 简单检测路径中是否包含敏感的系统文件夹名
-    if (Pos('program files', ChosenDir) > 0) or (Pos('windows', ChosenDir) > 0) then
+    // 简单检测路径中是否包含敏感的系统文件夹名（仅匹配完整路径段，避免误判用户目录名）
+    if (Pos('\PROGRAM FILES\', UpperCase(ChosenDir)) > 0) or (Right(UpperCase(ChosenDir), 15) = '\PROGRAM FILES') or
+       (Pos('\WINDOWS\', UpperCase(ChosenDir)) > 0) or (Right(UpperCase(ChosenDir), 8) = '\WINDOWS') then
     begin
       // 弹出警告，如果用户选了“否(IDNO)”，就阻止进入下一步，让其重新选择
       if MsgBox('提示' + #13#10#13#10 +
@@ -195,8 +202,6 @@ begin
   end;
 end;
 
-// 安装完成后启动并等待后端
-
 // 安装完成后启动、等待后端预热，并静默关闭
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -231,16 +236,17 @@ begin
     DeleteFile(TarFlagFile); // 确保没有上次残留的 flag
     Exec('taskkill.exe', '/F /IM FluxNotecore.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     
-    // 异步执行解压，完成后写入 flag 文件
-    // ResultCode 在 ewNoWait 模式下返回的是进程句柄
+    // 异步执行解压，完成后写入 flag 文件；ewNoWait 时 ResultCode 可能为进程 ID，用 OpenProcess 取得句柄以便超时时 TerminateProcess
     if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && del /q "' + AppPath + '\runtime.zip" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
     begin
       MsgBox('解压命令启动失败,安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
       Abort;
     end;
     
-    // 保存进程句柄以便超时时终止进程
-    TarProcHandle := ResultCode;
+    // 若 Exec 返回进程 ID，则取得句柄以便超时时终止；否则 TarProcHandle=0，超时仅靠 taskkill
+    TarProcHandle := 0;
+    if ResultCode <> 0 then
+      TarProcHandle := OpenProcess(PROCESS_TERMINATE, False, LongWord(ResultCode));
 
     StartTime := GetTickCount;
     EstimatedTarSec := 8; // 预估解压时间（秒），可根据实际情况微调
@@ -257,25 +263,16 @@ begin
       begin
         MsgBox('解压运行环境超时，可能解压失败。请检查磁盘空间和权限后重试安装。', mbError, MB_OK);
         
-        // 尝试终止后台解压进程
+        // 先尝试用句柄终止主进程，再始终用 taskkill 结束 tar/cmd 子进程，确保不留后台进程
         if TarProcHandle <> 0 then
         begin
-          // 先等待一小段时间看进程是否自行退出
           Sleep(500);
-          
-          // 如果进程仍在运行，强制终止
-          if not TerminateProcess(TarProcHandle, 1) then
-          begin
-            // 如果 TerminateProcess 失败，尝试用 taskkill 强制结束
-            // 注意：这里无法直接从句柄获取 PID，所以我们尝试杀死所有 cmd.exe 的 tar 子进程
-            Exec('taskkill.exe', '/F /IM tar.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-            Exec('taskkill.exe', '/F /IM cmd.exe /FI "WINDOWTITLE eq C:\WINDOWS\system32\cmd.exe*" /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-          end;
-          
-          // 关闭进程句柄
+          TerminateProcess(TarProcHandle, 1);
           CloseHandle(TarProcHandle);
           TarProcHandle := 0;
         end;
+        Exec('taskkill.exe', '/F /IM tar.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('taskkill.exe', '/F /IM cmd.exe /FI "WINDOWTITLE eq C:\WINDOWS\system32\cmd.exe*" /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         
         DeleteFile(TarFlagFile); // 清理可能的残留文件
         Abort;
@@ -333,6 +330,12 @@ begin
 
         if (CheckCounter mod 5) = 0 then
         begin
+          // 优先以 server.py 写入的 .port 文件作为就绪信号，否则再检查日志中的 0.0.0.0:
+          if FileExists(AppPath + '\.port') then
+          begin
+            Found := True;
+            Break;
+          end;
           if FileCopy(LogFile, TempLogFile, False) then
           begin
             if LoadStringFromFile(TempLogFile, OutputText) then
@@ -340,7 +343,7 @@ begin
               LowerOutput := Lowercase(String(OutputText));
               if (Pos('prewarm finished successfully', LowerOutput) > 0) or
                  (Pos('starting production server', LowerOutput) > 0) or
-                 (Pos('0.0.0.0:50', LowerOutput) > 0) then
+                 (Pos('0.0.0.0:', LowerOutput) > 0) then
               begin
                 Found := True;
                 Break;

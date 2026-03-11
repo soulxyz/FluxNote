@@ -251,6 +251,26 @@ DWORD WINAPI RestartThread(LPVOID lpParam) {
     return 0;
 }
 
+// 判断今天是否已弹过就绪通知；首次返回 TRUE 并记录日期，当天后续返回 FALSE
+static BOOL ShouldShowDailyNotify() {
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char today[16];
+    sprintf(today, "%04d-%02d-%02d", st.wYear, st.wMonth, st.wDay);
+
+    FILE *fp = fopen(".notify_date", "r");
+    if (fp) {
+        char stored[16] = {0};
+        fscanf(fp, "%15s", stored);
+        fclose(fp);
+        if (strcmp(today, stored) == 0) return FALSE;
+    }
+
+    fp = fopen(".notify_date", "w");
+    if (fp) { fprintf(fp, "%s", today); fclose(fp); }
+    return TRUE;
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     HANDLE hMutex = CreateMutexW(NULL, TRUE, L"FluxNote_Single_Instance_Mutex");
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -286,9 +306,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wcscpy(nid.szTip, L"FluxNote 正在启动...");
     Shell_NotifyIconW(NIM_ADD, &nid);
 
-    // 气泡提示用户耐心等待
-    ShowBalloon(L"FluxNote 正在启动", L"首次启动约需 10 秒，请稍候...", NIIF_INFO);
-
     // ── 2. 启动后端进程 ──────────────────────────────────────────────────
     STARTUPINFOW si = { sizeof(STARTUPINFOW) };
     PROCESS_INFORMATION pi;
@@ -313,6 +330,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // ── 3. 等待服务就绪，期间保持托盘响应并显示进度 ─────────────────────
     int max_retries = 3000;
     BOOL server_started = FALSE;
+    BOOL shownSlowBalloon = FALSE;
     DWORD startTick = GetTickCount();
 
     for (int i = 0; i < max_retries; i++) {
@@ -355,11 +373,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             fclose(fp);
         }
 
+        DWORD elapsed = GetTickCount() - startTick;
+
+        // 超过 3 秒才弹一次"略久"提示，之后不再重复
+        if (!shownSlowBalloon && elapsed > 3000) {
+            ShowBalloon(L"FluxNote 正在启动",
+                        L"启动略久，请稍候...\n可右键托盘图标管理运行状态", NIIF_INFO);
+            shownSlowBalloon = TRUE;
+        }
+
         // 每秒更新一次 Tooltip，显示已等待秒数
         if (i % 10 == 0) {
-            DWORD elapsed = (GetTickCount() - startTick) / 1000;
             wchar_t tip[128];
-            swprintf(tip, 128, L"FluxNote 正在启动... (%ds)", (int)elapsed);
+            swprintf(tip, 128, L"FluxNote 正在启动... (%ds)", (int)(elapsed / 1000));
             UpdateTip(tip);
         }
 
@@ -394,7 +420,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     wchar_t tip[128];
     swprintf(tip, 128, L"FluxNote 运行于端口 %d", g_serverPort);
     UpdateTip(tip);
-    ShowBalloon(L"FluxNote 已就绪！", L"你可以在托盘管理FluxNote的运行状态", NIIF_INFO);
+    // 慢启动已弹过一次提示，不再重复；快速启动仅当天首次弹出就绪通知
+    if (!shownSlowBalloon && ShouldShowDailyNotify()) {
+        ShowBalloon(L"FluxNote 已就绪", L"双击托盘图标可快速打开", NIIF_INFO);
+    }
 
     OpenBrowser();
 

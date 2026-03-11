@@ -505,7 +505,6 @@ export const pwa = {
 
     // 公开方法：重置安装提示设置
     resetInstallPromptSettings() {
-        localStorage.removeItem('pwa-install-dismissed');
         localStorage.removeItem('pwa-install-dismiss-time');
         localStorage.removeItem('pwa-visit-count');
         sessionStorage.removeItem('pwa-install-session-dismissed');

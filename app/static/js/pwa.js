@@ -434,7 +434,12 @@ export const pwa = {
             });
             if (response.ok) {
                 const data = await response.json();
-                return data.data?.pwa_install_prompt?.toLowerCase() !== 'false';
+                const raw = data.data?.pwa_install_prompt;
+                // 键不存在时 raw 为 undefined，默认启用；
+                // 后端可能返回布尔或字符串，统一处理两种类型
+                if (raw === undefined || raw === null) return true;
+                if (typeof raw === 'boolean') return raw;
+                return String(raw).toLowerCase() !== 'false';
             }
         } catch (e) {
             console.warn('[PWA] Error fetching install prompt setting:', e);

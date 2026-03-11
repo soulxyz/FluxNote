@@ -2109,12 +2109,28 @@ input:checked + .slider:before { transform: translateX(20px); }
 
 .pwa-install-actions {
     display: flex;
+    align-items: center;
     gap: 8px;
 }
 
 .pwa-install-actions .btn {
     padding: 8px 16px;
     font-size: 13px;
+}
+
+.pwa-install-actions .pwa-never-btn {
+    padding: 4px 8px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 4px;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+}
+
+.pwa-install-actions .pwa-never-btn:hover {
+    opacity: 1;
+    background: var(--slate-100) !important;
+    color: var(--slate-600) !important;
 }
 
 /* PWA 状态指示器 */

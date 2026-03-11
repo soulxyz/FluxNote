@@ -102,8 +102,8 @@ begin
     ChosenDir := Lowercase(WizardDirValue); // 获取用户当前填写的路径并转小写
     
     // 简单检测路径中是否包含敏感的系统文件夹名（仅匹配完整路径段，避免误判用户目录名）
-    if (Pos('\PROGRAM FILES\', UpperCase(ChosenDir)) > 0) or (Right(UpperCase(ChosenDir), 15) = '\PROGRAM FILES') or
-       (Pos('\WINDOWS\', UpperCase(ChosenDir)) > 0) or (Right(UpperCase(ChosenDir), 8) = '\WINDOWS') then
+    if (Pos('\PROGRAM FILES\', UpperCase(ChosenDir)) > 0) or (Copy(UpperCase(ChosenDir), Length(ChosenDir) - 14, 15) = '\PROGRAM FILES') or
+       (Pos('\WINDOWS\', UpperCase(ChosenDir)) > 0) or (Copy(UpperCase(ChosenDir), Length(ChosenDir) - 7, 8) = '\WINDOWS') then
     begin
       // 弹出警告，如果用户选了“否(IDNO)”，就阻止进入下一步，让其重新选择
       if MsgBox('提示' + #13#10#13#10 +

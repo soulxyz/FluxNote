@@ -1635,6 +1635,30 @@
                     <div class="form-row">
                         <div class="settings-toggle-row">
                             <div>
+                                <div class="settings-toggle-label">PWA安装提示</div>
+                                <div class="settings-toggle-desc">开启后，应用会在适当时机提示用户安装到桌面。关闭后将不再显示安装提示。</div>
+                                <div id="pwaStatusInfo" class="settings-toggle-desc" style="font-size:11px;color:#10B981;margin-top:4px;display:none;">
+                                    <i class="fas fa-info-circle"></i> <span id="pwaStatusText">检查安装状态中...</span>
+                                </div>
+                                <div style="margin-top:8px;display:flex;gap:8px;">
+                                    <button type="button" class="btn btn-sm" onclick="resetPwaSettings()" style="background:#F8FAFC;color:#64748B;border:1px solid #E2E8F0;font-size:11px;padding:4px 8px;">
+                                        <i class="fas fa-refresh"></i> 重置PWA设置
+                                    </button>
+                                    <button type="button" class="btn btn-sm" onclick="showPwaInstallDialog()" style="background:#10B981;color:white;border:none;font-size:11px;padding:4px 8px;">
+                                        <i class="fas fa-download"></i> 手动安装
+                                    </button>
+                                </div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="pwaInstallPromptToggle" onchange="togglePwaInstallPrompt()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="settings-toggle-row">
+                            <div>
                                 <div class="settings-toggle-label">调试模式</div>
                                 <div class="settings-toggle-desc">开启后，API错误将返回详细信息，便于排查问题。<strong style="color:#dc2626;">生产环境建议关闭！</strong></div>
                             </div>
@@ -2302,6 +2326,12 @@
 
                 const debugMode = data.debug_mode?.toLowerCase() === 'true';
                 document.getElementById('debugModeToggle').checked = debugMode;
+
+                const pwaInstallPrompt = data.pwa_install_prompt?.toLowerCase() !== 'false';
+                document.getElementById('pwaInstallPromptToggle').checked = pwaInstallPrompt;
+
+                // 检查PWA安装状态
+                updatePwaStatus();
             } catch (error) {
                 console.error('Failed to load settings');
             }
@@ -2407,6 +2437,68 @@
                 }
             } catch (error) {
                 showToast('修改失败', 'error');
+            }
+        }
+
+        function updatePwaStatus() {
+            if (!window.PWA) return;
+            const status = window.PWA.getInstallStatus();
+            const statusInfo = document.getElementById('pwaStatusInfo');
+            const statusText = document.getElementById('pwaStatusText');
+            let message, color;
+
+            if (status.isInstalled) {
+                message = '应用已安装到设备';
+                color = '#10B981';
+            } else if (!status.promptEnabled) {
+                message = '安装提示已禁用';
+                color = '#94A3B8';
+            } else if (status.hasDeferred) {
+                message = '支持安装，将在适当时机提示';
+                color = '#10B981';
+            } else {
+                message = '当前浏览器不支持应用安装';
+                color = '#F59E0B';
+            }
+
+            statusText.textContent = message;
+            statusInfo.style.color = color;
+            statusInfo.style.display = 'block';
+        }
+
+        async function togglePwaInstallPrompt() {
+            const enabled = document.getElementById('pwaInstallPromptToggle').checked;
+            try {
+                const response = await fetch('/api/settings/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pwa_install_prompt: enabled })
+                });
+                if (response.ok) {
+                    showToast(enabled ? 'PWA安装提示已启用' : 'PWA安装提示已禁用', 'success');
+                    window.PWA?.onSettingChanged('install_prompt', enabled);
+                    updatePwaStatus();
+                } else {
+                    showToast('设置失败', 'error');
+                    document.getElementById('pwaInstallPromptToggle').checked = !enabled;
+                }
+            } catch (e) {
+                showToast('网络错误', 'error');
+                document.getElementById('pwaInstallPromptToggle').checked = !enabled;
+            }
+        }
+
+        function resetPwaSettings() {
+            if (!window.PWA) { showToast('PWA模块未加载', 'error'); return; }
+            window.PWA.resetSettings();
+            localStorage.removeItem('pwa-app-installed');
+            updatePwaStatus();
+        }
+
+        function showPwaInstallDialog() {
+            if (!window.PWA) { showToast('PWA模块未加载', 'error'); return; }
+            if (!window.PWA.showInstallDialog()) {
+                showToast('当前浏览器不支持安装，或应用已安装', 'info');
             }
         }
 

@@ -61,13 +61,37 @@ function TerminateProcess(hProcess: THandle; uExitCode: UINT): BOOL;
 function CloseHandle(hObject: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
 
-const
-  PROCESS_TERMINATE = $0001;
-  SYNCHRONIZE       = $00100000;
-  WAIT_OBJECT_0     = $00000000;
+#ifdef UNICODE
+  #define AW "W"
+#else
+  #define AW "A"
+#endif
 
-function OpenProcess(dwDesiredAccess: LongWord; bInheritHandle: LongBool; dwProcessId: LongWord): THandle;
-  external 'OpenProcess@kernel32.dll stdcall';
+const
+  WAIT_OBJECT_0           = $00000000;
+  SEE_MASK_NOCLOSEPROCESS = $00000040;
+
+type
+  TShellExecuteInfo = record
+    cbSize: DWORD;
+    fMask: Cardinal;
+    Wnd: HWND;
+    lpVerb: string;
+    lpFile: string;
+    lpParameters: string;
+    lpDirectory: string;
+    nShow: Integer;
+    hInstApp: THandle;
+    lpIDList: DWORD;
+    lpClass: string;
+    hkeyClass: THandle;
+    dwHotKey: DWORD;
+    hMonitor: THandle;
+    hProcess: THandle;
+  end;
+
+function ShellExecuteEx(var lpExecInfo: TShellExecuteInfo): BOOL;
+  external 'ShellExecuteEx{#AW}@shell32.dll stdcall';
 
 function WaitForSingleObject(hHandle: THandle; dwMilliseconds: LongWord): LongWord;
   external 'WaitForSingleObject@kernel32.dll stdcall';
@@ -216,6 +240,7 @@ begin
     
     // 简单检测路径中是否包含敏感的系统文件夹名（仅匹配完整路径段，避免误判用户目录名）
     if (Pos('\PROGRAM FILES\', UpperCase(ChosenDir)) > 0) or (Copy(UpperCase(ChosenDir), Length(ChosenDir) - 14, 15) = '\PROGRAM FILES') or
+       (Pos('\PROGRAM FILES (X86)\', UpperCase(ChosenDir)) > 0) or (Copy(UpperCase(ChosenDir), Length(ChosenDir) - 20, 21) = '\PROGRAM FILES (X86)') or
        (Pos('\WINDOWS\', UpperCase(ChosenDir)) > 0) or (Copy(UpperCase(ChosenDir), Length(ChosenDir) - 7, 8) = '\WINDOWS') then
     begin
       // 弹出警告，如果用户选了“否(IDNO)”，就阻止进入下一步，让其重新选择
@@ -356,6 +381,7 @@ var
   TimeoutSec, CheckCounter, EstimatedTarSec, TempPos: Integer;
   Found: Boolean;
   TarProcHandle: THandle;
+  ExecInfo: TShellExecuteInfo;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -388,19 +414,24 @@ begin
     ExecLog('解压前终止 FluxNoteCore', 'taskkill.exe', '/F /IM FluxNotecore.exe /T', '', ResultCode);
 
     // 异步启动 tar 仅做解压；flag 写入和 zip 删除在解压成功后单独处理，避免删除失败污染退出码
-    // cmd /C tar -xf "..." -C "..." && echo 1 > "flag" —— 只让 tar 负责解压并在成功后写 flag，删除 zip 是后续最佳努力步骤
-    if not Exec('cmd.exe', '/C tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && echo 1 > "' + TarFlagFile + '"', '', SW_HIDE, ewNoWait, ResultCode) then
+    // 使用 ShellExecuteEx + SEE_MASK_NOCLOSEPROCESS 获取真实进程句柄，用于超时终止和提前退出检测
+    ExecInfo.cbSize := SizeOf(ExecInfo);
+    ExecInfo.fMask := SEE_MASK_NOCLOSEPROCESS;
+    ExecInfo.Wnd := 0;
+    ExecInfo.lpVerb := 'open';
+    ExecInfo.lpFile := 'cmd.exe';
+    ExecInfo.lpParameters := '/C tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && echo 1 > "' + TarFlagFile + '"';
+    ExecInfo.lpDirectory := '';
+    ExecInfo.nShow := SW_HIDE;
+
+    if not ShellExecuteEx(ExecInfo) then
     begin
-      Log2('[阶段1] 错误：解压命令启动失败，退出码：' + IntToStr(ResultCode));
-      MsgBox('解压命令启动失败,安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);
+      Log2('[阶段1] 错误：解压命令启动失败');
+      MsgBox('解压命令启动失败，安装无法继续。', mbError, MB_OK);
       Abort;
     end;
-    Log2('[阶段1] 解压进程已启动，PID/ResultCode：' + IntToStr(ResultCode));
-
-    // 若 Exec 返回进程 ID，则取得句柄：用于超时强制终止，也用于提前检测进程意外退出
-    TarProcHandle := 0;
-    if ResultCode <> 0 then
-      TarProcHandle := OpenProcess(PROCESS_TERMINATE or SYNCHRONIZE, False, LongWord(ResultCode));
+    TarProcHandle := ExecInfo.hProcess;
+    Log2('[阶段1] 解压进程已启动，句柄：' + IntToStr(TarProcHandle));
 
     StartTime := GetTickCount;
     EstimatedTarSec := 20; // 预估解压时间（秒），U盘/慢速存储可能需要更长时间
@@ -487,6 +518,7 @@ begin
     WizardForm.Refresh;
 
     DeleteFile(LogFile);
+    DeleteFile(AppPath + '\.port'); // 删除旧的 .port 文件，避免误判预热成功
     Found := False;
 
     if not Exec('cmd.exe', '/C ""' + RuntimePath + '" -u server.py --prewarm"',

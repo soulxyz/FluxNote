@@ -45,19 +45,22 @@ def sync_database_schema(app):
     tables_after = set(inspector.get_table_names())
     created_tables = sorted(tables_after - tables_before)
     if created_tables:
-        print(f"  [✓] 新建表: {', '.join(created_tables)}")
+        logger.info(f"  [✓] 新建表: {', '.join(created_tables)}")
 
     # ── 2. 补齐缺失列 ──
     col_changes = _sync_missing_columns(inspector)
+
+    # 刷新 inspector 以反映新添加的列
+    inspector = inspect(db.engine)
 
     # ── 3. 补齐缺失索引 ──
     idx_changes = _sync_missing_indexes(inspector)
 
     if col_changes or idx_changes:
         for msg in col_changes + idx_changes:
-            print(f"  [✓] {msg}")
+            logger.info(f"  [✓] {msg}")
     elif not created_tables:
-        print("  [✓] 数据库结构已是最新")
+        logger.info("  [✓] 数据库结构已是最新")
 
 
 def _sync_missing_columns(inspector):
@@ -88,9 +91,17 @@ def _sync_missing_columns(inspector):
 
             col_type = column.type.compile(dialect=db.engine.dialect)
 
-            # SQLite ADD COLUMN 限制: NOT NULL 必须有默认值
+            # 检测显式默认值（不合成安全占位符）
             default_clause = _resolve_default_clause(column, col_type)
-            nullable = column.nullable or default_clause is None
+            
+            # 如果是 NOT NULL 且无显式默认值，记录警告
+            if not column.nullable and default_clause is None:
+                logger.warning(
+                    f"列 {table.name}.{column.name} ({col_type}) 定义为 NOT NULL 但无默认值，"
+                    f"需要在迁移时处理数据回填"
+                )
+            
+            nullable = column.nullable
             null_str = "" if nullable else " NOT NULL"
             default_str = f" DEFAULT {default_clause}" if default_clause is not None else ""
 
@@ -112,9 +123,10 @@ def _sync_missing_columns(inspector):
 
 
 def _resolve_default_clause(column, col_type_str):
-    """为 ALTER TABLE ADD COLUMN 生成 SQLite 兼容的 DEFAULT 子句值。
+    """检测列的显式默认值（server_default 或静态 default）。
 
-    返回 SQL 片段字符串（不含 DEFAULT 关键字），或 None 表示无默认值。
+    返回 SQL 片段字符串（不含 DEFAULT 关键字），或 None 表示无显式默认值。
+    不会为 NOT NULL 列合成安全占位符。
     """
     # 先检查 server_default
     if column.server_default is not None:
@@ -142,15 +154,7 @@ def _resolve_default_clause(column, col_type_str):
             escaped_val = val.replace("'", "''")
             return f"'{escaped_val}'"
 
-    # 对 NOT NULL 且无静态默认值的列，按类型给一个安全默认值
-    if not column.nullable:
-        upper = col_type_str.upper()
-        if 'BOOL' in upper:
-            return "0"
-        if any(t in upper for t in ('INT', 'FLOAT', 'REAL', 'NUMERIC', 'DECIMAL')):
-            return "0"
-        return "''"
-
+    # 无显式默认值时返回 None，不合成安全占位符
     return None
 
 
@@ -230,9 +234,9 @@ def check_route_shadowing(app):
                 continue
             reported.add(key)
 
-            print("\n" + "!" * 50)
-            print(" [路由警告] 发现真实的路由可达性冲突:")
-            print(f" 实际命中: {matched_rule.rule} -> {matched_rule.endpoint} [{method}]")
-            print(f" 预期路由: {rule.rule} -> {rule.endpoint} [{method}]")
-            print(" 说明: 访问该静态路径时，Flask 没有命中预期规则，请检查路由设计。")
-            print("!" * 50 + "\n")
+            logger.warning("\n" + "!" * 50)
+            logger.warning(" [路由警告] 发现真实的路由可达性冲突:")
+            logger.warning(f" 实际命中: {matched_rule.rule} -> {matched_rule.endpoint} [{method}]")
+            logger.warning(f" 预期路由: {rule.rule} -> {rule.endpoint} [{method}]")
+            logger.warning(" 说明: 访问该静态路径时，Flask 没有命中预期规则，请检查路由设计。")
+            logger.warning("!" * 50 + "\n")

@@ -133,6 +133,11 @@ export async function renderContent(container, content, options = {}) {
     } = options;
 
     try {
+        // 0. 解码 HTML 实体（修复 Jinja2 自动转义问题）
+        // 当内容从 <script type="text/markdown"> 的 .textContent 读取时，
+        // Jinja2 已将 &nbsp; 转为 &amp;nbsp;，需要还原为 &nbsp; 供 marked.js 正常解析
+        content = decodeHtmlEntities(content);
+        
         // 1. 处理 WikiLinks
         let processed = parseWikiLinks(content);
 

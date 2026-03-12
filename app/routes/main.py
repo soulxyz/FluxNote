@@ -39,6 +39,12 @@ def service_worker():
         current_app.logger.error(f"Error serving sw.js: {e}")
         return "Service Worker not found", 404
 
+@main_bp.route('/favicon.ico')
+def favicon():
+    """根路径提供 favicon.ico"""
+    return send_from_directory(current_app.static_folder, 'favicon.ico',
+                               mimetype='image/vnd.microsoft.icon')
+
 @main_bp.route('/manifest.json')
 def manifest():
     """根路径提供 manifest.json"""

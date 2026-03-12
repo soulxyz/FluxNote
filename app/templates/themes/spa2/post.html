@@ -70,6 +70,7 @@ async function renderPost() {
 
     if (rawContainer && targetContainer) {
         await renderContent(targetContainer, rawContainer.textContent, {
+            skipFirstH1: true,
             enableViewer: true,
             enableMermaid: true,
             enableHighlight: true

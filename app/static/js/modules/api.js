@@ -186,5 +186,22 @@ export const api = {
     upload: (formData) => fetchJson('/api/upload', {
         method: 'POST',
         body: formData
-    })
+    }),
+    documents: {
+        upload: (file, noteId) => {
+            const fd = new FormData();
+            fd.append('file', file);
+            if (noteId) fd.append('note_id', noteId);
+            return fetchJson('/api/documents/upload', { method: 'POST', body: fd });
+        },
+        get: (id) => fetchJson(`/api/documents/${id}`),
+        delete: (id) => fetchJson(`/api/documents/${id}`, { method: 'DELETE' }),
+        getMd: (id) => fetchJson(`/api/documents/${id}/md`),
+        listByNote: (noteId) => fetchJson(`/api/notes/${noteId}/documents`),
+        linkToNote: (docId, noteId) => fetchJson(`/api/documents/${docId}/link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note_id: noteId })
+        }),
+    }
 };

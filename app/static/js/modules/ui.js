@@ -246,6 +246,7 @@ export const ui = {
                     <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
                     <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
                     <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
+                    <span class="note-action open-doc" data-action="open-doc" data-id="${note.id}" title="文档阅读"><i class="fas fa-file-alt"></i></span>
                     ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
                 </div>`) : ''}
             </div>

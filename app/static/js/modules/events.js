@@ -260,6 +260,29 @@ export function initGlobalEvents(context) {
         }
     });
 
+    // 文档引用链接点击 → 触发阅读面板跳转（事件委托）
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('.doc-citation-link');
+        if (!link) return;
+        e.preventDefault();
+        const docId = link.dataset.docId;
+        const page = link.dataset.page ? parseInt(link.dataset.page) : null;
+        // 从父级 blockquote 中提取引用文字（用于高亮定位）
+        const blockquote = link.closest('blockquote');
+        let text = '';
+        if (blockquote) {
+            const clone = blockquote.cloneNode(true);
+            // 移除来源行
+            clone.querySelectorAll('em').forEach(el => el.remove());
+            text = clone.textContent.trim().slice(0, 80);
+        }
+        if (docId) {
+            window.dispatchEvent(new CustomEvent('doc:navigate', {
+                detail: { docId, page, text }
+            }));
+        }
+    });
+
     eventsInitialized = true;
     console.log('Global events initialized');
 }
@@ -1222,6 +1245,99 @@ function initCustomEvents(loadNotes, loadTags) {
     });
 
     // 分享功能
+    // 文档阅读面板：打开关联到本笔记的文档（或上传新文档）
+    window.addEventListener('note:open-doc', async (e) => {
+        const noteId = e.detail;
+        window.__currentNoteId = noteId;
+        if (!window.readerModule) return showToast('阅读面板未就绪，请刷新页面');
+
+        const { reader, uploadAndOpenDocument } = window.readerModule;
+
+        // 查询已关联文档
+        const res = await api.documents?.listByNote(noteId);
+        if (res && res.ok) {
+            const docs = await res.json();
+            if (docs.length === 1) {
+                // 只有一个文档，直接打开
+                reader.open(docs[0].id, noteId);
+                reader.setActiveNote(noteId);
+            } else if (docs.length > 1) {
+                // 多个文档，显示选择器
+                _showDocPicker(docs, noteId);
+            } else {
+                // 无关联文档，触发上传
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.pdf,.docx,.doc';
+                input.onchange = async () => {
+                    if (input.files[0]) {
+                        await uploadAndOpenDocument(input.files[0], noteId);
+                        reader.setActiveNote(noteId);
+                    }
+                };
+                input.click();
+            }
+        }
+    });
+
+    function _showDocPicker(docs, noteId) {
+        const existing = document.querySelector('.doc-picker-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'doc-picker-modal';
+        modal.innerHTML = `
+            <div class="doc-picker-box">
+                <div class="doc-picker-header">
+                    <span>选择文档</span>
+                    <button class="doc-picker-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="doc-picker-list">
+                    ${docs.map(d => `
+                        <div class="doc-picker-item" data-doc-id="${d.id}">
+                            <i class="fas fa-${d.file_type === 'pdf' ? 'file-pdf' : 'file-word'}"></i>
+                            <span class="doc-picker-name">${d.original_filename}</span>
+                            <span class="doc-picker-meta">${d.page_count ? d.page_count + '页' : ''}</span>
+                        </div>
+                    `).join('')}
+                    <div class="doc-picker-item doc-picker-upload" id="docPickerUpload">
+                        <i class="fas fa-plus"></i>
+                        <span>上传新文档</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelector('.doc-picker-close').onclick = () => modal.remove();
+        modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.remove(); });
+
+        modal.querySelectorAll('.doc-picker-item:not(.doc-picker-upload)').forEach(item => {
+            item.onclick = () => {
+                modal.remove();
+                const { reader } = window.readerModule;
+                reader.open(item.dataset.docId, noteId);
+                reader.setActiveNote(noteId);
+            };
+        });
+
+        document.getElementById('docPickerUpload')?.addEventListener('click', () => {
+            modal.remove();
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.docx,.doc';
+            input.onchange = async () => {
+                if (input.files[0]) {
+                    const { uploadAndOpenDocument } = window.readerModule;
+                    await uploadAndOpenDocument(input.files[0], noteId);
+                    const { reader } = window.readerModule;
+                    reader.setActiveNote(noteId);
+                }
+            };
+            input.click();
+        });
+    }
+
     window.addEventListener('note:share', async (e) => {
         if (!navigator.onLine || state.sessionRevoked) return showToast('离线模式暂不支持分享');
         const noteId = e.detail;

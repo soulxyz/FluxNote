@@ -84,6 +84,14 @@
                             if (videoExts.test(href)) {
                                 return '<div class="video-wrapper"><video controls preload="metadata" src="' + href + '"></video></div>';
                             }
+                            // 文档引用协议：#doc:docId[:page]
+                            if (href && href.startsWith('#doc:')) {
+                                var parts = href.slice(5).split(':');
+                                var docId = parts[0];
+                                var page = parts[1] ? parseInt(parts[1]) : null;
+                                var pageLabel = page ? '第' + page + '页' : '';
+                                return '<a href="javascript:void(0)" class="doc-citation-link" data-doc-id="' + docId + '" data-page="' + (page || '') + '" title="跳转到文档' + pageLabel + '"><i class="fas fa-file-alt"></i>' + text + '</a>';
+                            }
                             var titleAttr = title ? ' title="' + title + '"' : '';
                             return '<a href="' + href + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + text + '</a>';
                         }
@@ -660,6 +668,85 @@
 
         // 供 settings.html 内部调用（通过 parent.closeSettingsModal）
         window.closeSettingsModal = closeSettingsModal;
+    </script>
+
+    <!-- 文档阅读面板 -->
+    <div id="readerOverlay" class="reader-overlay"></div>
+    <div id="readerPanel" class="reader-panel">
+        <!-- 顶部工具栏 -->
+        <div class="reader-header">
+            <div class="reader-header-left">
+                <button id="readerCloseBtn" class="reader-btn reader-btn-icon" title="关闭 (Esc)">
+                    <i class="fas fa-times"></i>
+                </button>
+                <span id="readerDocTitle" class="reader-doc-title">文档</span>
+            </div>
+            <div id="readerToolbar" class="reader-toolbar">
+                <!-- PDF 控制 -->
+                <div class="reader-pdf-controls">
+                    <button id="readerPrevBtn" class="reader-btn reader-btn-icon" title="上一页 (←)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="reader-page-info">
+                        <input id="readerPageInput" type="number" min="1" value="1" class="reader-page-input">
+                        <span class="reader-page-sep">/</span>
+                        <span id="readerTotalPages">—</span>
+                    </div>
+                    <button id="readerNextBtn" class="reader-btn reader-btn-icon" title="下一页 (→)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <select id="readerScale" class="reader-scale-select" title="缩放">
+                        <option value="0.8">80%</option>
+                        <option value="1.0">100%</option>
+                        <option value="1.2">120%</option>
+                        <option value="1.4" selected>140%</option>
+                        <option value="1.8">180%</option>
+                        <option value="2.2">220%</option>
+                    </select>
+                </div>
+                <button id="readerFullscreenBtn" class="reader-btn reader-btn-icon" title="全屏阅读">
+                    <i class="fas fa-expand-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="reader-body">
+            <!-- 加载中 -->
+            <div id="readerLoading" class="reader-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>正在加载文档…</span>
+            </div>
+
+            <!-- PDF 渲染区 -->
+            <div id="readerPdfWrapper" class="reader-pdf-wrapper">
+                <div class="reader-canvas-container">
+                    <canvas id="readerCanvas"></canvas>
+                    <div id="readerTextLayer" class="reader-text-layer"></div>
+                </div>
+            </div>
+
+            <!-- Word 渲染区（Markdown） -->
+            <div id="readerMdContent" class="reader-md-content markdown-body" style="display:none;"></div>
+        </div>
+
+        <!-- 选中文字浮动工具栏 -->
+        <div id="readerFloatBar" class="reader-float-bar" style="display:none;">
+            <button id="readerBtnQuote" class="reader-float-btn" title="插入引用到笔记">
+                <i class="fas fa-quote-right"></i> 引用
+            </button>
+            <div class="reader-float-sep"></div>
+            <button id="readerBtnAI" class="reader-float-btn" title="AI 解释选中内容">
+                <i class="fas fa-magic"></i> AI 解释
+            </button>
+        </div>
+    </div>
+
+    <!-- 初始化阅读面板 -->
+    <script type="module">
+        import { reader, uploadAndOpenDocument } from '/static/js/modules/reader.js?v={{ app_version }}';
+        reader.init();
+        window.readerModule = { reader, uploadAndOpenDocument };
     </script>
 </body>
 </html>

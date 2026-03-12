@@ -467,6 +467,40 @@ class ShareAttempt(db.Model):
         return max(0, int(remaining) + 1)
 
 
+class Document(db.Model):
+    """关联笔记的文档（PDF 直读 / Word 转 MD）"""
+    __tablename__ = 'document'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    note_id = db.Column(db.String(36), db.ForeignKey('note.id'), nullable=True)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    original_filename = db.Column(db.String(256), nullable=False)
+    stored_filename = db.Column(db.String(256), nullable=False)
+    file_type = db.Column(db.String(10), nullable=False)   # 'pdf' | 'docx'
+    page_count = db.Column(db.Integer, nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)       # bytes
+    text_content = db.Column(db.Text, nullable=True)       # 全文文本（搜索 / AI 摘要用）
+    md_content = db.Column(db.Text, nullable=True)         # Word 转换的 Markdown
+    ai_summary = db.Column(db.Text, nullable=True)         # AI 一句话摘要
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    note = db.relationship('Note', backref=db.backref('documents', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('documents', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'note_id': self.note_id,
+            'original_filename': self.original_filename,
+            'file_type': self.file_type,
+            'page_count': self.page_count,
+            'file_size': self.file_size,
+            'ai_summary': self.ai_summary,
+            'has_md': bool(self.md_content),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+
 class Comment(db.Model):
     """评论模型"""
     __tablename__ = 'comments'

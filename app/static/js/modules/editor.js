@@ -186,7 +186,8 @@ export const editor = {
             { label: '上传文件', action: 'upload', icon: 'fas fa-upload', match: 'upload' },
             { label: 'B站视频', action: 'bilibili', icon: 'fas fa-video', match: 'bilibili' },
             { label: 'AI 助手', action: 'ai', icon: 'fas fa-magic', match: 'ai' },
-            { label: '语音输入', action: 'voice', icon: 'fas fa-microphone', match: 'voice' }
+            { label: '语音输入', action: 'voice', icon: 'fas fa-microphone', match: 'voice' },
+            { label: '导入文档', action: 'doc', icon: 'fas fa-file-pdf', match: 'doc' }
         ];
 
         textarea.addEventListener('input', debounce((e) => {
@@ -437,6 +438,25 @@ export const editor = {
             replacement = '';
             this._showBilibiliDialog(textarea);
             return;
+        }
+
+        if (cmd.action === 'doc') {
+            replacement = '';
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.docx,.doc';
+            input.onchange = async () => {
+                const file = input.files[0];
+                if (!file) return;
+                if (window.readerModule?.uploadAndOpenDocument) {
+                    // 尝试获取当前活动笔记 ID（从 state 或 URL）
+                    const noteId = window.__currentNoteId || null;
+                    await window.readerModule.uploadAndOpenDocument(file, noteId);
+                } else {
+                    showToast('阅读面板未就绪，请刷新页面后重试');
+                }
+            };
+            input.click();
         }
 
         const text = textarea.value;

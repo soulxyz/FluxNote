@@ -1,0 +1,233 @@
+"""文档管理路由：上传 PDF/Word → 文本提取 → AI 摘要 → 关联笔记"""
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from flask_login import login_required, current_user
+from app.extensions import db
+from app.models import Document, Note
+from app.services.ai_service import AIService
+from werkzeug.utils import secure_filename
+import os
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
+
+documents_bp = Blueprint('documents', __name__)
+
+ALLOWED_DOC_EXTENSIONS = {'pdf', 'docx', 'doc'}
+MAX_DOC_SIZE = 50 * 1024 * 1024  # 50MB
+
+
+def _allowed_doc(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_DOC_EXTENSIONS
+
+
+def _extract_pdf(filepath):
+    """用 PyMuPDF 提取 PDF 全文和页数"""
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(filepath)
+        pages = doc.page_count
+        texts = []
+        for page in doc:
+            texts.append(page.get_text())
+        doc.close()
+        return pages, '\n'.join(texts)
+    except Exception as e:
+        logger.warning(f"PDF 文本提取失败: {e}")
+        return None, ''
+
+
+def _extract_docx(filepath):
+    """用 mammoth 提取 Word 文档内容（转为 Markdown 格式）"""
+    try:
+        import mammoth
+        # mammoth 自定义样式映射，保留标题层级
+        style_map = """
+            p[style-name='Heading 1'] => # $
+            p[style-name='Heading 2'] => ## $
+            p[style-name='Heading 3'] => ### $
+            p[style-name='Heading 4'] => #### $
+            b => **
+            i => _
+        """
+        with open(filepath, 'rb') as f:
+            result = mammoth.convert_to_markdown(f, style_map=style_map)
+        md = result.value or ''
+        # 纯文本用于 AI 摘要（去掉 Markdown 语法）
+        import re
+        plain = re.sub(r'[#*_`\[\]()>!]', '', md)
+        plain = re.sub(r'\s+', ' ', plain).strip()
+        return md, plain
+    except Exception as e:
+        logger.warning(f"Word 文本提取失败: {e}")
+        return '', ''
+
+
+def _generate_ai_summary(text, filename):
+    """调用 AI 生成文档摘要（失败时静默降级）"""
+    if not text or len(text.strip()) < 50:
+        return None
+    try:
+        excerpt = text[:3000]
+        messages = [
+            {
+                'role': 'system',
+                'content': '你是一个文档摘要助手，请用 1-3 句话简洁地概括文档的核心内容，不要使用列表，直接输出摘要文字。'
+            },
+            {
+                'role': 'user',
+                'content': f'文档名：《{filename}》\n\n文档内容（节选）：\n{excerpt}'
+            }
+        ]
+        summary = AIService.chat_completion(messages)
+        return summary.strip() if summary else None
+    except Exception as e:
+        logger.info(f"AI 摘要生成跳过（未配置或失败）: {e}")
+        return None
+
+
+@documents_bp.route('/documents/upload', methods=['POST'])
+@login_required
+def upload_document():
+    """上传文档并处理：文本提取 + AI 摘要"""
+    if 'file' not in request.files:
+        return jsonify({'error': '未找到文件'}), 400
+
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({'error': '文件名为空'}), 400
+
+    if not _allowed_doc(file.filename):
+        return jsonify({'error': '不支持的文件格式，请上传 PDF 或 Word 文档'}), 400
+
+    note_id = request.form.get('note_id')
+
+    # 验证 note_id 归属
+    if note_id:
+        note = Note.query.filter_by(id=note_id, user_id=current_user.id, is_deleted=False).first()
+        if not note:
+            return jsonify({'error': '笔记不存在'}), 404
+
+    # 文件大小检查
+    file.seek(0, 2)
+    file_size = file.tell()
+    file.seek(0)
+    if file_size > MAX_DOC_SIZE:
+        return jsonify({'error': f'文件过大，最大支持 {MAX_DOC_SIZE // 1024 // 1024}MB'}), 400
+
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    original_filename = file.filename
+    doc_id = str(uuid.uuid4())
+    stored_name = f"doc_{doc_id}.{ext}"
+
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    filepath = os.path.join(upload_folder, stored_name)
+    file.save(filepath)
+
+    # 文本提取
+    page_count = None
+    text_content = ''
+    md_content = None
+
+    if ext == 'pdf':
+        page_count, text_content = _extract_pdf(filepath)
+    elif ext in ('docx', 'doc'):
+        md_content, text_content = _extract_docx(filepath)
+
+    # AI 摘要（异步降级：失败不影响上传）
+    ai_summary = _generate_ai_summary(text_content, original_filename)
+
+    # 写入数据库
+    doc = Document(
+        id=doc_id,
+        note_id=note_id,
+        user_id=current_user.id,
+        original_filename=original_filename,
+        stored_filename=stored_name,
+        file_type=ext,
+        page_count=page_count,
+        file_size=file_size,
+        text_content=text_content[:100000] if text_content else None,  # 限制存储大小
+        md_content=md_content,
+        ai_summary=ai_summary,
+    )
+    db.session.add(doc)
+    db.session.commit()
+
+    result = doc.to_dict()
+    result['ai_summary'] = ai_summary
+    return jsonify(result), 201
+
+
+@documents_bp.route('/documents/<doc_id>', methods=['GET'])
+@login_required
+def get_document(doc_id):
+    """获取文档元数据"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    return jsonify(doc.to_dict())
+
+
+@documents_bp.route('/documents/<doc_id>', methods=['DELETE'])
+@login_required
+def delete_document(doc_id):
+    """删除文档（同时删除文件）"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    filepath = os.path.join(upload_folder, doc.stored_filename)
+    if os.path.exists(filepath):
+        try:
+            os.remove(filepath)
+        except Exception as e:
+            logger.warning(f"删除文件失败: {e}")
+    db.session.delete(doc)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@documents_bp.route('/documents/<doc_id>/file', methods=['GET'])
+@login_required
+def get_document_file(doc_id):
+    """获取原始文件（PDF 供 PDF.js 加载，Word 供下载）"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    upload_folder = current_app.config['UPLOAD_FOLDER']
+    as_attachment = doc.file_type in ('docx', 'doc')
+    return send_from_directory(
+        upload_folder,
+        doc.stored_filename,
+        as_attachment=as_attachment,
+        download_name=doc.original_filename if as_attachment else None
+    )
+
+
+@documents_bp.route('/documents/<doc_id>/md', methods=['GET'])
+@login_required
+def get_document_md(doc_id):
+    """获取 Word 转换的 Markdown 内容"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    if doc.file_type not in ('docx', 'doc') or not doc.md_content:
+        return jsonify({'error': '该文档无 Markdown 内容'}), 404
+    return jsonify({'md': doc.md_content, 'filename': doc.original_filename})
+
+
+@documents_bp.route('/notes/<note_id>/documents', methods=['GET'])
+@login_required
+def get_note_documents(note_id):
+    """获取笔记关联的所有文档"""
+    note = Note.query.filter_by(id=note_id, user_id=current_user.id, is_deleted=False).first_or_404()
+    docs = Document.query.filter_by(note_id=note.id, user_id=current_user.id).order_by(Document.created_at.desc()).all()
+    return jsonify([d.to_dict() for d in docs])
+
+
+@documents_bp.route('/documents/<doc_id>/link', methods=['POST'])
+@login_required
+def link_document_to_note(doc_id):
+    """将文档关联到笔记"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    data = request.get_json() or {}
+    note_id = data.get('note_id')
+    if not note_id:
+        return jsonify({'error': '缺少 note_id'}), 400
+    note = Note.query.filter_by(id=note_id, user_id=current_user.id, is_deleted=False).first_or_404()
+    doc.note_id = note.id
+    db.session.commit()
+    return jsonify(doc.to_dict())

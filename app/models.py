@@ -467,6 +467,36 @@ class ShareAttempt(db.Model):
         return max(0, int(remaining) + 1)
 
 
+class Annotation(db.Model):
+    """PDF/Word 文档上的批注（高亮 + 可选边注文字）"""
+    __tablename__ = 'annotation'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(db.String(36), db.ForeignKey('document.id'), nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    note_id = db.Column(db.String(36), db.ForeignKey('note.id'), nullable=True)  # 关联笔记（可选）
+    page = db.Column(db.Integer, nullable=True)      # PDF 页码，Word 文档为 None
+    selected_text = db.Column(db.Text, nullable=False)  # 高亮选中的原文
+    color = db.Column(db.String(20), default='yellow')  # yellow / green / pink / blue
+    ann_note = db.Column(db.Text, nullable=True)     # 可选：边注文字
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    document = db.relationship('Document', backref=db.backref('annotations', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('annotations', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'document_id': self.document_id,
+            'note_id': self.note_id,
+            'page': self.page,
+            'selected_text': self.selected_text,
+            'color': self.color,
+            'ann_note': self.ann_note,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+
 class Document(db.Model):
     """关联笔记的文档（PDF 直读 / Word 转 MD）"""
     __tablename__ = 'document'

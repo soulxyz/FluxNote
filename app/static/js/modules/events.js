@@ -1244,39 +1244,32 @@ function initCustomEvents(loadNotes, loadTags) {
         }
     });
 
-    // 分享功能
     // 文档阅读面板：打开关联到本笔记的文档（或上传新文档）
     window.addEventListener('note:open-doc', async (e) => {
         const noteId = e.detail;
         window.__currentNoteId = noteId;
         if (!window.readerModule) return showToast('阅读面板未就绪，请刷新页面');
 
-        const { reader, uploadAndOpenDocument } = window.readerModule;
+        const { reader, uploadAndOpenDocument, triggerDocUpload } = window.readerModule;
 
-        // 查询已关联文档
-        const res = await api.documents?.listByNote(noteId);
-        if (res && res.ok) {
-            const docs = await res.json();
-            if (docs.length === 1) {
-                // 只有一个文档，直接打开
-                reader.open(docs[0].id, noteId);
-                reader.setActiveNote(noteId);
-            } else if (docs.length > 1) {
-                // 多个文档，显示选择器
-                _showDocPicker(docs, noteId);
+        try {
+            const res = await api.documents?.listByNote(noteId);
+            if (res && res.ok) {
+                const docs = await res.json();
+                if (docs.length === 1) {
+                    reader.open(docs[0].id, noteId);
+                    reader.setActiveNote(noteId);
+                } else if (docs.length > 1) {
+                    _showDocPicker(docs, noteId);
+                } else {
+                    triggerDocUpload(noteId);
+                }
             } else {
-                // 无关联文档，触发上传
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.pdf,.docx,.doc';
-                input.onchange = async () => {
-                    if (input.files[0]) {
-                        await uploadAndOpenDocument(input.files[0], noteId);
-                        reader.setActiveNote(noteId);
-                    }
-                };
-                input.click();
+                showToast('查询关联文档失败');
             }
+        } catch (err) {
+            console.error('[Events] note:open-doc 失败', err);
+            showToast('操作失败，请重试');
         }
     });
 
@@ -1323,18 +1316,7 @@ function initCustomEvents(loadNotes, loadTags) {
 
         document.getElementById('docPickerUpload')?.addEventListener('click', () => {
             modal.remove();
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf,.docx,.doc';
-            input.onchange = async () => {
-                if (input.files[0]) {
-                    const { uploadAndOpenDocument } = window.readerModule;
-                    await uploadAndOpenDocument(input.files[0], noteId);
-                    const { reader } = window.readerModule;
-                    reader.setActiveNote(noteId);
-                }
-            };
-            input.click();
+            window.readerModule?.triggerDocUpload(noteId);
         });
     }
 

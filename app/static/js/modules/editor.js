@@ -18,6 +18,26 @@ export const editor = {
         this.setupCapsuleTool(textarea);
         this.setupVoiceInput(textarea);
         this.setupAutoHeight(textarea);
+        this.setupDocButton(textarea);
+    },
+
+    setupDocButton(textarea) {
+        const btn = document.getElementById('editorDocBtn');
+        if (!btn) return;
+
+        const showBtn = () => { btn.style.display = ''; };
+        window.addEventListener('auth:login', showBtn);
+        setTimeout(() => {
+            if (document.getElementById('userProfile')?.style.display !== 'none') showBtn();
+        }, 1000);
+
+        btn.addEventListener('click', () => {
+            if (window.readerModule?.triggerDocUpload) {
+                window.readerModule.triggerDocUpload(window.__currentNoteId || null);
+            } else {
+                showToast('阅读面板未就绪，请刷新页面');
+            }
+        });
     },
 
     setupAutoSave(textarea) {
@@ -410,6 +430,13 @@ export const editor = {
             input.accept = 'image/*,audio/*,video/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md';
             input.onchange = async () => {
                 for (const file of Array.from(input.files)) {
+                    if (/\.(pdf|docx|doc)$/i.test(file.name)) {
+                        if (window.readerModule?.uploadAndOpenDocument) {
+                            await window.readerModule.uploadAndOpenDocument(file, window.__currentNoteId || null);
+                        } else { showToast('阅读面板未就绪'); }
+                        continue;
+                    }
+                    // 其他文件 → 普通上传
                     const fd = new FormData();
                     fd.append('file', file);
                     showToast('正在上传...');
@@ -442,21 +469,11 @@ export const editor = {
 
         if (cmd.action === 'doc') {
             replacement = '';
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.pdf,.docx,.doc';
-            input.onchange = async () => {
-                const file = input.files[0];
-                if (!file) return;
-                if (window.readerModule?.uploadAndOpenDocument) {
-                    // 尝试获取当前活动笔记 ID（从 state 或 URL）
-                    const noteId = window.__currentNoteId || null;
-                    await window.readerModule.uploadAndOpenDocument(file, noteId);
-                } else {
-                    showToast('阅读面板未就绪，请刷新页面后重试');
-                }
-            };
-            input.click();
+            if (window.readerModule?.triggerDocUpload) {
+                window.readerModule.triggerDocUpload(window.__currentNoteId || null);
+            } else {
+                showToast('阅读面板未就绪，请刷新页面后重试');
+            }
         }
 
         const text = textarea.value;
@@ -1001,7 +1018,7 @@ export const editor = {
             if (!dragOverlay) {
                 dragOverlay = document.createElement('div');
                 dragOverlay.className = 'drag-drop-overlay';
-                dragOverlay.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>释放以上传文件</span>';
+                dragOverlay.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>释放以上传文件（PDF/Word 自动打开阅读面板）</span>';
                 memoEditor.appendChild(dragOverlay);
             }
             dragOverlay.classList.add('active');
@@ -1023,6 +1040,13 @@ export const editor = {
             e.preventDefault();
 
             for (const file of Array.from(files)) {
+                if (/\.(pdf|docx|doc)$/i.test(file.name)) {
+                    if (window.readerModule?.uploadAndOpenDocument) {
+                        await window.readerModule.uploadAndOpenDocument(file, window.__currentNoteId || null);
+                    } else { showToast('阅读面板未就绪'); }
+                    continue;
+                }
+
                 const formData = new FormData();
                 formData.append('file', file);
                 showToast('正在上传...');

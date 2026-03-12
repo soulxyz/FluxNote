@@ -1,12 +1,14 @@
 /**
  * reader.js — 文档阅读面板
  *
- * 职责：
- *   1. 管理右侧滑出式阅读面板的开关与生命周期
- *   2. PDF 阅读（PDF.js）：渲染、翻页、缩放、文本层
- *   3. Word 阅读（mammoth 已在后端转 MD）：Markdown 渲染
- *   4. 文本选中 → 浮动工具栏 → 插入引用 / AI 解释
- *   5. 响应 `doc:navigate` 事件 → 跳页 + 高亮引用文字
+ * 功能：
+ *   1. 右侧滑出式阅读面板
+ *   2. PDF 阅读（PDF.js）：渲染、翻页、缩放、文字层
+ *   3. Word 阅读：后端转 Markdown，渲染显示
+ *   4. 文字选中 → 浮动工具栏 → 颜色高亮 / 引用 / AI 解释
+ *   5. 高亮批注持久化（保存到数据库，重新打开时恢复）
+ *   6. 批注列表面板（查看 / 跳转 / 编辑备注 / 删除）
+ *   7. doc:navigate 事件 → 跳页 + 引用回溯高亮
  */
 
 import { api } from './api.js';
@@ -17,76 +19,82 @@ import { showToast } from './utils.js';
 const state = {
     isOpen: false,
     docId: null,
-    docMeta: null,          // Document 元数据
+    docMeta: null,
     fileType: null,         // 'pdf' | 'docx'
-    pdfDoc: null,           // PDF.js PDFDocumentProxy
+    pdfDoc: null,
     currentPage: 1,
     totalPages: 0,
     scale: 1.4,
     isRendering: false,
-    renderPending: false,
+    renderPending: null,
     pdfjsLoaded: false,
-    mdContent: null,        // Word 转换的 Markdown
-    activeNoteId: null,     // 当前笔记 ID，用于插入引用
+    mdContent: null,
+    activeNoteId: null,
+    annotations: [],
+    annPanelOpen: false,
 };
 
 // ─── DOM 引用（懒初始化）─────────────────────────────────────────────────
 
 let panel, overlay, canvas, ctx, textLayerDiv, pageInput, totalPagesEl,
-    scaleSelect, mdContentEl, toolbar, floatBar;
+    scaleSelect, mdContentEl, toolbar, floatBar, annPanel, annList;
 
 function initDom() {
-    panel         = document.getElementById('readerPanel');
-    overlay       = document.getElementById('readerOverlay');
-    canvas        = document.getElementById('readerCanvas');
-    textLayerDiv  = document.getElementById('readerTextLayer');
-    pageInput     = document.getElementById('readerPageInput');
-    totalPagesEl  = document.getElementById('readerTotalPages');
-    scaleSelect   = document.getElementById('readerScale');
-    mdContentEl   = document.getElementById('readerMdContent');
-    toolbar       = document.getElementById('readerToolbar');
-    floatBar      = document.getElementById('readerFloatBar');
+    panel        = document.getElementById('readerPanel');
+    overlay      = document.getElementById('readerOverlay');
+    canvas       = document.getElementById('readerCanvas');
+    textLayerDiv = document.getElementById('readerTextLayer');
+    pageInput    = document.getElementById('readerPageInput');
+    totalPagesEl = document.getElementById('readerTotalPages');
+    scaleSelect  = document.getElementById('readerScale');
+    mdContentEl  = document.getElementById('readerMdContent');
+    toolbar      = document.getElementById('readerToolbar');
+    floatBar     = document.getElementById('readerFloatBar');
+    annPanel     = document.getElementById('readerAnnPanel');
+    annList      = document.getElementById('readerAnnList');
 
     if (canvas) ctx = canvas.getContext('2d');
 }
 
-// ─── PDF.js 懒加载 ────────────────────────────────────────────────────────
+// ─── PDF.js 获取 ─────────────────────────────────────────────────────────
 
-async function loadPdfjsIfNeeded() {
-    if (state.pdfjsLoaded) return window.pdfjsLib;
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs';
-        script.type = 'module';
-        script.onload = () => {
-            // pdfjs-dist ES module 挂载在 window.pdfjsLib 上
-            state.pdfjsLoaded = true;
-            resolve(window.pdfjsLib);
-        };
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
-}
+const PDFJS_CDN    = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js';
+const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js';
 
-// 使用 importScripts-friendly 的非模块版本
 async function getPdfjsLib() {
     if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
         return window.pdfjsLib;
     }
-    // 动态 import ES module
-    try {
-        const mod = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs');
-        mod.GlobalWorkerOptions.workerSrc =
-            'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
-        window.pdfjsLib = mod;
-        state.pdfjsLoaded = true;
-        return mod;
-    } catch (e) {
-        showToast('PDF 渲染库加载失败，请检查网络');
-        throw e;
-    }
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${PDFJS_CDN}"]`);
+        if (existing) {
+            let tries = 0;
+            const poll = setInterval(() => {
+                if (window.pdfjsLib) {
+                    clearInterval(poll);
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+                    resolve(window.pdfjsLib);
+                } else if (++tries > 30) {
+                    clearInterval(poll);
+                    reject(new Error('PDF.js 全局变量未就绪'));
+                }
+            }, 200);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = PDFJS_CDN;
+        script.onload = () => {
+            if (window.pdfjsLib) {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+                resolve(window.pdfjsLib);
+            } else {
+                reject(new Error('PDF.js 加载后全局变量不存在'));
+            }
+        };
+        script.onerror = () => reject(new Error('PDF.js 脚本加载失败'));
+        document.head.appendChild(script);
+    });
 }
 
 // ─── 公开 API ─────────────────────────────────────────────────────────────
@@ -94,13 +102,13 @@ async function getPdfjsLib() {
 export const reader = {
     init() {
         initDom();
-        if (!panel) return; // 面板不在当前页
+        if (!panel) return;
 
         _bindPanelControls();
         _bindSelectionToolbar();
         _bindKeyboard();
+        _bindAnnotationListEvents();
 
-        // 监听"点击引用回溯"事件
         window.addEventListener('doc:navigate', (e) => {
             const { docId, page, text } = e.detail || {};
             if (!docId) return;
@@ -111,36 +119,28 @@ export const reader = {
             }
         });
 
-        // 监听笔记切换，更新 activeNoteId
         window.addEventListener('note:activated', (e) => {
             state.activeNoteId = e.detail?.noteId || null;
         });
     },
 
-    /**
-     * 打开文档阅读面板
-     * @param {string} docId - 文档 ID
-     * @param {string|null} noteId - 关联笔记 ID（用于插入引用）
-     * @param {object} opts - { page, text } 可选初始跳转
-     */
     async open(docId, noteId = null, opts = {}) {
         if (!panel) initDom();
         if (!panel) return;
 
         state.activeNoteId = noteId || state.activeNoteId;
 
-        // 已打开同一文档，只跳转
         if (state.isOpen && state.docId === docId) {
-            if (opts.page) await _gotoPageAndHighlight(opts.page, opts.text);
+            if (opts.page || opts.text) await _gotoPageAndHighlight(opts.page, opts.text);
             return;
         }
 
         _showPanel();
 
-        // 加载元数据
-        state.docId = docId;
-        state.pdfDoc = null;
-        state.mdContent = null;
+        state.docId      = docId;
+        state.pdfDoc     = null;
+        state.mdContent  = null;
+        state.annotations = [];
         state.currentPage = opts.page || 1;
 
         _setLoading(true);
@@ -148,12 +148,13 @@ export const reader = {
         const res = await api.documents.get(docId);
         if (!res || !res.ok) { _setLoading(false); return; }
         const meta = await res.json();
-        state.docMeta = meta;
+        state.docMeta  = meta;
         state.fileType = meta.file_type;
 
-        // 更新面板标题
         const titleEl = document.getElementById('readerDocTitle');
         if (titleEl) titleEl.textContent = meta.original_filename;
+
+        await _loadAllAnnotations(docId);
 
         if (meta.file_type === 'pdf') {
             await _loadPdf(docId, opts);
@@ -168,11 +169,23 @@ export const reader = {
         _hidePanel();
     },
 
-    /** 从外部设置当前活动笔记（用于引用插入定位） */
     setActiveNote(noteId) {
         state.activeNoteId = noteId;
     }
 };
+
+// ─── 批注缓存 ─────────────────────────────────────────────────────────────
+
+async function _loadAllAnnotations(docId) {
+    try {
+        const res = await api.documents.getAnnotations(docId);
+        if (res && res.ok) {
+            state.annotations = await res.json();
+        }
+    } catch (e) {
+        console.warn('[Reader] 批注加载失败', e);
+    }
+}
 
 // ─── 面板控制 ─────────────────────────────────────────────────────────────
 
@@ -180,7 +193,6 @@ function _showPanel() {
     state.isOpen = true;
     panel.classList.add('open');
     document.body.classList.add('reader-open');
-    // 移动端显示 overlay
     if (overlay) overlay.style.display = 'block';
 }
 
@@ -190,11 +202,12 @@ function _hidePanel() {
     document.body.classList.remove('reader-open');
     if (overlay) overlay.style.display = 'none';
     _hideFloatBar();
-    // 释放 PDF 内存
     if (state.pdfDoc) {
         state.pdfDoc.destroy();
         state.pdfDoc = null;
     }
+    if (annPanel) annPanel.style.display = 'none';
+    state.annPanelOpen = false;
 }
 
 function _setLoading(loading) {
@@ -207,30 +220,38 @@ function _setLoading(loading) {
 }
 
 function _bindPanelControls() {
-    // 关闭按钮
-    document.getElementById('readerCloseBtn')?.addEventListener('click', reader.close);
-    // Overlay 点击关闭（移动端）
-    overlay?.addEventListener('click', reader.close);
-
-    // 翻页按钮
+    document.getElementById('readerCloseBtn')?.addEventListener('click', () => reader.close());
+    overlay?.addEventListener('click', () => reader.close());
     document.getElementById('readerPrevBtn')?.addEventListener('click', () => _changePage(-1));
     document.getElementById('readerNextBtn')?.addEventListener('click', () => _changePage(1));
 
-    // 页码输入
     pageInput?.addEventListener('change', () => {
         const p = parseInt(pageInput.value);
         if (p >= 1 && p <= state.totalPages) _gotoPageAndHighlight(p);
     });
 
-    // 缩放
     scaleSelect?.addEventListener('change', () => {
         state.scale = parseFloat(scaleSelect.value);
         _renderPage(state.currentPage);
     });
 
-    // 全屏按钮
     document.getElementById('readerFullscreenBtn')?.addEventListener('click', () => {
         panel.classList.toggle('fullscreen');
+    });
+
+    document.getElementById('readerAnnToggleBtn')?.addEventListener('click', () => {
+        state.annPanelOpen = !state.annPanelOpen;
+        if (annPanel) {
+            annPanel.style.display = state.annPanelOpen ? 'flex' : 'none';
+        }
+        if (state.annPanelOpen) {
+            _refreshAnnotationPanel();
+        }
+    });
+
+    document.getElementById('readerAnnClose')?.addEventListener('click', () => {
+        state.annPanelOpen = false;
+        if (annPanel) annPanel.style.display = 'none';
     });
 }
 
@@ -248,26 +269,23 @@ function _bindKeyboard() {
 
 async function _loadPdf(docId, opts = {}) {
     const pdfjsLib = await getPdfjsLib();
-
     const fileUrl = `/api/documents/${docId}/file`;
     try {
         const pdfDoc = await pdfjsLib.getDocument(fileUrl).promise;
-        state.pdfDoc = pdfDoc;
-        state.totalPages = pdfDoc.numPages;
+        state.pdfDoc      = pdfDoc;
+        state.totalPages  = pdfDoc.numPages;
         state.currentPage = opts.page || 1;
 
-        // 显示 PDF 区域，隐藏 MD 区域
         if (canvas) canvas.style.display = 'block';
         if (textLayerDiv) textLayerDiv.style.display = 'block';
         if (mdContentEl) mdContentEl.style.display = 'none';
         toolbar?.classList.remove('word-mode');
-
         if (totalPagesEl) totalPagesEl.textContent = state.totalPages;
 
         await _renderPage(state.currentPage);
         if (opts.text) await _highlightText(opts.text);
     } catch (e) {
-        console.error('[Reader] PDF load failed:', e);
+        console.error('[Reader] PDF 加载失败:', e);
         showToast('PDF 加载失败');
     }
 }
@@ -278,44 +296,40 @@ async function _renderPage(pageNum) {
         state.renderPending = pageNum;
         return;
     }
-    state.isRendering = true;
-    state.currentPage = pageNum;
+    state.isRendering  = true;
+    state.currentPage  = pageNum;
     if (pageInput) pageInput.value = pageNum;
 
     try {
-        const page = await state.pdfDoc.getPage(pageNum);
+        const page     = await state.pdfDoc.getPage(pageNum);
         const viewport = page.getViewport({ scale: state.scale });
 
-        // Canvas 渲染
-        canvas.width = viewport.width;
+        canvas.width  = viewport.width;
         canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // TextLayer（文字选择 + 高亮）
         textLayerDiv.innerHTML = '';
-        textLayerDiv.style.width = viewport.width + 'px';
+        textLayerDiv.style.width  = viewport.width  + 'px';
         textLayerDiv.style.height = viewport.height + 'px';
 
         const textContent = await page.getTextContent();
-        const pdfjsLib = window.pdfjsLib;
-        if (pdfjsLib.renderTextLayer) {
-            // PDF.js v4.x API
-            const renderTask = pdfjsLib.renderTextLayer({
+        const lib = window.pdfjsLib;
+        if (lib && lib.renderTextLayer) {
+            const task = lib.renderTextLayer({
                 textContentSource: textContent,
                 container: textLayerDiv,
                 viewport,
             });
-            if (renderTask && renderTask.promise) {
-                await renderTask.promise;
-            } else if (renderTask && typeof renderTask.then === 'function') {
-                await renderTask;
-            }
+            if (task && task.promise) await task.promise;
+            else if (task && typeof task.then === 'function') await task;
         }
+
+        _applyPageAnnotations(pageNum);
     } finally {
         state.isRendering = false;
-        if (state.renderPending !== false) {
+        if (state.renderPending !== null) {
             const pending = state.renderPending;
-            state.renderPending = false;
+            state.renderPending = null;
             await _renderPage(pending);
         }
     }
@@ -328,44 +342,119 @@ function _changePage(delta) {
 }
 
 async function _gotoPageAndHighlight(page, text) {
-    if (state.fileType !== 'pdf') return;
-    if (page && page !== state.currentPage) await _renderPage(page);
-    if (text) await _highlightText(text);
+    if (state.fileType === 'pdf') {
+        if (page && page !== state.currentPage) await _renderPage(page);
+        if (text) await _highlightText(text);
+    } else {
+        if (text) _highlightWordText(text);
+    }
 }
 
-async function _highlightText(searchText) {
-    if (!searchText || !state.pdfDoc) return;
-    // 清除旧高亮
-    textLayerDiv.querySelectorAll('.reader-highlight').forEach(el => el.classList.remove('reader-highlight'));
+// ─── 批注高亮渲染（PDF TextLayer）────────────────────────────────────────
 
-    // 在当前页 TextLayer 中查找匹配文字并高亮
-    const spans = textLayerDiv.querySelectorAll('span');
-    const needle = searchText.trim().slice(0, 60).toLowerCase(); // 取前 60 字符做匹配
+function _applyPageAnnotations(pageNum) {
+    if (!textLayerDiv) return;
+    const pageAnnotations = state.annotations.filter(a => a.page === pageNum);
+    if (!pageAnnotations.length) return;
 
-    let accumulated = '';
-    let matchStart = null;
-    const toHighlight = [];
+    const spans = Array.from(textLayerDiv.querySelectorAll('span'));
 
-    for (const span of spans) {
-        const spanText = (span.textContent || '').toLowerCase();
-        accumulated += spanText;
-        if (matchStart === null && accumulated.includes(needle.slice(0, 10))) {
-            matchStart = span;
+    for (const ann of pageAnnotations) {
+        const needle = (ann.selected_text || '').trim().toLowerCase();
+        if (!needle) continue;
+
+        const matchLen = Math.min(40, needle.length);
+        const searchStr = needle.slice(0, matchLen);
+
+        for (const span of spans) {
+            const spanText = (span.textContent || '').toLowerCase();
+            if (spanText.includes(searchStr) || searchStr.includes(spanText.trim())) {
+                span.classList.add('ann-highlight', `ann-${ann.color}`);
+                span.dataset.annId = ann.id;
+                if (ann.ann_note) span.title = ann.ann_note;
+                break;
+            }
         }
-        if (matchStart && accumulated.includes(needle)) {
-            toHighlight.push(span);
+    }
+}
+
+// ─── 批注高亮渲染（Word HTML）────────────────────────────────────────────
+
+function _applyWordAnnotations() {
+    if (!mdContentEl) return;
+    const wordAnns = state.annotations.filter(a => !a.page);
+    if (!wordAnns.length) return;
+
+    for (const ann of wordAnns) {
+        const needle = (ann.selected_text || '').trim();
+        if (!needle) continue;
+
+        const walker = document.createTreeWalker(mdContentEl, NodeFilter.SHOW_TEXT, null);
+        let node;
+        while ((node = walker.nextNode())) {
+            const idx = node.textContent.indexOf(needle.slice(0, Math.min(50, needle.length)));
+            if (idx === -1) continue;
+
+            const mark = document.createElement('mark');
+            mark.className = `ann-highlight ann-${ann.color} ann-word-mark`;
+            mark.dataset.annId = ann.id;
+            if (ann.ann_note) mark.title = ann.ann_note;
+
+            const range = document.createRange();
+            range.setStart(node, idx);
+            range.setEnd(node, Math.min(node.textContent.length, idx + needle.length));
+            range.surroundContents(mark);
             break;
         }
-        if (matchStart) toHighlight.push(span);
     }
+}
 
-    // 简单方案：对包含搜索词首段的 span 添加高亮样式
+/**
+ * 引用回溯高亮（临时，不持久化）
+ */
+async function _highlightText(searchText) {
+    if (!searchText || !state.pdfDoc) return;
+    textLayerDiv.querySelectorAll('.reader-nav-highlight').forEach(el => el.classList.remove('reader-nav-highlight'));
+
+    const needle = searchText.trim().slice(0, 60).toLowerCase();
+    const spans  = textLayerDiv.querySelectorAll('span');
+    const matchLen = Math.min(30, needle.length);
+
     for (const span of spans) {
-        if (span.textContent && needle && span.textContent.toLowerCase().includes(needle.slice(0, 20))) {
-            span.classList.add('reader-highlight');
+        if (span.textContent && span.textContent.toLowerCase().includes(needle.slice(0, matchLen))) {
+            span.classList.add('reader-nav-highlight');
             span.scrollIntoView({ behavior: 'smooth', block: 'center' });
             break;
         }
+    }
+}
+
+function _highlightWordText(searchText) {
+    if (!searchText || !mdContentEl) return;
+
+    mdContentEl.querySelectorAll('.reader-nav-highlight-word').forEach(el => {
+        const parent = el.parentNode;
+        parent.replaceChild(document.createTextNode(el.textContent), el);
+        parent.normalize();
+    });
+
+    const needle = searchText.trim();
+    if (!needle) return;
+
+    const walker = document.createTreeWalker(mdContentEl, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+        const idx = node.textContent.indexOf(needle.slice(0, Math.min(50, needle.length)));
+        if (idx === -1) continue;
+
+        const mark = document.createElement('mark');
+        mark.className = 'reader-nav-highlight-word';
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, Math.min(node.textContent.length, idx + needle.length));
+        range.surroundContents(mark);
+        mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        break;
     }
 }
 
@@ -385,13 +474,13 @@ async function _loadWord(docId) {
     const data = await res.json();
     state.mdContent = data.md || '';
 
-    // 用全局 marked 渲染（与笔记保持一致）
     if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
         mdContentEl.innerHTML = DOMPurify.sanitize(marked.parse(state.mdContent));
     } else {
-        // 降级：纯文本
         mdContentEl.textContent = state.mdContent;
     }
+
+    _applyWordAnnotations();
 }
 
 // ─── 文字选中浮动工具栏 ───────────────────────────────────────────────────
@@ -399,8 +488,7 @@ async function _loadWord(docId) {
 function _bindSelectionToolbar() {
     if (!floatBar) return;
 
-    // 监听选中事件
-    const pdfWrapper = document.getElementById('readerPdfWrapper');
+    const pdfWrapper  = document.getElementById('readerPdfWrapper');
     const wordWrapper = document.getElementById('readerMdContent');
 
     [pdfWrapper, wordWrapper].forEach(wrapper => {
@@ -409,29 +497,40 @@ function _bindSelectionToolbar() {
         wrapper.addEventListener('touchend', _handleSelection);
     });
 
-    // 点击空白隐藏
     document.addEventListener('mousedown', (e) => {
-        if (!floatBar.contains(e.target) && e.target !== floatBar) {
+        if (floatBar && !floatBar.contains(e.target)) {
             _hideFloatBar();
         }
     });
 
-    // 引用按钮
+    floatBar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.reader-color-btn');
+        if (btn) {
+            const color = btn.dataset.color;
+            _saveHighlight(color);
+            _hideFloatBar();
+        }
+    });
+
     document.getElementById('readerBtnQuote')?.addEventListener('click', () => {
         _insertQuote();
         _hideFloatBar();
     });
 
-    // AI 解释按钮
     document.getElementById('readerBtnAI')?.addEventListener('click', () => {
         _aiExplain();
+        _hideFloatBar();
+    });
+
+    document.getElementById('readerBtnAddNote')?.addEventListener('click', () => {
+        _addAnnotationNote();
         _hideFloatBar();
     });
 }
 
 function _handleSelection(e) {
     setTimeout(() => {
-        const sel = window.getSelection();
+        const sel  = window.getSelection();
         const text = sel?.toString().trim();
         if (!text || text.length < 2) {
             _hideFloatBar();
@@ -445,23 +544,222 @@ function _showFloatBar(e, text) {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
 
-    const range = sel.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    const range     = sel.getRangeAt(0);
+    const rect      = range.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
 
     floatBar.dataset.selectedText = text;
     floatBar.style.display = 'flex';
 
-    // 定位在选区上方
-    const top = rect.top - panelRect.top - floatBar.offsetHeight - 8;
+    const top  = rect.top - panelRect.top - floatBar.offsetHeight - 8;
     const left = rect.left - panelRect.left + (rect.width / 2) - (floatBar.offsetWidth / 2);
 
-    floatBar.style.top = Math.max(8, top) + 'px';
+    floatBar.style.top  = Math.max(8, top)  + 'px';
     floatBar.style.left = Math.max(8, left) + 'px';
 }
 
 function _hideFloatBar() {
     if (floatBar) floatBar.style.display = 'none';
+}
+
+// ─── 高亮批注保存 ─────────────────────────────────────────────────────────
+
+async function _saveHighlight(color) {
+    const text = floatBar?.dataset.selectedText || '';
+    if (!text || !state.docId) return;
+
+    const payload = {
+        selected_text: text,
+        color,
+        page: state.fileType === 'pdf' ? state.currentPage : null,
+        note_id: state.activeNoteId || null,
+    };
+
+    try {
+        const res = await api.documents.createAnnotation(state.docId, payload);
+        if (!res || !res.ok) { showToast('批注保存失败'); return; }
+        const ann = await res.json();
+        state.annotations.push(ann);
+
+        if (state.fileType === 'pdf' && textLayerDiv) {
+            _applyPageAnnotations(state.currentPage);
+        } else if (state.fileType !== 'pdf' && mdContentEl) {
+            _applyWordAnnotations();
+        }
+
+        showToast('高亮已保存');
+
+        if (state.annPanelOpen) _refreshAnnotationPanel();
+    } catch (e) {
+        console.error('[Reader] 保存批注失败', e);
+        showToast('批注保存失败');
+    }
+}
+
+async function _addAnnotationNote() {
+    const text = floatBar?.dataset.selectedText || '';
+    if (!text || !state.docId) return;
+
+    const noteText = prompt('为选中内容添加批注备注：');
+    if (noteText === null) return;
+
+    const payload = {
+        selected_text: text,
+        color: 'yellow',
+        page: state.fileType === 'pdf' ? state.currentPage : null,
+        note_id: state.activeNoteId || null,
+        ann_note: noteText,
+    };
+
+    try {
+        const res = await api.documents.createAnnotation(state.docId, payload);
+        if (!res || !res.ok) { showToast('批注保存失败'); return; }
+        const ann = await res.json();
+        state.annotations.push(ann);
+
+        if (state.fileType === 'pdf' && textLayerDiv) {
+            _applyPageAnnotations(state.currentPage);
+        } else if (state.fileType !== 'pdf' && mdContentEl) {
+            _applyWordAnnotations();
+        }
+
+        showToast('批注已保存');
+        if (state.annPanelOpen) _refreshAnnotationPanel();
+    } catch (e) {
+        console.error('[Reader] 保存批注失败', e);
+        showToast('批注保存失败');
+    }
+}
+
+// ─── 批注列表面板 ─────────────────────────────────────────────────────────
+
+function _bindAnnotationListEvents() {
+    if (!annList) return;
+
+    annList.addEventListener('click', async (e) => {
+        const deleteBtn = e.target.closest('.ann-delete-btn');
+        if (deleteBtn) {
+            e.stopPropagation();
+            const annId = deleteBtn.dataset.annId;
+            if (!confirm('确定删除这条批注？')) return;
+            await _deleteAnnotation(annId);
+            return;
+        }
+
+        const editBtn = e.target.closest('.ann-edit-btn');
+        if (editBtn) {
+            e.stopPropagation();
+            const annId = editBtn.dataset.annId;
+            _editAnnotationNote(annId);
+            return;
+        }
+
+        const item = e.target.closest('.ann-item');
+        if (item) {
+            const annId = item.dataset.annId;
+            const ann = state.annotations.find(a => a.id === annId);
+            if (ann) {
+                _gotoPageAndHighlight(ann.page, (ann.selected_text || '').slice(0, 40));
+            }
+        }
+    });
+}
+
+function _refreshAnnotationPanel() {
+    if (!annList) return;
+    annList.innerHTML = '';
+
+    if (!state.annotations.length) {
+        annList.innerHTML = '<p class="ann-empty">暂无批注</p>';
+        return;
+    }
+
+    const sorted = [...state.annotations].sort((a, b) => (a.page || 0) - (b.page || 0));
+
+    for (const ann of sorted) {
+        const item = document.createElement('div');
+        item.className = 'ann-item';
+        item.dataset.annId = ann.id;
+
+        const colorDot = `<span class="ann-dot ann-${ann.color}"></span>`;
+        const pageStr  = ann.page ? `第 ${ann.page} 页` : 'Word';
+        const preview  = (ann.selected_text || '').slice(0, 80);
+        const noteHtml = ann.ann_note
+            ? `<div class="ann-item-note"><i class="fas fa-sticky-note"></i> ${_escHtml(ann.ann_note)}</div>`
+            : '';
+
+        item.innerHTML = `
+            <div class="ann-item-header">
+                ${colorDot}
+                <span class="ann-item-page">${pageStr}</span>
+                <div class="ann-item-actions">
+                    <button class="ann-edit-btn" data-ann-id="${ann.id}" title="编辑备注"><i class="fas fa-pen"></i></button>
+                    <button class="ann-delete-btn" data-ann-id="${ann.id}" title="删除批注"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+            <div class="ann-item-text">${_escHtml(preview)}${(ann.selected_text || '').length > 80 ? '…' : ''}</div>
+            ${noteHtml}
+        `;
+
+        annList.appendChild(item);
+    }
+}
+
+async function _editAnnotationNote(annId) {
+    const ann = state.annotations.find(a => a.id === annId);
+    if (!ann) return;
+
+    const newNote = prompt('编辑批注备注：', ann.ann_note || '');
+    if (newNote === null) return;
+
+    try {
+        const res = await api.documents.updateAnnotation(annId, { ann_note: newNote });
+        if (!res || !res.ok) { showToast('更新失败'); return; }
+        const updated = await res.json();
+        Object.assign(ann, updated);
+
+        if (state.fileType === 'pdf' && textLayerDiv) {
+            const el = textLayerDiv.querySelector(`[data-ann-id="${annId}"]`);
+            if (el) el.title = newNote || '';
+        }
+
+        _refreshAnnotationPanel();
+        showToast('备注已更新');
+    } catch (e) {
+        showToast('更新失败');
+    }
+}
+
+async function _deleteAnnotation(annId) {
+    try {
+        const res = await api.documents.deleteAnnotation(annId);
+        if (!res || !res.ok) { showToast('删除失败'); return; }
+        state.annotations = state.annotations.filter(a => a.id !== annId);
+
+        textLayerDiv?.querySelectorAll(`[data-ann-id="${annId}"]`).forEach(el => {
+            el.classList.remove('ann-highlight', 'ann-yellow', 'ann-green', 'ann-pink', 'ann-blue');
+            delete el.dataset.annId;
+        });
+
+        mdContentEl?.querySelectorAll(`mark[data-ann-id="${annId}"]`).forEach(el => {
+            const parent = el.parentNode;
+            parent.replaceChild(document.createTextNode(el.textContent), el);
+            parent.normalize();
+        });
+
+        _refreshAnnotationPanel();
+        showToast('批注已删除');
+    } catch (e) {
+        showToast('删除失败');
+    }
+}
+
+function _escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 // ─── 引用插入 ─────────────────────────────────────────────────────────────
@@ -470,20 +768,15 @@ function _insertQuote() {
     const text = floatBar?.dataset.selectedText || '';
     if (!text) return;
 
-    const meta = state.docMeta;
-    const docId = state.docId;
-    const page = state.fileType === 'pdf' ? state.currentPage : null;
+    const meta     = state.docMeta;
+    const page     = state.fileType === 'pdf' ? state.currentPage : null;
     const filename = meta?.original_filename || '文档';
-
-    // 生成引用 Markdown
-    // 格式：标准 blockquote + 可点击的来源标注
-    const lines = text.split('\n').map(l => '> ' + l).join('\n');
-    const pageStr = page ? `第${page}页` : '';
-    const anchor = `#doc:${docId}${page ? ':' + page : ''}`;
+    const lines    = text.split('\n').map(l => '> ' + l).join('\n');
+    const pageStr  = page ? `第${page}页` : '';
+    const anchor   = `#doc:${state.docId}${page ? ':' + page : ''}`;
     const citation = `>\n> *—— [《${filename}》${pageStr}](${anchor})*`;
     const markdown = `${lines}\n${citation}\n\n`;
 
-    // 插入到活动编辑器
     _insertToEditor(markdown);
     showToast('已插入引用');
 }
@@ -502,40 +795,34 @@ async function _aiExplain() {
             prompt: `请简洁解释以下来自《${filename}》的段落，用中文回答，不超过150字：\n\n${text}`
         });
 
-        if (!response || !response.body) {
-            showToast('AI 服务暂不可用');
-            return;
-        }
+        if (!response || !response.body) { showToast('AI 服务暂不可用'); return; }
 
         let explanation = '';
-        const reader2 = response.body.getReader();
-        const decoder = new TextDecoder();
+        const reader2  = response.body.getReader();
+        const decoder  = new TextDecoder();
         while (true) {
             const { done, value } = await reader2.read();
             if (done) break;
             explanation += decoder.decode(value, { stream: true });
         }
 
-        // 将引用 + AI 解释一起插入编辑器
-        const meta = state.docMeta;
-        const page = state.fileType === 'pdf' ? state.currentPage : null;
-        const lines = text.split('\n').map(l => '> ' + l).join('\n');
-        const pageStr = page ? `第${page}页` : '';
-        const anchor = `#doc:${state.docId}${page ? ':' + page : ''}`;
-        const citation = `>\n> *—— [《${meta?.original_filename || '文档'}》${pageStr}](${anchor})*`;
-        const aiBlock = `\n**AI 解读：** ${explanation.trim()}\n`;
+        const page     = state.fileType === 'pdf' ? state.currentPage : null;
+        const lines    = text.split('\n').map(l => '> ' + l).join('\n');
+        const pageStr  = page ? `第${page}页` : '';
+        const anchor   = `#doc:${state.docId}${page ? ':' + page : ''}`;
+        const citation = `>\n> *—— [《${state.docMeta?.original_filename || '文档'}》${pageStr}](${anchor})*`;
+        const aiBlock  = `\n**AI 解读：** ${explanation.trim()}\n`;
         const markdown = `${lines}\n${citation}\n${aiBlock}\n`;
 
         _insertToEditor(markdown);
         showToast('已插入引用与 AI 解读');
     } catch (e) {
-        console.error('[Reader] AI explain failed:', e);
+        console.error('[Reader] AI explain 失败:', e);
         showToast('AI 解释失败');
     }
 }
 
 function _insertToEditor(text) {
-    // 优先插入到当前活动的 textarea
     const textarea = document.getElementById('noteContent') ||
                      document.querySelector('.inline-editor textarea');
     if (!textarea) {
@@ -543,22 +830,19 @@ function _insertToEditor(text) {
         return;
     }
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    const start  = textarea.selectionStart;
+    const end    = textarea.selectionEnd;
     const before = textarea.value.slice(0, start);
-    const after = textarea.value.slice(end);
-
-    // 确保引用前有空行
+    const after  = textarea.value.slice(end);
     const prefix = before.length > 0 && !before.endsWith('\n\n') ? '\n\n' : '';
+
     textarea.value = before + prefix + text + after;
     textarea.selectionStart = textarea.selectionEnd = start + prefix.length + text.length;
-
-    // 触发 input 事件，让编辑器的自动保存等功能感知到变更
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
     textarea.focus();
 }
 
-// ─── 文档上传（供 editor 斜杠命令调用）────────────────────────────────────
+// ─── 文档上传（供 editor.js 等模块调用）──────────────────────────────────
 
 export async function uploadAndOpenDocument(file, noteId) {
     showToast('正在上传文档...', 3000);
@@ -570,7 +854,6 @@ export async function uploadAndOpenDocument(file, noteId) {
     const doc = await res.json();
     showToast(doc.ai_summary ? `已上传：${doc.ai_summary.slice(0, 30)}…` : '文档上传成功');
 
-    // 如果有 AI 摘要，插入笔记
     if (doc.ai_summary && noteId) {
         const textarea = document.getElementById('noteContent');
         if (textarea && !textarea.value.trim()) {
@@ -581,4 +864,19 @@ export async function uploadAndOpenDocument(file, noteId) {
 
     await reader.open(doc.id, noteId);
     return doc;
+}
+
+/**
+ * 触发文件选择并上传文档（统一入口，供 editor 各处调用）
+ */
+export function triggerDocUpload(noteId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.docx,.doc';
+    input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        await uploadAndOpenDocument(file, noteId || window.__currentNoteId || null);
+    };
+    input.click();
 }

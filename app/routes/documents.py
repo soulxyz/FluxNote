@@ -1,8 +1,8 @@
-"""文档管理路由：上传 PDF/Word → 文本提取 → AI 摘要 → 关联笔记"""
+"""文档管理路由：上传 PDF/Word → 文本提取 → AI 摘要 → 关联笔记 → 批注 CRUD"""
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Document, Note
+from app.models import Document, Note, Annotation
 from app.services.ai_service import AIService
 from werkzeug.utils import secure_filename
 import os
@@ -84,6 +84,42 @@ def _generate_ai_summary(text, filename):
     except Exception as e:
         logger.info(f"AI 摘要生成跳过（未配置或失败）: {e}")
         return None
+
+
+@documents_bp.route('/documents', methods=['GET'])
+@login_required
+def list_documents():
+    """列出当前用户所有文档（支持分页 + 关键词过滤）"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    keyword = request.args.get('q', '').strip()
+
+    query = Document.query.filter_by(user_id=current_user.id)
+    if keyword:
+        query = query.filter(Document.original_filename.ilike(f'%{keyword}%'))
+    query = query.order_by(Document.created_at.desc())
+
+    total = query.count()
+    docs = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    result = []
+    for doc in docs:
+        d = doc.to_dict()
+        # 附加关联笔记标题
+        if doc.note_id:
+            note = Note.query.filter_by(id=doc.note_id, is_deleted=False).first()
+            d['note_title'] = note.title if note else None
+        else:
+            d['note_title'] = None
+        d['annotation_count'] = len(doc.annotations)
+        result.append(d)
+
+    return jsonify({
+        'documents': result,
+        'total': total,
+        'page': page,
+        'has_next': (page * per_page) < total,
+    })
 
 
 @documents_bp.route('/documents/upload', methods=['POST'])
@@ -231,3 +267,68 @@ def link_document_to_note(doc_id):
     doc.note_id = note.id
     db.session.commit()
     return jsonify(doc.to_dict())
+
+
+# ─── 批注 CRUD ────────────────────────────────────────────────────────────────
+
+@documents_bp.route('/documents/<doc_id>/annotations', methods=['GET'])
+@login_required
+def get_annotations(doc_id):
+    """获取文档的批注列表（可按页码过滤）"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    page_num = request.args.get('page', type=int)  # None = 全部
+    query = Annotation.query.filter_by(document_id=doc.id, user_id=current_user.id)
+    if page_num is not None:
+        query = query.filter_by(page=page_num)
+    annotations = query.order_by(Annotation.created_at.asc()).all()
+    return jsonify([a.to_dict() for a in annotations])
+
+
+@documents_bp.route('/documents/<doc_id>/annotations', methods=['POST'])
+@login_required
+def create_annotation(doc_id):
+    """新建批注（高亮 / 标注）"""
+    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
+    data = request.get_json() or {}
+    selected_text = (data.get('selected_text') or '').strip()
+    if not selected_text:
+        return jsonify({'error': '缺少选中文字'}), 400
+    color = data.get('color', 'yellow')
+    if color not in ('yellow', 'green', 'pink', 'blue'):
+        color = 'yellow'
+    ann = Annotation(
+        document_id=doc.id,
+        user_id=current_user.id,
+        note_id=data.get('note_id') or doc.note_id,
+        page=data.get('page'),
+        selected_text=selected_text[:2000],
+        color=color,
+        ann_note=(data.get('ann_note') or '').strip() or None,
+    )
+    db.session.add(ann)
+    db.session.commit()
+    return jsonify(ann.to_dict()), 201
+
+
+@documents_bp.route('/annotations/<ann_id>', methods=['PATCH'])
+@login_required
+def update_annotation(ann_id):
+    """更新批注的边注文字或颜色"""
+    ann = Annotation.query.filter_by(id=ann_id, user_id=current_user.id).first_or_404()
+    data = request.get_json() or {}
+    if 'ann_note' in data:
+        ann.ann_note = (data['ann_note'] or '').strip() or None
+    if 'color' in data and data['color'] in ('yellow', 'green', 'pink', 'blue'):
+        ann.color = data['color']
+    db.session.commit()
+    return jsonify(ann.to_dict())
+
+
+@documents_bp.route('/annotations/<ann_id>', methods=['DELETE'])
+@login_required
+def delete_annotation(ann_id):
+    """删除批注"""
+    ann = Annotation.query.filter_by(id=ann_id, user_id=current_user.id).first_or_404()
+    db.session.delete(ann)
+    db.session.commit()
+    return jsonify({'ok': True})

@@ -198,6 +198,9 @@ async function loadData() {
     
     if (state.currentUser) {
         checkAndNotifyCapsules();
+        // 登录后显示文档导入按钮
+        const docBtn = document.getElementById('editorDocBtn');
+        if (docBtn) docBtn.style.display = '';
     }
 }
 

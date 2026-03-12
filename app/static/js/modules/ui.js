@@ -428,6 +428,9 @@ export const ui = {
     async startInlineEdit(id) {
         const card = document.getElementById(`note-${id}`);
         if (!card) return;
+        // 记录当前编辑的笔记 ID，供文档上传等功能使用
+        window.__currentNoteId = id;
+        if (window.readerModule?.reader) window.readerModule.reader.setActiveNote(id);
 
         const contentDiv = card.querySelector('.note-content');
         const tagsDiv = card.querySelector('.note-tags');

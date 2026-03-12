@@ -683,6 +683,17 @@ button { font-family: inherit; cursor: pointer; }
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
+/* 文档导入按钮：带一点绿色提示，区分于普通工具 */
+.tool-btn-doc {
+    color: var(--primary);
+    border-color: var(--primary-light);
+}
+.tool-btn-doc:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary-hover);
+}
+
 .editor-actions { display: flex; align-items: center; gap: 15px; }
 
 /* 胶囊图标按钮 —— 放在 editor-actions 右侧区，风格与 public-switch globe 一致 */
@@ -4162,3 +4173,433 @@ input:checked + .slider:before { transform: translateX(20px); }
 .doc-picker-upload i {
     color: var(--primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   高亮批注：TextLayer 叠加高亮色
+   ══════════════════════════════════════════════════════════════════ */
+
+.ann-highlight {
+    border-radius: 2px;
+    padding: 0 1px;
+    cursor: pointer;
+    transition: opacity .15s;
+}
+.ann-highlight:hover { opacity: .8; }
+
+.ann-yellow { background: rgba(255, 213,  0, .45); }
+.ann-green  { background: rgba( 52, 199,  89, .38); }
+.ann-pink   { background: rgba(255,  99, 163, .38); }
+.ann-blue   { background: rgba( 90, 167, 255, .38); }
+
+/* 引用回溯高亮（临时） */
+.reader-nav-highlight {
+    background: rgba(255, 140, 0, .55);
+    border-radius: 2px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   浮动工具栏：颜色按钮
+   ══════════════════════════════════════════════════════════════════ */
+
+.reader-color-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(0,0,0,.12);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    transition: transform .15s, box-shadow .15s;
+}
+.reader-color-btn:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(0,0,0,.12);
+}
+.reader-color-btn.ann-yellow { background: rgb(255, 213, 0); }
+.reader-color-btn.ann-green  { background: rgb( 52, 199, 89); }
+.reader-color-btn.ann-pink   { background: rgb(255,  99,163); }
+.reader-color-btn.ann-blue   { background: rgb( 90, 167,255); }
+
+/* ══════════════════════════════════════════════════════════════════
+   批注列表面板（reader-body 内底部抽屉）
+   ══════════════════════════════════════════════════════════════════ */
+
+.reader-ann-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 260px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px rgba(0,0,0,.1);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+}
+
+.reader-ann-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-main);
+    flex-shrink: 0;
+}
+
+.reader-ann-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ann-empty {
+    text-align: center;
+    color: var(--slate-400);
+    font-size: 13px;
+    margin-top: 20px;
+}
+
+.ann-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ann-item:hover { background: var(--slate-50); }
+
+.ann-item-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.ann-item-actions {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.ann-item:hover .ann-item-actions { opacity: 1; }
+
+.ann-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.ann-dot.ann-yellow { background: rgb(255, 213, 0); }
+.ann-dot.ann-green  { background: rgb( 52, 199, 89); }
+.ann-dot.ann-pink   { background: rgb(255,  99,163); }
+.ann-dot.ann-blue   { background: rgb( 90, 167,255); }
+
+.ann-item-page {
+    font-size: 11px;
+    color: var(--slate-400);
+    flex: 1;
+}
+
+.ann-edit-btn, .ann-delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--slate-400);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    line-height: 1;
+}
+.ann-edit-btn:hover {
+    background: var(--primary-light, #eff6ff);
+    color: var(--primary);
+}
+.ann-delete-btn:hover {
+    background: var(--danger-light, #fef2f2);
+    color: #ef4444;
+}
+
+.ann-item-text {
+    font-size: 12px;
+    color: var(--text-main);
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.ann-item-note {
+    font-size: 11px;
+    color: var(--slate-500);
+    margin-top: 3px;
+    font-style: italic;
+}
+.ann-item-note i { margin-right: 3px; font-size: 10px; }
+
+/* Word 文档中的批注高亮 */
+mark.ann-word-mark {
+    border-radius: 2px;
+    padding: 0 1px;
+    cursor: pointer;
+}
+mark.ann-word-mark:hover { opacity: .8; }
+
+/* Word 引用回溯高亮 */
+mark.reader-nav-highlight-word {
+    background: rgba(255, 140, 0, .55);
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   文档管理弹窗
+   ══════════════════════════════════════════════════════════════════ */
+
+.doc-mgr-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 900;
+    backdrop-filter: blur(2px);
+}
+
+.doc-mgr-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(720px, 94vw);
+    max-height: 82vh;
+    background: var(--bg-card);
+    border-radius: 16px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.22);
+    z-index: 901;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.doc-mgr-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.doc-mgr-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-main);
+    white-space: nowrap;
+}
+
+.doc-mgr-search {
+    flex: 1;
+    position: relative;
+    max-width: 260px;
+}
+
+.doc-mgr-search input {
+    width: 100%;
+    padding: 7px 10px 7px 32px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text-main);
+    outline: none;
+    box-sizing: border-box;
+}
+.doc-mgr-search input:focus { border-color: var(--primary); }
+
+.doc-mgr-search > i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--slate-400);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.doc-mgr-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--slate-400);
+    font-size: 16px;
+    padding: 6px;
+    border-radius: 6px;
+    line-height: 1;
+}
+.doc-mgr-close:hover { background: var(--slate-100); color: var(--text-main); }
+
+.doc-mgr-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.doc-mgr-loading, .doc-mgr-empty {
+    text-align: center;
+    color: var(--slate-400);
+    font-size: 13px;
+    padding: 40px 0;
+}
+
+.doc-mgr-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    transition: background .15s, box-shadow .15s;
+}
+.doc-mgr-card:hover {
+    background: var(--slate-50);
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+.doc-mgr-card-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.doc-mgr-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.doc-mgr-card-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+}
+
+.doc-mgr-card-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--slate-400);
+}
+
+.doc-mgr-note-link {
+    background: var(--primary-light, #eff6ff);
+    color: var(--primary);
+    padding: 1px 6px;
+    border-radius: 4px;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.doc-mgr-note-link i, .doc-mgr-unlinked i { margin-right: 3px; font-size: 10px; }
+
+.doc-mgr-unlinked {
+    color: var(--slate-400);
+    font-size: 11px;
+}
+
+.doc-mgr-date {
+    margin-left: auto;
+}
+
+.doc-mgr-summary {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin: 4px 0 0;
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.doc-mgr-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.doc-mgr-btn-open, .doc-mgr-btn-del {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--slate-500);
+    transition: all .15s;
+    line-height: 1;
+}
+.doc-mgr-btn-open:hover {
+    background: var(--primary-light, #eff6ff);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.doc-mgr-btn-del:hover {
+    background: #fef2f2;
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.doc-mgr-more-btn {
+    align-self: center;
+    padding: 8px 20px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--slate-500);
+    cursor: pointer;
+    font-size: 13px;
+}
+.doc-mgr-more-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.doc-mgr-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.doc-mgr-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background .15s;
+}
+.doc-mgr-upload-btn:hover { background: var(--primary-hover, #1d4ed8); }

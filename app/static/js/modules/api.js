@@ -203,5 +203,24 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ note_id: noteId })
         }),
+        listAll: (params = {}) => {
+            const qs = new URLSearchParams(params).toString();
+            return fetchJson(`/api/documents${qs ? '?' + qs : ''}`);
+        },
+        getAnnotations: (docId, page) => {
+            const qs = page !== undefined ? `?page=${page}` : '';
+            return fetchJson(`/api/documents/${docId}/annotations${qs}`);
+        },
+        createAnnotation: (docId, data) => fetchJson(`/api/documents/${docId}/annotations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }),
+        updateAnnotation: (annId, data) => fetchJson(`/api/annotations/${annId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }),
+        deleteAnnotation: (annId) => fetchJson(`/api/annotations/${annId}`, { method: 'DELETE' }),
     }
 };

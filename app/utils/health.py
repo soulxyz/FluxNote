@@ -25,56 +25,150 @@ def run_self_check(app):
             logger.error(f"路由自检出错: {e}")
 
 def sync_database_schema(app):
-    """尽量同步数据库结构，并准确说明同步能力边界。
+    """运行时自动迁移：对比 SQLAlchemy 模型与实际数据库结构，补齐差异。
 
-    - Alembic upgrade: 负责真正的结构迁移（新增列、删列、索引等）
-    - db.create_all(): 只负责补齐缺失表，不会修改已有表结构
+    策略:
+      1. db.create_all() — 补齐缺失的整张表
+      2. 逐表对比列 — ALTER TABLE ADD COLUMN 补齐缺失列
+      3. 逐表对比索引 — CREATE INDEX 补齐缺失索引
+
+    不做危险操作（不删表、不删列、不改列类型），保证数据安全。
     """
-    repo_root = Path(app.root_path).parent
-    versions_dir = repo_root / "migrations" / "versions"
-    version_files = sorted(
-        path for path in versions_dir.glob("*.py")
-        if path.is_file() and path.name != "__init__.py"
-    )
-
     inspector = inspect(db.engine)
     tables_before = set(inspector.get_table_names())
 
-    if version_files:
-        try:
-            from flask_migrate import upgrade
-            upgrade()
-
-            current_revision = None
-            tables_after_upgrade = set(inspect(db.engine).get_table_names())
-            if "alembic_version" in tables_after_upgrade:
-                current_revision = db.session.execute(
-                    text("SELECT version_num FROM alembic_version")
-                ).scalar()
-
-            if current_revision:
-                print(f"  [✓] Alembic 迁移已同步到版本: {current_revision}")
-            else:
-                print("  [✓] Alembic 迁移检查已完成")
-        except Exception:
-            logger.exception("Alembic 自动升级失败")
-            print("  [!] Alembic 自动升级失败，将回退为仅补齐缺失表。")
-            print("      注意: `create_all()` 不会修改已有列、索引或约束。")
-    else:
-        logger.warning("未发现迁移脚本，跳过 Alembic upgrade。")
-        print("  [i] 未发现迁移脚本，跳过 Alembic upgrade。")
-
+    # ── 1. 补齐缺失表 ──
     db.create_all()
 
-    tables_after = set(inspect(db.engine).get_table_names())
+    inspector = inspect(db.engine)
+    tables_after = set(inspector.get_table_names())
     created_tables = sorted(tables_after - tables_before)
     if created_tables:
-        print(f"  [i] 已补齐缺失表: {', '.join(created_tables)}")
+        print(f"  [✓] 新建表: {', '.join(created_tables)}")
+
+    # ── 2. 补齐缺失列 ──
+    col_changes = _sync_missing_columns(inspector)
+
+    # ── 3. 补齐缺失索引 ──
+    idx_changes = _sync_missing_indexes(inspector)
+
+    if col_changes or idx_changes:
+        for msg in col_changes + idx_changes:
+            print(f"  [✓] {msg}")
+    elif not created_tables:
+        print("  [✓] 数据库结构已是最新")
+
+
+def _sync_missing_columns(inspector):
+    """对比模型定义与数据库实际列，补齐缺失列。"""
+    changes = []
+    existing_tables = set(inspector.get_table_names())
+
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+
+        existing_cols = {col['name'] for col in inspector.get_columns(table.name)}
+
+        for column in table.columns:
+            if column.name in existing_cols:
+                continue
+
+            col_type = column.type.compile(dialect=db.engine.dialect)
+
+            # SQLite ADD COLUMN 限制: NOT NULL 必须有默认值
+            default_clause = _resolve_default_clause(column, col_type)
+            nullable = column.nullable or default_clause is None
+            null_str = "" if nullable else " NOT NULL"
+            default_str = f" DEFAULT {default_clause}" if default_clause is not None else ""
+
+            sql = f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}{null_str}{default_str}'
+
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text(sql))
+                changes.append(f"新增列 {table.name}.{column.name}")
+            except Exception as e:
+                logger.warning(f"无法添加列 {table.name}.{column.name}: {e}")
+
+    return changes
+
+
+def _resolve_default_clause(column, col_type_str):
+    """为 ALTER TABLE ADD COLUMN 生成 SQLite 兼容的 DEFAULT 子句值。
+
+    返回 SQL 片段字符串（不含 DEFAULT 关键字），或 None 表示无默认值。
+    """
+    # 先检查 server_default
+    if column.server_default is not None:
+        sd = column.server_default
+        if hasattr(sd, 'arg'):
+            arg = sd.arg
+            if hasattr(arg, 'text'):
+                return str(arg.text)
+            return f"'{arg}'" if isinstance(arg, str) else str(arg)
+        return str(sd)
+
+    # 再检查 Python 侧 default（只取静态值，callable 的 default 无法用于 DDL）
+    if column.default is not None and not column.default.is_callable and not column.default.is_clause_element:
+        val = column.default.arg
+        if isinstance(val, bool):
+            return "1" if val else "0"
+        if isinstance(val, (int, float)):
+            return str(val)
+        if isinstance(val, str):
+            return f"'{val}'"
+
+    # 对 NOT NULL 且无静态默认值的列，按类型给一个安全默认值
+    if not column.nullable:
+        upper = col_type_str.upper()
+        if 'BOOL' in upper:
+            return "0"
+        if any(t in upper for t in ('INT', 'FLOAT', 'REAL', 'NUMERIC', 'DECIMAL')):
+            return "0"
+        return "''"
+
+    return None
+
+
+def _sync_missing_indexes(inspector):
+    """对比模型定义与数据库实际索引，补齐缺失索引。"""
+    changes = []
+    existing_tables = set(inspector.get_table_names())
+
+    for table in db.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+
+        existing_idx_names = {idx['name'] for idx in inspector.get_indexes(table.name) if idx.get('name')}
+        db_columns = {col['name'] for col in inspector.get_columns(table.name)}
+
+        for index in table.indexes:
+            if not index.name or index.name in existing_idx_names:
+                continue
+
+            idx_cols = [col.name for col in index.columns]
+            if not all(c in db_columns for c in idx_cols):
+                continue
+
+            cols_sql = ', '.join(f'"{c}"' for c in idx_cols)
+            unique = "UNIQUE " if index.unique else ""
+            sql = f'CREATE {unique}INDEX IF NOT EXISTS "{index.name}" ON "{table.name}" ({cols_sql})'
+
+            try:
+                with db.engine.begin() as conn:
+                    conn.execute(text(sql))
+                changes.append(f"新增索引 {table.name}.{index.name}")
+            except Exception as e:
+                logger.warning(f"无法创建索引 {index.name}: {e}")
+
+    return changes
+
 
 def check_route_shadowing(app):
     """检查静态路由是否真的会被其他规则截获。
 
-    旧逻辑按定义顺序猜测“变量路由会遮挡静态路由”，
+    旧逻辑按定义顺序猜测"变量路由会遮挡静态路由"，
     但 Flask/Werkzeug 实际会按规则优先级匹配，静态段通常优先于变量段。
     因此这里改为：直接用路由匹配器验证静态路径最终命中了哪条规则。
     """
@@ -82,7 +176,6 @@ def check_route_shadowing(app):
     reported = set()
 
     for rule in app.url_map.iter_rules():
-        # 只检查完全静态的 URL；这类路由可以直接用真实路径验证是否可达。
         if rule.arguments:
             continue
 

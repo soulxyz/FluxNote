@@ -3,9 +3,21 @@ import os
 import sys
 import traceback
 
+class TeeStream:
+    """同时输出到终端和日志文件"""
+    def __init__(self, file, original):
+        self.file = file
+        self.original = original
+    def write(self, data):
+        self.original.write(data)
+        self.file.write(data)
+    def flush(self):
+        self.original.flush()
+        self.file.flush()
+
 log_file = open('fluxnote_runtime.log', 'w', encoding='utf-8')
-sys.stdout = log_file
-sys.stderr = log_file
+sys.stdout = TeeStream(log_file, sys.__stdout__)
+sys.stderr = TeeStream(log_file, sys.__stderr__)
 
 try:
     from waitress import serve

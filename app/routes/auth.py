@@ -47,6 +47,13 @@ def login():
 
     user = User.query.filter_by(username=username).first()
     if user and user.check_password(password):
+        # 懒加载密码哈希迁移：检查是否使用当前首选方案
+        # Werkzeug 3.0+ 默认使用 scrypt
+        if not user.password_hash.startswith('scrypt:'):
+            # 使用当前首选算法重新生成哈希
+            user.set_password(password)
+            db.session.commit()
+        
         login_user(user)
         return jsonify({'message': '登录成功', 'user': {'id': user.id, 'username': user.username}})
 

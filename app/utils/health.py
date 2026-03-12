@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 
 from werkzeug.exceptions import MethodNotAllowed, NotFound
@@ -63,15 +64,26 @@ def _sync_missing_columns(inspector):
     """对比模型定义与数据库实际列，补齐缺失列。"""
     changes = []
     existing_tables = set(inspector.get_table_names())
+    identifier_pattern = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
     for table in db.metadata.sorted_tables:
         if table.name not in existing_tables:
+            continue
+
+        # 验证表名是否为合法标识符
+        if not identifier_pattern.match(table.name):
+            logger.warning(f"跳过无效的表名: {table.name}")
             continue
 
         existing_cols = {col['name'] for col in inspector.get_columns(table.name)}
 
         for column in table.columns:
             if column.name in existing_cols:
+                continue
+
+            # 验证列名是否为合法标识符
+            if not identifier_pattern.match(column.name):
+                logger.warning(f"跳过无效的列名: {table.name}.{column.name}")
                 continue
 
             col_type = column.type.compile(dialect=db.engine.dialect)
@@ -82,7 +94,12 @@ def _sync_missing_columns(inspector):
             null_str = "" if nullable else " NOT NULL"
             default_str = f" DEFAULT {default_clause}" if default_clause is not None else ""
 
-            sql = f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {col_type}{null_str}{default_str}'
+            # 使用 dialect preparer 正确引用标识符
+            preparer = db.engine.dialect.identifier_preparer
+            quoted_table = preparer.quote(table.name)
+            quoted_column = preparer.quote(column.name)
+            
+            sql = f'ALTER TABLE {quoted_table} ADD COLUMN {quoted_column} {col_type}{null_str}{default_str}'
 
             try:
                 with db.engine.begin() as conn:
@@ -106,7 +123,11 @@ def _resolve_default_clause(column, col_type_str):
             arg = sd.arg
             if hasattr(arg, 'text'):
                 return str(arg.text)
-            return f"'{arg}'" if isinstance(arg, str) else str(arg)
+            if isinstance(arg, str):
+                # 转义单引号:将 ' 替换为 ''
+                escaped_arg = arg.replace("'", "''")
+                return f"'{escaped_arg}'"
+            return str(arg)
         return str(sd)
 
     # 再检查 Python 侧 default（只取静态值，callable 的 default 无法用于 DDL）
@@ -117,7 +138,9 @@ def _resolve_default_clause(column, col_type_str):
         if isinstance(val, (int, float)):
             return str(val)
         if isinstance(val, str):
-            return f"'{val}'"
+            # 转义单引号:将 ' 替换为 ''
+            escaped_val = val.replace("'", "''")
+            return f"'{escaped_val}'"
 
     # 对 NOT NULL 且无静态默认值的列，按类型给一个安全默认值
     if not column.nullable:

@@ -9,11 +9,35 @@ class TeeStream:
         self.file = file
         self.original = original
     def write(self, data):
-        self.original.write(data)
-        self.file.write(data)
+        try:
+            self.original.write(data)
+        except Exception as e:
+            try:
+                sys.__stderr__.write(f"TeeStream: original.write failed: {e}\n")
+            except:
+                pass
+        try:
+            self.file.write(data)
+        except Exception as e:
+            try:
+                sys.__stderr__.write(f"TeeStream: file.write failed: {e}\n")
+            except:
+                pass
     def flush(self):
-        self.original.flush()
-        self.file.flush()
+        try:
+            self.original.flush()
+        except Exception as e:
+            try:
+                sys.__stderr__.write(f"TeeStream: original.flush failed: {e}\n")
+            except:
+                pass
+        try:
+            self.file.flush()
+        except Exception as e:
+            try:
+                sys.__stderr__.write(f"TeeStream: file.flush failed: {e}\n")
+            except:
+                pass
 
 log_file = open('fluxnote_runtime.log', 'w', encoding='utf-8')
 sys.stdout = TeeStream(log_file, sys.__stdout__)

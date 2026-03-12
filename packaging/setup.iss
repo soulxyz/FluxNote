@@ -78,7 +78,6 @@ var
   DriveWarnLabel: TNewStaticText; // 驱动器离线时显示的橙色警告标签
   DriveWarnText: String;          // 在 GetCustomDefaultDir 里写入，InitializeWizard 里读取
   InstallLogFile: String;         // 安装日志文件路径
-  TarExtractOK: Boolean;          // 解压是否成功完成（阶段1结果）
 
 // 写入安装日志（追加模式，带时间戳）
 procedure Log2(const Msg: String);
@@ -389,8 +388,8 @@ begin
     ExecLog('解压前终止 FluxNoteCore', 'taskkill.exe', '/F /IM FluxNotecore.exe /T', '', ResultCode);
 
     // 异步启动 tar 仅做解压；flag 写入和 zip 删除在解压成功后单独处理，避免删除失败污染退出码
-    // cmd /C "tar ... && echo 1 > flag" —— 只让 tar 负责解压并在成功后写 flag，删除 zip 是后续最佳努力步骤
-    if not Exec('cmd.exe', '/C "tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && echo 1 > "' + TarFlagFile + '""', '', SW_HIDE, ewNoWait, ResultCode) then
+    // cmd /C tar -xf "..." -C "..." && echo 1 > "flag" —— 只让 tar 负责解压并在成功后写 flag，删除 zip 是后续最佳努力步骤
+    if not Exec('cmd.exe', '/C tar -xf "' + AppPath + '\runtime.zip" -C "' + AppPath + '" && echo 1 > "' + TarFlagFile + '"', '', SW_HIDE, ewNoWait, ResultCode) then
     begin
       Log2('[阶段1] 错误：解压命令启动失败，退出码：' + IntToStr(ResultCode));
       MsgBox('解压命令启动失败,安装无法继续。错误代码：' + IntToStr(ResultCode), mbError, MB_OK);

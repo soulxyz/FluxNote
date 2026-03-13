@@ -288,6 +288,15 @@ def create_note():
         db.session.add(new_note)
         db.session.flush()  # 确保 new_note.id 已生成，供 _sync_note_references 使用
 
+        # 关联上传的文档
+        doc_ids = data.get('doc_ids', [])
+        if doc_ids:
+            from .documents import Document
+            for doc_id in doc_ids:
+                doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
+                if doc:
+                    doc.note_id = new_note.id
+
         # Update Tags Relation
         update_note_tags(new_note, tags)
         
@@ -414,6 +423,19 @@ def update_note(note_id):
 
         if note.user_id != current_user.id:
             return jsonify({'error': '无权修改此笔记'}), 403
+
+        # 更新关联的文档
+        doc_ids = data.get('doc_ids')
+        if doc_ids is not None:
+            from .documents import Document
+            # 先解除当前笔记的所有文档关联
+            Document.query.filter_by(note_id=note.id, user_id=current_user.id).update({'note_id': None})
+            # 重新关联传入的文档
+            if doc_ids:
+                for doc_id in doc_ids:
+                    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
+                    if doc:
+                        doc.note_id = note.id
 
         # Update capsule fields if provided
         note.is_capsule = is_capsule

@@ -58,43 +58,89 @@ function initDom() {
 
 // ─── PDF.js 获取 ─────────────────────────────────────────────────────────
 
-const PDFJS_CDN    = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js';
-const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js';
+let pdfjsLib = null;
 
 async function getPdfjsLib() {
-    if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-        return window.pdfjsLib;
+    if (pdfjsLib) {
+        return pdfjsLib;
     }
-    return new Promise((resolve, reject) => {
-        const existing = document.querySelector(`script[src="${PDFJS_CDN}"]`);
-        if (existing) {
-            let tries = 0;
-            const poll = setInterval(() => {
-                if (window.pdfjsLib) {
-                    clearInterval(poll);
-                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-                    resolve(window.pdfjsLib);
-                } else if (++tries > 30) {
-                    clearInterval(poll);
-                    reject(new Error('PDF.js 全局变量未就绪'));
-                }
-            }, 200);
-            return;
+
+    // 备用CDN列表
+    const cdnOptions = [
+        {
+            module: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs',
+            worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs',
+            umd: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js',
+            umdWorker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js'
+        },
+        {
+            module: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.mjs',
+            worker: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs',
+            umd: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js',
+            umdWorker: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js'
         }
-        const script = document.createElement('script');
-        script.src = PDFJS_CDN;
-        script.onload = () => {
+    ];
+
+    // 尝试ES模块导入
+    for (const cdn of cdnOptions) {
+        try {
+            console.log('[Reader] 尝试加载PDF.js ES模块:', cdn.module);
+            
+            // 检查是否已经有全局变量
             if (window.pdfjsLib) {
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-                resolve(window.pdfjsLib);
-            } else {
-                reject(new Error('PDF.js 加载后全局变量不存在'));
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = cdn.worker;
+                pdfjsLib = window.pdfjsLib;
+                return pdfjsLib;
             }
-        };
-        script.onerror = () => reject(new Error('PDF.js 脚本加载失败'));
-        document.head.appendChild(script);
-    });
+
+            // 尝试ES模块导入
+            pdfjsLib = await import(cdn.module);
+            pdfjsLib.GlobalWorkerOptions.workerSrc = cdn.worker;
+            
+            console.log('[Reader] PDF.js ES模块加载成功');
+            return pdfjsLib;
+        } catch (error) {
+            console.warn('[Reader] ES模块导入失败:', cdn.module, error);
+            continue;
+        }
+    }
+
+    // 如果ES模块都失败了，尝试UMD版本
+    for (const cdn of cdnOptions) {
+        try {
+            console.log('[Reader] 尝试加载PDF.js UMD版本:', cdn.umd);
+            
+            pdfjsLib = await new Promise((resolve, reject) => {
+                // 检查是否已经有全局变量
+                if (window.pdfjsLib) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = cdn.umdWorker;
+                    resolve(window.pdfjsLib);
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = cdn.umd;
+                script.onload = () => {
+                    if (window.pdfjsLib) {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = cdn.umdWorker;
+                        resolve(window.pdfjsLib);
+                    } else {
+                        reject(new Error('PDF.js UMD版本加载后全局变量不存在'));
+                    }
+                };
+                script.onerror = () => reject(new Error('PDF.js UMD脚本加载失败'));
+                document.head.appendChild(script);
+            });
+
+            console.log('[Reader] PDF.js UMD版本加载成功');
+            return pdfjsLib;
+        } catch (error) {
+            console.warn('[Reader] UMD版本加载失败:', cdn.umd, error);
+            continue;
+        }
+    }
+
+    throw new Error('所有PDF.js加载方案都失败了，请检查网络连接或尝试刷新页面');
 }
 
 // ─── 公开 API ─────────────────────────────────────────────────────────────
@@ -268,9 +314,10 @@ function _bindKeyboard() {
 // ─── PDF 加载与渲染 ───────────────────────────────────────────────────────
 
 async function _loadPdf(docId, opts = {}) {
-    const pdfjsLib = await getPdfjsLib();
-    const fileUrl = `/api/documents/${docId}/file`;
     try {
+        const pdfjsLib = await getPdfjsLib();
+        const fileUrl = `/api/documents/${docId}/file`;
+        
         const pdfDoc = await pdfjsLib.getDocument(fileUrl).promise;
         state.pdfDoc      = pdfDoc;
         state.totalPages  = pdfDoc.numPages;
@@ -286,7 +333,36 @@ async function _loadPdf(docId, opts = {}) {
         if (opts.text) await _highlightText(opts.text);
     } catch (e) {
         console.error('[Reader] PDF 加载失败:', e);
-        showToast('PDF 加载失败');
+        
+        // 显示详细的错误信息
+        let errorMsg = 'PDF 加载失败';
+        if (e.message.includes('PDF.js')) {
+            errorMsg = 'PDF.js 库加载失败，请检查网络连接或尝试刷新页面';
+        } else if (e.message.includes('网络')) {
+            errorMsg = '网络连接失败，请检查网络设置';
+        } else if (e.message.includes('文件')) {
+            errorMsg = 'PDF 文件损坏或格式不支持';
+        }
+        
+        showToast(errorMsg, 5000);
+        
+        // 在阅读器中显示错误信息
+        if (mdContentEl) {
+            mdContentEl.style.display = 'block';
+            mdContentEl.innerHTML = `
+                <div class="reader-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>PDF 加载失败</h3>
+                    <p>${errorMsg}</p>
+                    <p>请尝试以下解决方案：</p>
+                    <ul>
+                        <li>刷新页面重试</li>
+                        <li>检查网络连接</li>
+                        <li>如果问题持续存在，请联系管理员</li>
+                    </ul>
+                </div>
+            `;
+        }
     }
 }
 
@@ -861,6 +937,11 @@ export async function uploadAndOpenDocument(file, noteId) {
             textarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
+
+    // 触发自定义事件，通知编辑器更新附件列表
+    window.dispatchEvent(new CustomEvent('document:uploaded', { 
+        detail: { doc, noteId } 
+    }));
 
     await reader.open(doc.id, noteId);
     return doc;

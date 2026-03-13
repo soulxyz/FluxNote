@@ -219,6 +219,88 @@ export const ui = {
                 </div>
             `;
         }
+        
+        // Render Documents List
+        let docsHtml = '';
+        if (note.documents && note.documents.length > 0) {
+            const docs = note.documents.map(doc => {
+                const icon = doc.file_type === 'pdf' 
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                return `
+                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
+                        ${icon}
+                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            docsHtml = `
+                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
+                    ${docs}
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <div class="note-header">
+                <span>${formatDate(note.created_at)}</span>
+                <span class="note-header-right">
+                    ${note.is_public ? '<i class="fas fa-globe" title="公开"></i>' : '<i class="fas fa-lock" title="私密"></i>'}
+                    ${isOpenedCapsule ? '<span title="已拆开的时光胶囊" style="color:#f39c12; font-size:12px; display:inline-flex; align-items:center; gap:3px;"><i class="fas fa-hourglass-end"></i> 胶囊</span>' : ''}
+                    ${note.is_offline_draft ? '<span class="offline-badge" title="待同步"><i class="fas fa-cloud-upload-alt"></i></span>' : ''}
+                </span>
+        // Render Documents List
+        let docsHtml = '';
+        if (note.documents && note.documents.length > 0) {
+            const docs = note.documents.map(doc => {
+                const icon = doc.file_type === 'pdf' 
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                return `
+                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
+                        ${icon}
+                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            docsHtml = `
+                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
+                    ${docs}
+                </div>
+            `;
+        }
+
+        card.innerHTML = `
+            <div class="note-header">
+                <span>${formatDate(note.created_at)}</span>
+                <span class="note-header-right">
+                    ${note.is_public ? '<i class="fas fa-globe" title="公开"></i>' : '<i class="fas fa-lock" title="私密"></i>'}
+                    ${isOpenedCapsule ? '<span title="已拆开的时光胶囊" style="color:#f39c12; font-size:12px; display:inline-flex; align-items:center; gap:3px;"><i class="fas fa-hourglass-end"></i> 胶囊</span>' : ''}
+                    ${note.is_offline_draft ? '<span class="offline-badge" title="待同步"><i class="fas fa-cloud-upload-alt"></i></span>' : ''}
+                </span>
+        // Render Documents List
+        let docsHtml = '';
+        if (note.documents && note.documents.length > 0) {
+            const docs = note.documents.map(doc => {
+                const icon = doc.file_type === 'pdf' 
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                return `
+                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
+                        ${icon}
+                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                    </div>
+                `;
+            }).join('');
+            
+            docsHtml = `
+                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
+                    ${docs}
+                </div>
+            `;
+        }
 
         card.innerHTML = `
             <div class="note-header">
@@ -230,6 +312,8 @@ export const ui = {
                 </span>
             </div>
             <div class="note-content markdown-body" style="${isOwner ? 'cursor: pointer;' : ''}" ${isOwner && !note.is_offline_draft ? `ondblclick="window.dispatchEvent(new CustomEvent('note:edit', { detail: '${note.id}' }))"` : ''}>${content}</div>
+            
+            ${docsHtml}
 
             <div class="note-footer">
                 <div class="note-tags">
@@ -461,6 +545,12 @@ export const ui = {
             textarea.id = `edit-textarea-${id}`;
             textarea.className = 'inline-editor-textarea';
 
+            // 文档附件列表
+            const docsList = document.createElement('div');
+            docsList.className = 'editor-documents-list inline-editor-documents';
+            docsList.id = `edit-docs-list-${id}`;
+            docsList.style.display = 'none';
+
             // Auto-resize
             const autoResize = () => {
                 textarea.style.height = 'auto';
@@ -562,16 +652,23 @@ export const ui = {
                 const capsuleHint = textarea.dataset.capsuleHint || '';
 
                 // Dispatch event to main.js for handling (offline support)
+                const updateDetail = {
+                    id: id,
+                    content: textarea.value,
+                    tags: state.editTags,
+                    is_public: isPublic,
+                    is_capsule: isCapsule,
+                    capsule_date: capsuleDate,
+                    capsule_hint: capsuleHint
+                };
+                
+                // 获取当前编辑的文档附件 ID 列表
+                if (window.__editPendingDocs && window.__editPendingDocs[id]) {
+                    updateDetail.doc_ids = window.__editPendingDocs[id].map(d => d.id);
+                }
+
                 window.dispatchEvent(new CustomEvent('note:request-update', {
-                    detail: {
-                        id: id,
-                        content: textarea.value,
-                        tags: state.editTags,
-                        is_public: isPublic,
-                        is_capsule: isCapsule,
-                        capsule_date: capsuleDate,
-                        capsule_hint: capsuleHint
-                    }
+                    detail: updateDetail
                 }));
             };
 
@@ -581,9 +678,121 @@ export const ui = {
             footer.appendChild(btnsDiv);
 
             container.appendChild(textarea);
+            container.appendChild(docsList);
             container.appendChild(toolsBar);
             container.appendChild(tagsArea);
             container.appendChild(footer);
+            
+            // 渲染已有的文档附件
+            if (note.documents && note.documents.length > 0) {
+                // 暂时将文档存入全局状态，以便编辑时可以删除或增加
+                window.__editPendingDocs = window.__editPendingDocs || {};
+                window.__editPendingDocs[id] = [...note.documents];
+                
+                // 渲染附件列表
+                const renderEditDocs = () => {
+                    const docs = window.__editPendingDocs[id] || [];
+                    if (docs.length > 0) {
+                        docsList.style.display = 'flex';
+                        docsList.innerHTML = docs.map(doc => {
+                            const icon = doc.file_type === 'pdf' 
+                                ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                                : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                            return `
+                                <div class="editor-doc-card" data-doc-id="${doc.id}">
+                                    ${icon}
+                                    <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                                    <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
+                                </div>
+                            `;
+                        }).join('');
+                        
+                        // 绑定事件
+                        docsList.querySelectorAll('.editor-doc-card').forEach(card => {
+                            // 点击卡片打开阅读器
+                            card.addEventListener('click', (e) => {
+                                if (e.target.closest('.doc-remove-btn')) return;
+                                const docId = card.dataset.docId;
+                                if (window.readerModule?.reader) {
+                                    window.readerModule.reader.open(docId, id);
+                                }
+                            });
+                            
+                            // 点击删除按钮
+                            const removeBtn = card.querySelector('.doc-remove-btn');
+                            removeBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const docId = card.dataset.docId;
+                                window.__editPendingDocs[id] = window.__editPendingDocs[id].filter(d => d.id !== docId);
+                                renderEditDocs();
+                            });
+                        });
+                    } else {
+                        docsList.style.display = 'none';
+                        docsList.innerHTML = '';
+                    }
+                };
+                
+                // 绑定到 DOM 元素上以便其他模块调用
+                docsList.__renderFunc = renderEditDocs;
+                
+                renderEditDocs();
+            }
+
+            // 监听新上传的文档
+            const uploadListener = (e) => {
+                if (e.detail.noteId == id) {
+                    if (docsList.__renderFunc) {
+                        docsList.__renderFunc();
+                    } else {
+                        // 如果之前没有附件，初始化渲染函数并调用
+                        docsList.__renderFunc = () => {
+                            const docs = window.__editPendingDocs[id] || [];
+                            if (docs.length > 0) {
+                                docsList.style.display = 'flex';
+                                docsList.innerHTML = docs.map(doc => {
+                                    const icon = doc.file_type === 'pdf' 
+                                        ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                                        : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                                    return `
+                                        <div class="editor-doc-card" data-doc-id="${doc.id}">
+                                            ${icon}
+                                            <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                                            <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
+                                        </div>
+                                    `;
+                                }).join('');
+                                
+                                docsList.querySelectorAll('.editor-doc-card').forEach(card => {
+                                    card.addEventListener('click', (e) => {
+                                        if (e.target.closest('.doc-remove-btn')) return;
+                                        const docId = card.dataset.docId;
+                                        if (window.readerModule?.reader) {
+                                            window.readerModule.reader.open(docId, id);
+                                        }
+                                    });
+                                    
+                                    const removeBtn = card.querySelector('.doc-remove-btn');
+                                    removeBtn.addEventListener('click', (e) => {
+                                        e.stopPropagation();
+                                        const docId = card.dataset.docId;
+                                        window.__editPendingDocs[id] = window.__editPendingDocs[id].filter(d => d.id !== docId);
+                                        docsList.__renderFunc();
+                                    });
+                                });
+                            } else {
+                                docsList.style.display = 'none';
+                                docsList.innerHTML = '';
+                            }
+                        };
+                        docsList.__renderFunc();
+                    }
+                }
+            };
+            window.addEventListener('document:edit-uploaded', uploadListener);
+            
+            // 保存清理监听器的引用
+            container.__uploadListener = uploadListener;
 
             contentDiv.innerHTML = '';
             contentDiv.appendChild(container);

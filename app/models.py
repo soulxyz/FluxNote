@@ -140,7 +140,8 @@ class Note(db.Model):
             'is_capsule': self.is_capsule,
             'capsule_date': self.capsule_date.strftime('%Y-%m-%d %H:%M:%S') if self.capsule_date else None,
             'capsule_hint': self.capsule_hint,
-            'capsule_status': self.capsule_status
+            'capsule_status': self.capsule_status,
+            'documents': [doc.to_dict() for doc in self.documents] if hasattr(self, 'documents') else []
         }
 
     @staticmethod
@@ -162,6 +163,7 @@ class Note(db.Model):
         d['links'] = []
         d['backlinks'] = []
         d['tags'] = []
+        d['documents'] = []
         return d
 
     def get_excerpt(self, max_length=150):

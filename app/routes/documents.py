@@ -24,8 +24,11 @@ def _allowed_doc(filename):
 def _extract_pdf(filepath):
     """用 PyMuPDF 提取 PDF 全文和页数"""
     try:
+        # 路径安全验证：确保 filepath 是绝对路径且规范化
+        safe_filepath = os.path.abspath(filepath)
+        
         import fitz  # PyMuPDF
-        doc = fitz.open(filepath)
+        doc = fitz.open(safe_filepath)
         pages = doc.page_count
         texts = []
         for page in doc:
@@ -40,6 +43,9 @@ def _extract_pdf(filepath):
 def _extract_docx(filepath):
     """用 mammoth 提取 Word 文档内容（转为 Markdown 格式）"""
     try:
+        # 路径安全验证：确保 filepath 是绝对路径且规范化
+        safe_filepath = os.path.abspath(filepath)
+        
         import mammoth
         # mammoth 自定义样式映射，保留标题层级
         style_map = """
@@ -50,7 +56,7 @@ def _extract_docx(filepath):
             b => **
             i => _
         """
-        with open(filepath, 'rb') as f:
+        with open(safe_filepath, 'rb') as f:
             result = mammoth.convert_to_markdown(f, style_map=style_map)
         md = result.value or ''
         # 纯文本用于 AI 摘要（去掉 Markdown 语法）
@@ -156,8 +162,17 @@ def upload_document():
     doc_id = str(uuid.uuid4())
     stored_name = f"doc_{doc_id}.{ext}"
 
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    filepath = os.path.join(upload_folder, stored_name)
+    # 路径安全验证：规范化并确保在受信任的根目录内
+    upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+    filepath = os.path.abspath(os.path.join(upload_folder, stored_name))
+    
+    # 验证 filepath 仍在 upload_folder 内（防止路径遍历攻击）
+    try:
+        if os.path.commonpath([upload_folder, filepath]) != upload_folder:
+            return jsonify({'error': '无效的文件路径'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': '无效的文件路径'}), 400
+    
     file.save(filepath)
 
     # 文本提取
@@ -208,8 +223,24 @@ def get_document(doc_id):
 def delete_document(doc_id):
     """删除文档（同时删除文件）"""
     doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    filepath = os.path.join(upload_folder, doc.stored_filename)
+    
+    # 路径安全验证：规范化并确保在受信任的根目录内
+    upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+    filepath = os.path.abspath(os.path.join(upload_folder, doc.stored_filename))
+    
+    # 验证 filepath 仍在 upload_folder 内（防止路径遍历攻击）
+    try:
+        if os.path.commonpath([upload_folder, filepath]) != upload_folder:
+            logger.warning(f"尝试访问不安全的路径: {filepath}")
+            db.session.delete(doc)
+            db.session.commit()
+            return jsonify({'ok': True, 'warning': '文件路径验证失败，仅删除数据库记录'})
+    except (ValueError, TypeError):
+        logger.warning(f"路径验证失败: {filepath}")
+        db.session.delete(doc)
+        db.session.commit()
+        return jsonify({'ok': True, 'warning': '文件路径验证失败,仅删除数据库记录'})
+    
     if os.path.exists(filepath):
         try:
             os.remove(filepath)
@@ -296,10 +327,21 @@ def create_annotation(doc_id):
     color = data.get('color', 'yellow')
     if color not in ('yellow', 'green', 'pink', 'blue'):
         color = 'yellow'
+    
+    # 验证 note_id：如果用户提供了 note_id，必须验证其有效性和归属
+    note_id = data.get('note_id')
+    if note_id:
+        note = Note.query.filter_by(id=note_id, user_id=current_user.id, is_deleted=False).first()
+        if not note:
+            return jsonify({'error': '笔记不存在或无权访问'}), 404
+    else:
+        # 如果用户未提供 note_id，使用文档自身的 note_id
+        note_id = doc.note_id
+    
     ann = Annotation(
         document_id=doc.id,
         user_id=current_user.id,
-        note_id=data.get('note_id') or doc.note_id,
+        note_id=note_id,
         page=data.get('page'),
         selected_text=selected_text[:2000],
         color=color,

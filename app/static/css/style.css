@@ -37,6 +37,26 @@
     --radius: 12px;
 }
 
+[data-theme="dark"] .editor-doc-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .editor-doc-card:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .editor-doc-card .doc-remove-btn {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .editor-doc-card .doc-remove-btn:hover {
+    color: var(--danger-color);
+    background: rgba(231, 76, 60, 0.2);
+}
+
 /* ============================================================
    2. 基础样式
    ============================================================ */
@@ -573,6 +593,67 @@ button { font-family: inherit; cursor: pointer; }
     box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1), 0 4px 6px -2px rgba(16, 185, 129, 0.05);
     border-color: var(--primary-light);
     transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   Editor Documents List (PDF/Word Attachments)
+   ========================================================================== */
+
+.editor-documents-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0 0 10px 0;
+}
+
+.inline-editor-documents {
+    padding: 10px 0 0 0;
+}
+
+.editor-doc-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    max-width: 100%;
+}
+
+.editor-doc-card:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary-color);
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.editor-doc-card .doc-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.editor-doc-card .doc-remove-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.editor-doc-card .doc-remove-btn:hover {
+    color: var(--danger-color);
+    background: rgba(231, 76, 60, 0.1);
 }
 
 .memo-editor::before {
@@ -3229,27 +3310,68 @@ input:checked + .slider:before { transform: translateX(20px); }
         transform: none !important;
     }
 
-    /* 侧边栏遮罩 */
-    body.sidebar-open::after {
-        content: '';
+    /* 侧边栏遮罩 - 优化版本 */
+    .sidebar-overlay {
         position: fixed;
         top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(2px);
-        z-index: 1000;
-        animation: fadeInOverlay 0.25s ease-out;
+        z-index: 999;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease-out, visibility 0.25s ease-out;
+        cursor: pointer;
+        /* 移除backdrop-filter以提升性能，避免在低端设备上卡顿 */
+        /* backdrop-filter: blur(2px); */
+        /* 只在移动端显示 */
+        display: none;
     }
+    
+    /* 移动端显示蒙版 */
+    @media (max-width: 900px) {
+        .sidebar-overlay {
+            display: block;
+        }
+        
+        /* 优化触摸体验 */
+        .sidebar-overlay:active {
+            background: rgba(0, 0, 0, 0.5);
+        }
+    }
+    
+    body.sidebar-open .sidebar-overlay {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    body.sidebar-closing .sidebar-overlay {
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s ease-in, visibility 0.2s ease-in;
+    }
+    
+    /* 防止背景滚动穿透 */
+    @media (max-width: 900px) {
+        body.sidebar-open {
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+        
+        body.sidebar-open .main-stream {
+            overflow: hidden;
+        }
+    }
+    
+    /* 兼容旧版本的伪元素蒙版 - 禁用 */
+    body.sidebar-open::after,
     body.sidebar-closing::after {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(2px);
-        z-index: 1000;
-        animation: fadeOutOverlay 0.2s ease-in forwards;
+        display: none !important;
     }
-    @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes fadeOutOverlay { from { opacity: 1; } to { opacity: 0; } }
+    
+    /* 确保侧边栏在蒙版之上 */
+    .sidebar {
+        z-index: 1001;
+    }
 
     /* 隐藏桌面端按钮 */
     .sidebar-toggle-btn, .floating-menu-btn { display: none !important; }
@@ -4267,7 +4389,7 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .ann-item {
-    background: var(--bg);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 10px;
@@ -4320,7 +4442,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     line-height: 1;
 }
 .ann-edit-btn:hover {
-    background: var(--primary-light, #eff6ff);
+    background: var(--primary-light, #D1FAE5);
     color: var(--primary);
 }
 .ann-delete-btn:hover {
@@ -4418,7 +4540,7 @@ mark.reader-nav-highlight-word {
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 13px;
-    background: var(--bg);
+    background: var(--bg-card);
     color: var(--text-main);
     outline: none;
     box-sizing: border-box;
@@ -4471,7 +4593,7 @@ mark.reader-nav-highlight-word {
     padding: 12px 14px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: var(--bg);
+    background: var(--bg-card);
     transition: background .15s, box-shadow .15s;
 }
 .doc-mgr-card:hover {
@@ -4510,7 +4632,7 @@ mark.reader-nav-highlight-word {
 }
 
 .doc-mgr-note-link {
-    background: var(--primary-light, #eff6ff);
+    background: var(--primary-light, #D1FAE5);
     color: var(--primary);
     padding: 1px 6px;
     border-radius: 4px;
@@ -4560,7 +4682,7 @@ mark.reader-nav-highlight-word {
     line-height: 1;
 }
 .doc-mgr-btn-open:hover {
-    background: var(--primary-light, #eff6ff);
+    background: var(--primary-light, #D1FAE5);
     border-color: var(--primary);
     color: var(--primary);
 }
@@ -4602,4 +4724,53 @@ mark.reader-nav-highlight-word {
     font-weight: 500;
     transition: background .15s;
 }
-.doc-mgr-upload-btn:hover { background: var(--primary-hover, #1d4ed8); }
+.doc-mgr-upload-btn:hover { background: var(--primary-hover, #059669); }
+
+/* ─── PDF 阅读器错误提示 ─────────────────────────────────────────────── */
+.reader-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px;
+    text-align: center;
+    color: var(--slate-600);
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    margin: 20px;
+}
+
+.reader-error i {
+    font-size: 48px;
+    color: var(--orange-500, #f97316);
+    margin-bottom: 20px;
+}
+
+.reader-error h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--slate-800);
+    margin-bottom: 12px;
+}
+
+.reader-error p {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    max-width: 400px;
+}
+
+.reader-error ul {
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--slate-600);
+    background: var(--bg-primary);
+    padding: 16px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.reader-error li {
+    margin-bottom: 4px;
+}

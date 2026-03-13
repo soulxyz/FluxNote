@@ -108,8 +108,14 @@
     <!-- Viewer.js for Image Zoom - defer -->
     <link rel="stylesheet" href={{ static_v("lib/viewerjs/viewer.min.css") }}>
     <script src={{ static_v("lib/viewerjs/viewer.min.js") }} defer></script>
-    <!-- PDF.js - 预加载，避免动态 import 失败 -->
-    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js" defer></script>
+    <!-- PDF.js - ES模块方式加载，支持多CDN备用 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"
+        }
+    }
+    </script>
 </head>
 <body>
     <div class="app-layout" id="appLayout">
@@ -248,6 +254,9 @@
             <!-- 笔记输入框 (仅登录可见) -->
             <div class="memo-editor" id="noteInputSection" style="display: none;">
                 <textarea id="noteContent" placeholder="现在的想法是..."></textarea>
+
+                <!-- 文档附件列表 -->
+                <div id="editorDocumentsList" class="editor-documents-list" style="display: none;"></div>
 
                 <div class="editor-footer">
                     <div class="editor-tools">

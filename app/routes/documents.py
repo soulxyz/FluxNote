@@ -21,12 +21,14 @@ def _allowed_doc(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_DOC_EXTENSIONS
 
 
-def _extract_pdf(filepath):
+def _extract_pdf(filepath, trusted_root):
     """用 PyMuPDF 提取 PDF 全文和页数"""
     try:
-        # 路径安全验证：确保 filepath 是绝对路径且规范化
         safe_filepath = os.path.abspath(filepath)
-        
+        if not safe_filepath.startswith(os.path.abspath(trusted_root) + os.sep):
+            logger.warning(f"PDF 路径不在受信目录内: {safe_filepath}")
+            return None, ''
+
         import fitz  # PyMuPDF
         doc = fitz.open(safe_filepath)
         pages = doc.page_count
@@ -40,12 +42,14 @@ def _extract_pdf(filepath):
         return None, ''
 
 
-def _extract_docx(filepath):
+def _extract_docx(filepath, trusted_root):
     """用 mammoth 提取 Word 文档内容（转为 Markdown 格式）"""
     try:
-        # 路径安全验证：确保 filepath 是绝对路径且规范化
         safe_filepath = os.path.abspath(filepath)
-        
+        if not safe_filepath.startswith(os.path.abspath(trusted_root) + os.sep):
+            logger.warning(f"Word 路径不在受信目录内: {safe_filepath}")
+            return '', ''
+
         import mammoth
         # mammoth 自定义样式映射，保留标题层级
         style_map = """
@@ -157,22 +161,24 @@ def upload_document():
     if file_size > MAX_DOC_SIZE:
         return jsonify({'error': f'文件过大，最大支持 {MAX_DOC_SIZE // 1024 // 1024}MB'}), 400
 
-    ext = file.filename.rsplit('.', 1)[1].lower()
     original_filename = file.filename
+    safe_name = secure_filename(file.filename)
+    if not safe_name or '.' not in safe_name:
+        return jsonify({'error': '无效的文件名'}), 400
+
+    ext = safe_name.rsplit('.', 1)[1].lower()
+    if ext not in ALLOWED_DOC_EXTENSIONS:
+        return jsonify({'error': '不支持的文件格式'}), 400
+
     doc_id = str(uuid.uuid4())
     stored_name = f"doc_{doc_id}.{ext}"
 
-    # 路径安全验证：规范化并确保在受信任的根目录内
     upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
     filepath = os.path.abspath(os.path.join(upload_folder, stored_name))
-    
-    # 验证 filepath 仍在 upload_folder 内（防止路径遍历攻击）
-    try:
-        if os.path.commonpath([upload_folder, filepath]) != upload_folder:
-            return jsonify({'error': '无效的文件路径'}), 400
-    except (ValueError, TypeError):
+
+    if not filepath.startswith(upload_folder + os.sep):
         return jsonify({'error': '无效的文件路径'}), 400
-    
+
     file.save(filepath)
 
     # 文本提取
@@ -181,9 +187,9 @@ def upload_document():
     md_content = None
 
     if ext == 'pdf':
-        page_count, text_content = _extract_pdf(filepath)
+        page_count, text_content = _extract_pdf(filepath, upload_folder)
     elif ext in ('docx', 'doc'):
-        md_content, text_content = _extract_docx(filepath)
+        md_content, text_content = _extract_docx(filepath, upload_folder)
 
     # AI 摘要（异步降级：失败不影响上传）
     ai_summary = _generate_ai_summary(text_content, original_filename)

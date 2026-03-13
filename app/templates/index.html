@@ -84,6 +84,14 @@
                             if (videoExts.test(href)) {
                                 return '<div class="video-wrapper"><video controls preload="metadata" src="' + href + '"></video></div>';
                             }
+                            // 文档引用协议：#doc:docId[:page]
+                            if (href && href.startsWith('#doc:')) {
+                                var parts = href.slice(5).split(':');
+                                var docId = parts[0];
+                                var page = parts[1] ? parseInt(parts[1]) : null;
+                                var pageLabel = page ? '第' + page + '页' : '';
+                                return '<a href="javascript:void(0)" class="doc-citation-link" data-doc-id="' + docId + '" data-page="' + (page || '') + '" title="跳转到文档' + pageLabel + '"><i class="fas fa-file-alt"></i>' + text + '</a>';
+                            }
                             var titleAttr = title ? ' title="' + title + '"' : '';
                             return '<a href="' + href + '"' + titleAttr + ' target="_blank" rel="noopener noreferrer">' + text + '</a>';
                         }
@@ -100,6 +108,14 @@
     <!-- Viewer.js for Image Zoom - defer -->
     <link rel="stylesheet" href={{ static_v("lib/viewerjs/viewer.min.css") }}>
     <script src={{ static_v("lib/viewerjs/viewer.min.js") }} defer></script>
+    <!-- PDF.js - ES模块方式加载，支持多CDN备用 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.mjs"
+        }
+    }
+    </script>
 </head>
 <body>
     <div class="app-layout" id="appLayout">
@@ -180,6 +196,9 @@
                         <a href="#" class="nav-item" id="navTrash" onclick="return false;">
                             <i class="fas fa-trash"></i> 回收站
                         </a>
+                        <a href="#" class="nav-item" id="navDocMgr" onclick="openDocMgr();return false;">
+                            <i class="fas fa-folder-open"></i> 文档管理
+                        </a>
                         <div class="nav-divider"></div>
                         <a href="#" class="nav-item nav-item-subtle" id="navCapsules" onclick="return false;">
                             <i class="far fa-hourglass"></i> 时光胶囊
@@ -236,11 +255,17 @@
             <div class="memo-editor" id="noteInputSection" style="display: none;">
                 <textarea id="noteContent" placeholder="现在的想法是..."></textarea>
 
+                <!-- 文档附件列表 -->
+                <div id="editorDocumentsList" class="editor-documents-list" style="display: none;"></div>
+
                 <div class="editor-footer">
                     <div class="editor-tools">
                         <button class="tool-btn" id="toggleTagInputBtn" title="插入标签 (Ctrl+#)"><i class="fas fa-hashtag"></i></button>
                         <input type="text" id="tagInput" class="tag-input-inline" placeholder="输入标签按回车..." style="display:none;">
                         <button class="tool-btn" title="上传图片"><i class="far fa-image"></i></button>
+                        <button class="tool-btn tool-btn-doc" id="editorDocBtn" title="导入文档（PDF / Word）阅读并批注" style="display:none;">
+                            <i class="fas fa-file-import"></i>
+                        </button>
                         <!-- AI 按钮由 JS 插入 -->
                         <div class="input-controls"></div>
                     </div>
@@ -660,6 +685,266 @@
 
         // 供 settings.html 内部调用（通过 parent.closeSettingsModal）
         window.closeSettingsModal = closeSettingsModal;
+    </script>
+
+    <!-- 文档阅读面板 -->
+    <div id="readerOverlay" class="reader-overlay"></div>
+    <div id="readerPanel" class="reader-panel">
+        <!-- 顶部工具栏 -->
+        <div class="reader-header">
+            <div class="reader-header-left">
+                <button id="readerCloseBtn" class="reader-btn reader-btn-icon" title="关闭 (Esc)">
+                    <i class="fas fa-times"></i>
+                </button>
+                <span id="readerDocTitle" class="reader-doc-title">文档</span>
+            </div>
+            <div id="readerToolbar" class="reader-toolbar">
+                <!-- PDF 控制 -->
+                <div class="reader-pdf-controls">
+                    <button id="readerPrevBtn" class="reader-btn reader-btn-icon" title="上一页 (←)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="reader-page-info">
+                        <input id="readerPageInput" type="number" min="1" value="1" class="reader-page-input">
+                        <span class="reader-page-sep">/</span>
+                        <span id="readerTotalPages">—</span>
+                    </div>
+                    <button id="readerNextBtn" class="reader-btn reader-btn-icon" title="下一页 (→)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <select id="readerScale" class="reader-scale-select" title="缩放">
+                        <option value="0.8">80%</option>
+                        <option value="1.0">100%</option>
+                        <option value="1.2">120%</option>
+                        <option value="1.4" selected>140%</option>
+                        <option value="1.8">180%</option>
+                        <option value="2.2">220%</option>
+                    </select>
+                </div>
+                <!-- 批注列表开关 -->
+                <button id="readerAnnToggleBtn" class="reader-btn reader-btn-icon" title="批注列表">
+                    <i class="fas fa-highlighter"></i>
+                </button>
+                <button id="readerFullscreenBtn" class="reader-btn reader-btn-icon" title="全屏阅读">
+                    <i class="fas fa-expand-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="reader-body">
+            <!-- 加载中 -->
+            <div id="readerLoading" class="reader-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>正在加载文档…</span>
+            </div>
+
+            <!-- PDF 渲染区 -->
+            <div id="readerPdfWrapper" class="reader-pdf-wrapper">
+                <div class="reader-canvas-container">
+                    <canvas id="readerCanvas"></canvas>
+                    <div id="readerTextLayer" class="reader-text-layer"></div>
+                </div>
+            </div>
+
+            <!-- Word 渲染区（Markdown） -->
+            <div id="readerMdContent" class="reader-md-content markdown-body" style="display:none;"></div>
+
+            <!-- 批注列表面板（可收起） -->
+            <div id="readerAnnPanel" class="reader-ann-panel" style="display:none;">
+                <div class="reader-ann-header">
+                    <span><i class="fas fa-highlighter"></i> 批注列表</span>
+                    <button id="readerAnnClose" class="reader-btn reader-btn-icon" title="关闭">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="readerAnnList" class="reader-ann-list"></div>
+            </div>
+        </div>
+
+        <!-- 选中文字浮动工具栏 -->
+        <div id="readerFloatBar" class="reader-float-bar" style="display:none;">
+            <button class="reader-color-btn ann-yellow" data-color="yellow" title="黄色高亮"></button>
+            <button class="reader-color-btn ann-green"  data-color="green"  title="绿色高亮"></button>
+            <button class="reader-color-btn ann-pink"   data-color="pink"   title="粉色高亮"></button>
+            <button class="reader-color-btn ann-blue"   data-color="blue"   title="蓝色高亮"></button>
+            <div class="reader-float-sep"></div>
+            <button id="readerBtnAddNote" class="reader-float-btn" title="添加批注备注">
+                <i class="fas fa-sticky-note"></i> 批注
+            </button>
+            <div class="reader-float-sep"></div>
+            <button id="readerBtnQuote" class="reader-float-btn" title="插入引用到笔记">
+                <i class="fas fa-quote-right"></i> 引用
+            </button>
+            <div class="reader-float-sep"></div>
+            <button id="readerBtnAI" class="reader-float-btn" title="AI 解释选中内容">
+                <i class="fas fa-magic"></i> AI
+            </button>
+        </div>
+    </div>
+
+    <!-- 文档管理弹窗 -->
+    <div id="docMgrOverlay" class="doc-mgr-overlay" style="display:none;" onclick="if(event.target===this)closeDo​cMgr()"></div>
+    <div id="docMgrModal" class="doc-mgr-modal" style="display:none;">
+        <div class="doc-mgr-header">
+            <h3><i class="fas fa-folder-open"></i> 我的文档</h3>
+            <div class="doc-mgr-search">
+                <input id="docMgrSearch" type="text" placeholder="搜索文件名…" autocomplete="off">
+                <i class="fas fa-search"></i>
+            </div>
+            <button class="doc-mgr-close" onclick="closeDocMgr()" title="关闭">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="docMgrList" class="doc-mgr-list">
+            <div class="doc-mgr-loading"><i class="fas fa-spinner fa-spin"></i> 加载中…</div>
+        </div>
+        <div class="doc-mgr-footer">
+            <button class="doc-mgr-upload-btn" id="docMgrUploadBtn">
+                <i class="fas fa-file-import"></i> 上传新文档
+            </button>
+            <input id="docMgrFileInput" type="file" accept=".pdf,.docx,.doc" style="display:none;">
+        </div>
+    </div>
+
+    <!-- 初始化阅读面板 -->
+    <script type="module">
+        import { reader, uploadAndOpenDocument, triggerDocUpload } from '/static/js/modules/reader.js?v={{ app_version }}';
+        import { api } from '/static/js/modules/api.js?v={{ app_version }}';
+        reader.init();
+        window.readerModule = { reader, uploadAndOpenDocument, triggerDocUpload };
+
+        // ── 文档管理弹窗逻辑 ──
+        let docMgrPage = 1;
+        let docMgrKeyword = '';
+
+        window.openDocMgr = async function() {
+            document.getElementById('docMgrOverlay').style.display = 'block';
+            document.getElementById('docMgrModal').style.display = 'flex';
+            await loadDocMgrList();
+        };
+
+        window.closeDocMgr = function() {
+            document.getElementById('docMgrOverlay').style.display = 'none';
+            document.getElementById('docMgrModal').style.display = 'none';
+        };
+
+        const docMgrListEl = document.getElementById('docMgrList');
+
+        async function loadDocMgrList(page = 1, q = '') {
+            docMgrPage = page;
+            docMgrKeyword = q;
+            docMgrListEl.innerHTML = '<div class="doc-mgr-loading"><i class="fas fa-spinner fa-spin"></i> 加载中…</div>';
+            const res = await api.documents.listAll({ page, per_page: 20, q });
+            if (!res || !res.ok) { docMgrListEl.innerHTML = '<p class="doc-mgr-empty">加载失败</p>'; return; }
+            const data = await res.json();
+            renderDocMgrList(data);
+        }
+
+        function renderDocMgrList(data) {
+            const { documents, total, has_next } = data;
+            if (!documents.length) {
+                docMgrListEl.innerHTML = '<p class="doc-mgr-empty">暂无文档，点击下方按钮上传</p>';
+                return;
+            }
+            docMgrListEl.innerHTML = '';
+            for (const doc of documents) {
+                const card = document.createElement('div');
+                card.className = 'doc-mgr-card';
+                const icon = doc.file_type === 'pdf'
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
+                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                const pages = doc.page_count ? `${doc.page_count}页` : 'Word';
+                const annCnt = doc.annotation_count || 0;
+                const size = doc.file_size ? _formatSize(doc.file_size) : '';
+                const noteTitle = doc.note_title ? `<span class="doc-mgr-note-link" title="关联笔记：${escHtml(doc.note_title)}"><i class="fas fa-link"></i> ${escHtml(doc.note_title)}</span>` : '<span class="doc-mgr-unlinked" title="未关联笔记"><i class="fas fa-unlink"></i> 未关联</span>';
+                const summary = doc.ai_summary ? `<p class="doc-mgr-summary">${escHtml(doc.ai_summary.slice(0, 80))}${doc.ai_summary.length > 80 ? '…' : ''}</p>` : '';
+
+                card.innerHTML = `
+                    <div class="doc-mgr-card-icon">${icon}</div>
+                    <div class="doc-mgr-card-body">
+                        <div class="doc-mgr-card-title">${escHtml(doc.original_filename)}</div>
+                        <div class="doc-mgr-card-meta">
+                            <span>${pages}</span>
+                            ${size ? `<span>${size}</span>` : ''}
+                            ${annCnt ? `<span><i class="fas fa-highlighter"></i> ${annCnt} 条批注</span>` : ''}
+                            ${noteTitle}
+                            <span class="doc-mgr-date">${doc.created_at.slice(0,10)}</span>
+                        </div>
+                        ${summary}
+                    </div>
+                    <div class="doc-mgr-card-actions">
+                        <button class="doc-mgr-btn-open" data-id="${doc.id}" title="打开阅读">
+                            <i class="fas fa-book-open"></i>
+                        </button>
+                        <button class="doc-mgr-btn-del" data-id="${doc.id}" data-name="${escHtml(doc.original_filename)}" title="删除文档">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `;
+                docMgrListEl.appendChild(card);
+            }
+
+            if (has_next) {
+                const moreBtn = document.createElement('button');
+                moreBtn.className = 'doc-mgr-more-btn';
+                moreBtn.textContent = '加载更多';
+                moreBtn.onclick = () => loadDocMgrList(docMgrPage + 1, docMgrKeyword);
+                docMgrListEl.appendChild(moreBtn);
+            }
+        }
+
+        docMgrListEl.addEventListener('click', async (e) => {
+            const openBtn = e.target.closest('.doc-mgr-btn-open');
+            if (openBtn) {
+                closeDocMgr();
+                await reader.open(openBtn.dataset.id);
+                return;
+            }
+            const delBtn = e.target.closest('.doc-mgr-btn-del');
+            if (delBtn) {
+                if (!confirm(`确定删除《${delBtn.dataset.name}》及其所有批注？此操作不可撤销。`)) return;
+                const res = await api.documents.delete(delBtn.dataset.id);
+                if (res && res.ok) {
+                    delBtn.closest('.doc-mgr-card').remove();
+                    if (!docMgrListEl.querySelector('.doc-mgr-card')) {
+                        docMgrListEl.innerHTML = '<p class="doc-mgr-empty">暂无文档，点击下方按钮上传</p>';
+                    }
+                    window.showToast?.('文档已删除');
+                } else {
+                    window.showToast?.('删除失败');
+                }
+            }
+        });
+
+        let _searchTimer;
+        document.getElementById('docMgrSearch')?.addEventListener('input', (e) => {
+            clearTimeout(_searchTimer);
+            _searchTimer = setTimeout(() => loadDocMgrList(1, e.target.value.trim()), 400);
+        });
+
+        document.getElementById('docMgrUploadBtn')?.addEventListener('click', () => {
+            document.getElementById('docMgrFileInput').click();
+        });
+        document.getElementById('docMgrFileInput')?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            closeDocMgr();
+            await uploadAndOpenDocument(file, window.__currentNoteId || null);
+            e.target.value = '';
+        });
+
+        document.getElementById('docMgrOverlay')?.addEventListener('click', closeDocMgr);
+
+        function _formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function escHtml(s) {
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
     </script>
 </body>
 </html>

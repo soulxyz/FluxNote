@@ -399,6 +399,15 @@ function mediaRenderer() {
             }
             if (!text) text = href;
 
+            // 文档引用协议：#doc:docId[:page]
+            if (href && href.startsWith('#doc:')) {
+                const parts = href.slice(5).split(':');  // 去掉 "#doc:"
+                const docId = parts[0];
+                const page = parts[1] ? parseInt(parts[1]) : null;
+                const pageLabel = page ? `第${page}页` : '';
+                return `<a href="javascript:void(0)" class="doc-citation-link" data-doc-id="${docId}" data-page="${page || ''}" title="跳转到文档${pageLabel}"><i class="fas fa-file-alt"></i>${text}</a>`;
+            }
+
             if (audioExts.test(href)) {
                 return `<audio controls preload="metadata" src="${href}"></audio>`;
             }

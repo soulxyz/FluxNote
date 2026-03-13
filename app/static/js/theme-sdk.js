@@ -257,12 +257,22 @@ class ThemeSDK {
             }
         });
 
+        // 蒙版点击关闭侧边栏
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.closeMobileSidebar();
+            });
+        }
+
         // 点击遮罩关闭侧边栏
         document.addEventListener('click', (e) => {
             const sidebar = document.querySelector('#sidebar');
             if (sidebar && sidebar.classList.contains('mobile-open')) {
-                // 检查是否点击在侧边栏外部
-                if (!sidebar.contains(e.target) && !e.target.closest('#mobileMenuBtn')) {
+                // 检查是否点击在侧边栏外部（排除蒙版元素，因为已单独处理）
+                if (!sidebar.contains(e.target) && !e.target.closest('#mobileMenuBtn') && e.target.id !== 'sidebarOverlay') {
                     this.closeMobileSidebar();
                 }
             }
@@ -282,9 +292,18 @@ class ThemeSDK {
         const isOpen = sidebar.classList.toggle('mobile-open');
         document.body.classList.toggle('sidebar-open', isOpen);
 
-        if (!isOpen) {
+        if (isOpen) {
+            // 打开时保存当前滚动位置
+            this.scrollPosition = window.pageYOffset;
+            document.body.style.top = `-${this.scrollPosition}px`;
+        } else {
             sidebar.classList.add('mobile-closing');
             document.body.classList.add('sidebar-closing');
+            
+            // 恢复滚动位置
+            document.body.style.top = '';
+            window.scrollTo(0, this.scrollPosition || 0);
+            
             setTimeout(() => {
                 sidebar.classList.remove('mobile-closing');
                 document.body.classList.remove('sidebar-closing');
@@ -303,6 +322,10 @@ class ThemeSDK {
         sidebar.classList.remove('mobile-open');
         document.body.classList.add('sidebar-closing');
         document.body.classList.remove('sidebar-open');
+
+        // 恢复滚动位置
+        document.body.style.top = '';
+        window.scrollTo(0, this.scrollPosition || 0);
 
         setTimeout(() => {
             sidebar.classList.remove('mobile-closing');

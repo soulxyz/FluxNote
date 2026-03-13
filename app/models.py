@@ -119,8 +119,8 @@ class Note(db.Model):
     tags_list = db.relationship('Tag', secondary=note_tags, lazy='subquery',
         backref=db.backref('notes', lazy=True))
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_documents=False):
+        result = {
             'id': self.id,
             'content': self.content,
             'title': self.title,
@@ -140,8 +140,18 @@ class Note(db.Model):
             'is_capsule': self.is_capsule,
             'capsule_date': self.capsule_date.strftime('%Y-%m-%d %H:%M:%S') if self.capsule_date else None,
             'capsule_hint': self.capsule_hint,
-            'capsule_status': self.capsule_status
+            'capsule_status': self.capsule_status,
         }
+        
+        if hasattr(self, 'documents'):
+            if include_documents:
+                result['documents'] = [doc.to_dict() for doc in self.documents]
+            else:
+                result['documents'] = [{'id': doc.id} for doc in self.documents]
+        else:
+            result['documents'] = []
+            
+        return result
 
     @staticmethod
     def get_visible_filter():
@@ -156,12 +166,13 @@ class Note(db.Model):
 
     def to_obfuscated_dict(self):
         """返回脱敏后的字典数据（用于未拆开的胶囊）"""
-        d = self.to_dict()
+        d = self.to_dict(include_documents=False)
         d['title'] = '🔒 时光胶囊'
-        d['content'] = '内容已封存，请在解锁时间到达后拆开。'
+        d['content'] = '内容已封存,请在解锁时间到达后拆开。'
         d['links'] = []
         d['backlinks'] = []
         d['tags'] = []
+        d['documents'] = []
         return d
 
     def get_excerpt(self, max_length=150):
@@ -465,6 +476,70 @@ class ShareAttempt(db.Model):
             return 0
         remaining = (self.locked_until - datetime.now()).total_seconds() / 60
         return max(0, int(remaining) + 1)
+
+
+class Annotation(db.Model):
+    """PDF/Word 文档上的批注（高亮 + 可选边注文字）"""
+    __tablename__ = 'annotation'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    document_id = db.Column(db.String(36), db.ForeignKey('document.id'), nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    note_id = db.Column(db.String(36), db.ForeignKey('note.id'), nullable=True)  # 关联笔记（可选）
+    page = db.Column(db.Integer, nullable=True)      # PDF 页码，Word 文档为 None
+    selected_text = db.Column(db.Text, nullable=False)  # 高亮选中的原文
+    color = db.Column(db.String(20), default='yellow')  # yellow / green / pink / blue
+    ann_note = db.Column(db.Text, nullable=True)     # 可选：边注文字
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    document = db.relationship('Document', backref=db.backref('annotations', cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('annotations', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'document_id': self.document_id,
+            'note_id': self.note_id,
+            'page': self.page,
+            'selected_text': self.selected_text,
+            'color': self.color,
+            'ann_note': self.ann_note,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
+
+
+class Document(db.Model):
+    """关联笔记的文档（PDF 直读 / Word 转 MD）"""
+    __tablename__ = 'document'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    note_id = db.Column(db.String(36), db.ForeignKey('note.id'), nullable=True)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    original_filename = db.Column(db.String(256), nullable=False)
+    stored_filename = db.Column(db.String(256), nullable=False)
+    file_type = db.Column(db.String(10), nullable=False)   # 'pdf' | 'docx'
+    page_count = db.Column(db.Integer, nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)       # bytes
+    text_content = db.Column(db.Text, nullable=True)       # 全文文本（搜索 / AI 摘要用）
+    md_content = db.Column(db.Text, nullable=True)         # Word 转换的 Markdown
+    ai_summary = db.Column(db.Text, nullable=True)         # AI 一句话摘要
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    note = db.relationship('Note', backref=db.backref('documents'))
+    user = db.relationship('User', backref=db.backref('documents', lazy=True))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'note_id': self.note_id,
+            'original_filename': self.original_filename,
+            'file_type': self.file_type,
+            'page_count': self.page_count,
+            'file_size': self.file_size,
+            'ai_summary': self.ai_summary,
+            'has_md': bool(self.md_content),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        }
 
 
 class Comment(db.Model):

@@ -443,7 +443,8 @@ function _applyPageAnnotations(pageNum) {
 
         for (const span of spans) {
             const spanText = (span.textContent || '').toLowerCase();
-            if (spanText.includes(searchStr) || searchStr.includes(spanText.trim())) {
+            const trimmedSpan = spanText.trim();
+            if (trimmedSpan.length >= Math.min(3, searchStr.length) && spanText.includes(searchStr)) {
                 span.classList.add('ann-highlight', `ann-${ann.color}`);
                 span.dataset.annId = ann.id;
                 if (ann.ann_note) span.title = ann.ann_note;

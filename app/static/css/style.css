@@ -3871,23 +3871,39 @@ input:checked + .slider:before { transform: translateX(20px); }
     /* 侧边栏收起 */
     body.reader-open .sidebar {
         width: 60px;
-        overflow: hidden;
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     
-    /* 侧边栏收起时隐藏文字内容，只保留图标可见 */
-    body.reader-open .sidebar .blog-title,
-    body.reader-open .sidebar .blog-desc,
-    body.reader-open .sidebar .username-large,
-    body.reader-open .sidebar .pro-badge,
-    body.reader-open .sidebar .user-actions-mini,
+    /* 侧边栏收起时，隐藏除图标外的所有内容 */
+    body.reader-open .sidebar .sidebar-header,
     body.reader-open .sidebar .stats-panel,
-    body.reader-open .sidebar .section-title,
-    body.reader-open .sidebar .filter-tags-list,
-    body.reader-open .sidebar .nav-item span,
-    body.reader-open .sidebar .sidebar-footer {
-        opacity: 0;
-        transition: opacity 0.2s ease;
+    body.reader-open .sidebar .tags-section,
+    body.reader-open .sidebar .sidebar-footer,
+    body.reader-open .sidebar .sidebar-toggle-btn,
+    body.reader-open .sidebar .nav-divider {
+        display: none;
+    }
+    
+    /* 导航项收起：只显示图标，隐藏文字 */
+    body.reader-open .sidebar .nav-item {
+        padding: 12px;
+        justify-content: center;
+        font-size: 0; /* 隐藏文本 */
+        gap: 0;
+        margin-bottom: 8px;
+    }
+    
+    body.reader-open .sidebar .nav-item i {
+        font-size: 20px; /* 图标保持可见且略大 */
+        width: auto;
+    }
+    
+    /* 导航区域居中显示 */
+    body.reader-open .sidebar .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px 8px;
     }
     
     /* 主内容区保持不变，不添加 padding */

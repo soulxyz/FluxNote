@@ -3,7 +3,7 @@
  *
  * 功能：
  *   1. 右侧滑出式阅读面板
- *   2. PDF 阅读（PDF.js）：渲染、翻页、缩放、文字层
+ *   2. PDF 阅读（PDF.js）：渲染、翻页、缩放、文字层（已配置 cMapUrl）
  *   3. Word 阅读：后端转 Markdown，渲染显示
  *   4. 文字选中 → 浮动工具栏 → 颜色高亮 / 引用 / AI 解释
  *   5. 高亮批注持久化（保存到数据库，重新打开时恢复）
@@ -318,7 +318,14 @@ async function _loadPdf(docId, opts = {}) {
         const pdfjsLib = await getPdfjsLib();
         const fileUrl = `/api/documents/${docId}/file`;
         
-        const pdfDoc = await pdfjsLib.getDocument(fileUrl).promise;
+        // 配置 PDF.js 加载参数
+        const loadingTask = pdfjsLib.getDocument({
+            url: fileUrl,
+            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/cmaps/',
+            cMapPacked: true,
+        });
+        
+        const pdfDoc = await loadingTask.promise;
         state.pdfDoc      = pdfDoc;
         state.totalPages  = pdfDoc.numPages;
         state.currentPage = opts.page || 1;

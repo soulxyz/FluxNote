@@ -615,20 +615,20 @@ button { font-family: inherit; cursor: pointer; }
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: var(--bg-secondary, var(--bg-card));
+    border: 1px solid var(--border-color, var(--border));
     border-radius: 16px;
     font-size: 0.85rem;
-    color: var(--text-primary);
+    color: var(--text-primary, var(--text-main));
     cursor: pointer;
     transition: all 0.2s ease;
     max-width: 100%;
 }
 
 .editor-doc-card:hover {
-    background: var(--bg-hover);
-    border-color: var(--primary-color);
-    box-shadow: 0 2px 4px var(--shadow-color);
+    background: var(--bg-hover, var(--slate-100));
+    border-color: var(--primary-color, var(--primary));
+    box-shadow: 0 2px 4px var(--shadow-color, rgba(0, 0, 0, 0.1));
 }
 
 .editor-doc-card .doc-name {
@@ -3838,8 +3838,8 @@ input:checked + .slider:before { transform: translateX(20px); }
     inset: 0;
     background: rgba(0, 0, 0, 0.35);
     z-index: 1099;
-    backdrop-filter: blur(2px);
     cursor: pointer;
+    /* 移除 backdrop-filter，避免模糊侧边栏 */
 }
 
 /* ── 面板主体 ────────────────────────────────────────────────── */
@@ -3866,11 +3866,33 @@ input:checked + .slider:before { transform: translateX(20px); }
     transform: translateX(0);
 }
 
-/* 当面板打开时，主内容区收窄（桌面端） */
+/* 当面板打开时，侧边栏收起（桌面端） */
 @media (min-width: 900px) {
+    /* 侧边栏收起 */
+    body.reader-open .sidebar {
+        width: 60px;
+        overflow: hidden;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* 侧边栏收起时隐藏文字内容，只保留图标可见 */
+    body.reader-open .sidebar .blog-title,
+    body.reader-open .sidebar .blog-desc,
+    body.reader-open .sidebar .username-large,
+    body.reader-open .sidebar .pro-badge,
+    body.reader-open .sidebar .user-actions-mini,
+    body.reader-open .sidebar .stats-panel,
+    body.reader-open .sidebar .section-title,
+    body.reader-open .sidebar .filter-tags-list,
+    body.reader-open .sidebar .nav-item span,
+    body.reader-open .sidebar .sidebar-footer {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    
+    /* 主内容区保持不变，不添加 padding */
     body.reader-open .app-layout {
-        padding-right: calc(50% + 20px);
-        transition: padding-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 }
 
@@ -4194,14 +4216,12 @@ input:checked + .slider:before { transform: translateX(20px); }
         min-width: 0;
     }
 
-    body.reader-open .app-layout {
-        padding-right: 0;
+    /* 移动端不需要收起侧边栏，因为侧边栏是浮动的 */
+    body.reader-open .sidebar {
+        width: auto; /* 恢复默认 */
     }
 
-    .reader-overlay {
-        display: block;
-    }
-
+    /* 移动端显示overlay遮罩 */
     body.reader-open .reader-overlay {
         display: block;
     }

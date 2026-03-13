@@ -1185,9 +1185,9 @@ function initCustomEvents(loadNotes, loadTags) {
     });
 
     window.addEventListener('note:request-update', async (e) => {
-        const { id, content, tags, is_public, is_capsule, capsule_date, capsule_hint } = e.detail;
+        const { id, content, tags, is_public, is_capsule, capsule_date, capsule_hint, doc_ids } = e.detail;
         const note = state.notes.find(n => n.id == id);
-        const updatePayload = { content, tags, is_public, is_capsule, capsule_date, capsule_hint };
+        const updatePayload = { content, tags, is_public, is_capsule, capsule_date, capsule_hint, doc_ids };
 
         const syncNoteState = (note) => {
             if (!note) return;

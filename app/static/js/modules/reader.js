@@ -389,9 +389,8 @@ async function _renderPage(pageNum) {
         textLayerDiv.style.height = viewport.height + 'px';
 
         const textContent = await page.getTextContent();
-        const lib = window.pdfjsLib;
-        if (lib && lib.renderTextLayer) {
-            const task = lib.renderTextLayer({
+        if (pdfjsLib && pdfjsLib.renderTextLayer) {
+            const task = pdfjsLib.renderTextLayer({
                 textContentSource: textContent,
                 container: textLayerDiv,
                 viewport,

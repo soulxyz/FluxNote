@@ -3967,6 +3967,12 @@ input:checked + .slider:before { transform: translateX(20px); }
     cursor: pointer;
 }
 
+.reader-scale-select:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-color: var(--primary);
+}
+
 /* ── 通用按钮 ────────────────────────────────────────────────── */
 .reader-btn {
     display: inline-flex;
@@ -3982,6 +3988,13 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 
 .reader-btn:hover {
+    background: var(--slate-100);
+    color: var(--slate-800);
+}
+
+.reader-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
     background: var(--slate-100);
     color: var(--slate-800);
 }
@@ -4131,6 +4144,12 @@ input:checked + .slider:before { transform: translateX(20px); }
     background: rgba(255, 255, 255, 0.15);
 }
 
+.reader-float-btn:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
 .reader-float-btn i {
     font-size: 12px;
     opacity: 0.85;
@@ -4172,6 +4191,7 @@ input:checked + .slider:before { transform: translateX(20px); }
     .reader-panel {
         width: 100%;
         max-width: 100%;
+        min-width: 0;
     }
 
     body.reader-open .app-layout {
@@ -4337,6 +4357,12 @@ input:checked + .slider:before { transform: translateX(20px); }
     transform: scale(1.2);
     box-shadow: 0 0 0 3px rgba(0,0,0,.12);
 }
+.reader-color-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px rgba(0,0,0,.12);
+}
 .reader-color-btn.ann-yellow { background: rgb(255, 213, 0); }
 .reader-color-btn.ann-green  { background: rgb( 52, 199, 89); }
 .reader-color-btn.ann-pink   { background: rgb(255,  99,163); }
@@ -4398,6 +4424,12 @@ input:checked + .slider:before { transform: translateX(20px); }
 }
 .ann-item:hover { background: var(--slate-50); }
 
+.ann-item:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    background: var(--slate-50);
+}
+
 .ann-item-header {
     display: flex;
     align-items: center;
@@ -4445,7 +4477,19 @@ input:checked + .slider:before { transform: translateX(20px); }
     background: var(--primary-light, #D1FAE5);
     color: var(--primary);
 }
+.ann-edit-btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    background: var(--primary-light, #D1FAE5);
+    color: var(--primary);
+}
 .ann-delete-btn:hover {
+    background: var(--danger-light, #fef2f2);
+    color: #ef4444;
+}
+.ann-delete-btn:focus-visible {
+    outline: 2px solid #ef4444;
+    outline-offset: 2px;
     background: var(--danger-light, #fef2f2);
     color: #ef4444;
 }

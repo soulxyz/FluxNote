@@ -119,8 +119,8 @@ class Note(db.Model):
     tags_list = db.relationship('Tag', secondary=note_tags, lazy='subquery',
         backref=db.backref('notes', lazy=True))
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_documents=False):
+        result = {
             'id': self.id,
             'content': self.content,
             'title': self.title,
@@ -141,8 +141,17 @@ class Note(db.Model):
             'capsule_date': self.capsule_date.strftime('%Y-%m-%d %H:%M:%S') if self.capsule_date else None,
             'capsule_hint': self.capsule_hint,
             'capsule_status': self.capsule_status,
-            'documents': [doc.to_dict() for doc in self.documents] if hasattr(self, 'documents') else []
         }
+        
+        if hasattr(self, 'documents'):
+            if include_documents:
+                result['documents'] = [doc.to_dict() for doc in self.documents]
+            else:
+                result['documents'] = [{'id': doc.id} for doc in self.documents]
+        else:
+            result['documents'] = []
+            
+        return result
 
     @staticmethod
     def get_visible_filter():
@@ -157,9 +166,9 @@ class Note(db.Model):
 
     def to_obfuscated_dict(self):
         """返回脱敏后的字典数据（用于未拆开的胶囊）"""
-        d = self.to_dict()
+        d = self.to_dict(include_documents=False)
         d['title'] = '🔒 时光胶囊'
-        d['content'] = '内容已封存，请在解锁时间到达后拆开。'
+        d['content'] = '内容已封存,请在解锁时间到达后拆开。'
         d['links'] = []
         d['backlinks'] = []
         d['tags'] = []
@@ -516,7 +525,7 @@ class Document(db.Model):
     ai_summary = db.Column(db.Text, nullable=True)         # AI 一句话摘要
     created_at = db.Column(db.DateTime, default=datetime.now)
 
-    note = db.relationship('Note', backref=db.backref('documents', cascade='all, delete-orphan'))
+    note = db.relationship('Note', backref=db.backref('documents'))
     user = db.relationship('User', backref=db.backref('documents', lazy=True))
 
     def to_dict(self):

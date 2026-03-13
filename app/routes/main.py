@@ -53,13 +53,6 @@ def manifest():
 @main_bp.route('/')
 def index():
     """Home Page - 登录用户显示SPA管理界面，未登录用户重定向到博客首页"""
-    # 临时自动登录，截图用
-    from flask_login import login_user
-    if not current_user.is_authenticated:
-        user = User.query.first()
-        if user:
-            login_user(user)
-
     if current_user.is_authenticated:
         return render_template('index.html')
     else:

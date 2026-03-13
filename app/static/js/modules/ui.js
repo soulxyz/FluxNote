@@ -227,70 +227,13 @@ export const ui = {
                 const icon = doc.file_type === 'pdf' 
                     ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
                     : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                const escapedFilename = escapeHtml(doc.original_filename);
+                const escapedDocId = escapeHtml(String(doc.id));
+                const escapedNoteId = escapeHtml(String(note.id));
                 return `
-                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
+                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${escapedDocId}', '${escapedNoteId}')">
                         ${icon}
-                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
-                    </div>
-                `;
-            }).join('');
-            
-            docsHtml = `
-                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
-                    ${docs}
-                </div>
-            `;
-        }
-
-        card.innerHTML = `
-            <div class="note-header">
-                <span>${formatDate(note.created_at)}</span>
-                <span class="note-header-right">
-                    ${note.is_public ? '<i class="fas fa-globe" title="公开"></i>' : '<i class="fas fa-lock" title="私密"></i>'}
-                    ${isOpenedCapsule ? '<span title="已拆开的时光胶囊" style="color:#f39c12; font-size:12px; display:inline-flex; align-items:center; gap:3px;"><i class="fas fa-hourglass-end"></i> 胶囊</span>' : ''}
-                    ${note.is_offline_draft ? '<span class="offline-badge" title="待同步"><i class="fas fa-cloud-upload-alt"></i></span>' : ''}
-                </span>
-        // Render Documents List
-        let docsHtml = '';
-        if (note.documents && note.documents.length > 0) {
-            const docs = note.documents.map(doc => {
-                const icon = doc.file_type === 'pdf' 
-                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
-                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
-                return `
-                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
-                        ${icon}
-                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
-                    </div>
-                `;
-            }).join('');
-            
-            docsHtml = `
-                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
-                    ${docs}
-                </div>
-            `;
-        }
-
-        card.innerHTML = `
-            <div class="note-header">
-                <span>${formatDate(note.created_at)}</span>
-                <span class="note-header-right">
-                    ${note.is_public ? '<i class="fas fa-globe" title="公开"></i>' : '<i class="fas fa-lock" title="私密"></i>'}
-                    ${isOpenedCapsule ? '<span title="已拆开的时光胶囊" style="color:#f39c12; font-size:12px; display:inline-flex; align-items:center; gap:3px;"><i class="fas fa-hourglass-end"></i> 胶囊</span>' : ''}
-                    ${note.is_offline_draft ? '<span class="offline-badge" title="待同步"><i class="fas fa-cloud-upload-alt"></i></span>' : ''}
-                </span>
-        // Render Documents List
-        let docsHtml = '';
-        if (note.documents && note.documents.length > 0) {
-            const docs = note.documents.map(doc => {
-                const icon = doc.file_type === 'pdf' 
-                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
-                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
-                return `
-                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${doc.id}', '${note.id}')">
-                        ${icon}
-                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                        <span class="doc-name" title="${escapedFilename}">${escapedFilename}</span>
                     </div>
                 `;
             }).join('');
@@ -698,10 +641,12 @@ export const ui = {
                             const icon = doc.file_type === 'pdf' 
                                 ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
                                 : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                            const escapedFilename = escapeHtml(doc.original_filename);
+                            const escapedDocId = escapeHtml(String(doc.id));
                             return `
-                                <div class="editor-doc-card" data-doc-id="${doc.id}">
+                                <div class="editor-doc-card" data-doc-id="${escapedDocId}">
                                     ${icon}
-                                    <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                                    <span class="doc-name" title="${escapedFilename}">${escapedFilename}</span>
                                     <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
                                 </div>
                             `;
@@ -754,10 +699,12 @@ export const ui = {
                                     const icon = doc.file_type === 'pdf' 
                                         ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
                                         : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                                    const escapedFilename = escapeHtml(doc.original_filename);
+                                    const escapedDocId = escapeHtml(String(doc.id));
                                     return `
-                                        <div class="editor-doc-card" data-doc-id="${doc.id}">
+                                        <div class="editor-doc-card" data-doc-id="${escapedDocId}">
                                             ${icon}
-                                            <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                                            <span class="doc-name" title="${escapedFilename}">${escapedFilename}</span>
                                             <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
                                         </div>
                                     `;

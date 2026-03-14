@@ -14,24 +14,32 @@
         <a href="{{ url_for('blog.index') }}" class="post-back-link" title="返回首页">
             <i class="fas fa-arrow-left"></i>
         </a>
-        <span class="header-title">文章详情</span>
     </div>
+    {% if current_user.is_authenticated %}
+    <div class="header-right">
+        <button class="post-edit-btn" data-note-id="{{ note.id }}" title="编辑文章">
+            <i class="fas fa-edit"></i>
+        </button>
+    </div>
+    {% endif %}
 </header>
 
 <!-- 文章 -->
 <article class="note-card post-article" data-note-id="{{ note.id }}">
     <div class="post-header">
-        <h1 class="post-title">{{ note.title or '无标题' }}</h1>
-        <div class="post-meta">
-            <span class="note-date" data-timestamp="{{ note.created_at.isoformat() }}">
-                <i class="far fa-calendar"></i> {{ note.created_at.strftime('%Y年%m月%d日') }}
-            </span>
-            <span><i class="far fa-clock"></i> {{ note.reading_time }} 分钟阅读</span>
-            {% if note.updated_at != note.created_at %}
-            <span class="note-date" data-timestamp="{{ note.updated_at.isoformat() }}" data-prefix="更新于 ">
-                <i class="far fa-edit"></i> 更新于 {{ note.updated_at.strftime('%Y年%m月%d日') }}
-            </span>
-            {% endif %}
+        <div class="post-header-content">
+            <h1 class="post-title">{{ note.title or '无标题' }}</h1>
+            <div class="post-meta-content">
+                <span class="note-date" data-timestamp="{{ note.created_at.isoformat() }}">
+                    <i class="far fa-calendar"></i> {{ note.created_at.strftime('%Y年%m月%d日') }}
+                </span>
+                <span><i class="far fa-clock"></i> {{ note.reading_time }} 分钟阅读</span>
+                {% if note.updated_at != note.created_at %}
+                <span class="note-date" data-timestamp="{{ note.updated_at.isoformat() }}" data-prefix="更新于 ">
+                    <i class="far fa-edit"></i> 更新于 {{ note.updated_at.strftime('%Y年%m月%d日') }}
+                </span>
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -63,18 +71,25 @@
 {% block scripts %}
     <script type="module">
         import { renderContent } from '/static/js/markdown-renderer.js?v={{ app_version }}';
+        import { inlineEditor } from '/static/js/modules/inline-editor.js?v={{ app_version }}';
+
 async function renderPost() {
     const id = "{{ note.id }}";
     const rawContainer = document.getElementById(`raw-content-${id}`);
     const targetContainer = document.getElementById(`note-render-${id}`);
 
     if (rawContainer && targetContainer) {
-        await renderContent(targetContainer, rawContainer.textContent, {
-            skipFirstH1: true,
-            enableViewer: true,
-            enableMermaid: true,
-            enableHighlight: true
-        });
+        try {
+            await renderContent(targetContainer, rawContainer.textContent, {
+                skipFirstH1: true,
+                enableViewer: true,
+                enableMermaid: true,
+                enableHighlight: true
+            });
+        } catch (e) {
+            console.error('Render error:', e);
+            targetContainer.innerHTML = '<div style="color: red;">渲染失败，请刷新页面重试</div>';
+        }
     }
 
     formatRelativeTime();
@@ -106,6 +121,18 @@ function formatRelativeTime() {
 
 function initPage() {
     renderPost();
+
+    // 绑定编辑按钮点击事件
+    const editBtn = document.querySelector('.post-edit-btn');
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const noteId = editBtn.dataset.noteId;
+            if (window.inlineEditor) {
+                window.inlineEditor.open(noteId);
+            }
+        });
+    }
 }
 
 initPage();

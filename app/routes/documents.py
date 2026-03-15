@@ -208,8 +208,18 @@ def upload_document():
         md_content=md_content,
         ai_summary=ai_summary,
     )
-    db.session.add(doc)
-    db.session.commit()
+    try:
+        db.session.add(doc)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"文档记录保存失败: {e}")
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+            except Exception as rm_e:
+                logger.error(f"发生异常后，清理上传文档失败: {rm_e}")
+        return jsonify({'error': '保存文档信息到数据库时发生异常，文档上传失败'}), 500
 
     result = doc.to_dict()
     result['ai_summary'] = ai_summary
@@ -333,6 +343,16 @@ def create_annotation(doc_id):
     color = data.get('color', 'yellow')
     if color not in ('yellow', 'green', 'pink', 'blue'):
         color = 'yellow'
+
+    raw_page = data.get('page')
+    if raw_page is not None:
+        try:
+            page_num = int(raw_page)
+            if page_num < 1 or page_num > 10000:
+                raise ValueError("页码范围不合法")
+            data['page'] = page_num
+        except (ValueError, TypeError):
+            return jsonify({'error': '无效的页码值'}), 400
     
     # 验证 note_id：如果用户提供了 note_id，必须验证其有效性和归属
     note_id = data.get('note_id')

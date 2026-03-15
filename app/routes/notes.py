@@ -296,6 +296,8 @@ def create_note():
 
         # 关联上传的文档
         doc_ids = data.get('doc_ids', [])
+        if not isinstance(doc_ids, list) or not all(isinstance(x, str) for x in doc_ids):
+            return jsonify({'error': 'doc_ids 参数格式错误，必须是一个包含字符串的列表'}), 400
         if doc_ids:
             from app.models import Document
             for doc_id in doc_ids:
@@ -433,6 +435,8 @@ def update_note(note_id):
         # 更新关联的文档
         doc_ids = data.get('doc_ids')
         if doc_ids is not None:
+            if not isinstance(doc_ids, list) or not all(isinstance(x, str) for x in doc_ids):
+                return jsonify({'error': 'doc_ids 参数格式错误，必须是一个包含字符串的列表'}), 400
             from app.models import Document
             # 先解除当前笔记的所有文档关联
             Document.query.filter_by(note_id=note.id, user_id=current_user.id).update({'note_id': None})

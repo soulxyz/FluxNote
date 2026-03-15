@@ -921,7 +921,7 @@ function _bindAnnotationListEvents() {
         const item = e.target.closest('.ann-item');
         if (item) {
             const annId = item.dataset.annId;
-            const ann = state.annotations.find(a => a.id === annId);
+            const ann = state.annotations.find(a => String(a.id) === String(annId));
             if (ann) {
                 _gotoPageAndHighlight(ann.page, (ann.selected_text || '').slice(0, 40));
             }
@@ -970,7 +970,7 @@ function _refreshAnnotationPanel() {
 }
 
 async function _editAnnotationNote(annId) {
-    const ann = state.annotations.find(a => a.id === annId);
+    const ann = state.annotations.find(a => String(a.id) === String(annId));
     if (!ann) return;
 
     const newNote = prompt('编辑批注备注：', ann.ann_note || '');
@@ -998,7 +998,7 @@ async function _deleteAnnotation(annId) {
     try {
         const res = await api.documents.deleteAnnotation(annId);
         if (!res || !res.ok) { showToast('删除失败'); return; }
-        state.annotations = state.annotations.filter(a => a.id !== annId);
+        state.annotations = state.annotations.filter(a => String(a.id) !== String(annId));
 
         textLayerDiv?.querySelectorAll(`[data-ann-id="${annId}"]`).forEach(el => {
             el.classList.remove('ann-highlight', 'ann-yellow', 'ann-green', 'ann-pink', 'ann-blue');

@@ -103,24 +103,20 @@ self.addEventListener('install', (event) => {
                         total: totalItems
                     });
 
-                    const targetCache = await caches.open(getStaticAssetCache(url));
-                    const cachedResponse = await targetCache.match(url);
-                    if (cachedResponse) {
-                        const cachedHash = cachedResponse.headers.get('X-Asset-Hash');
-                        if (cachedHash === hash) {
-                            completedItems += 1;
-                            await broadcastUpdateStatus({
-                                status: 'progress',
-                                stage: 'cached',
-                                asset: url,
-                                completed: completedItems,
-                                total: totalItems
-                            });
-                            return;
-                        }
-                    }
-
                     const versionedUrl = `${url}?v=${hash}`;
+                    const targetCache = await caches.open(getStaticAssetCache(url));
+                    const cachedResponse = await targetCache.match(versionedUrl);
+                    if (cachedResponse) {
+                        completedItems += 1;
+                        await broadcastUpdateStatus({
+                            status: 'progress',
+                            stage: 'cached',
+                            asset: url,
+                            completed: completedItems,
+                            total: totalItems
+                        });
+                        return;
+                    }
                     const response = await fetch(versionedUrl, { cache: 'no-store' });
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -133,7 +129,17 @@ self.addEventListener('install', (event) => {
                         statusText: response.statusText,
                         headers: headers
                     });
-                    await targetCache.put(url, newResponse);
+
+                    // 清理相同路径的旧缓存
+                    const keys = await targetCache.keys();
+                    for (const req of keys) {
+                        const reqUrl = new URL(req.url);
+                        if (reqUrl.pathname === url) {
+                            await targetCache.delete(req);
+                        }
+                    }
+
+                    await targetCache.put(versionedUrl, newResponse);
                     completedItems += 1;
                     await broadcastUpdateStatus({
                         status: 'progress',
@@ -373,7 +379,7 @@ self.addEventListener('fetch', (event) => {
     }
 
     // 5. 业务静态资源 (JS/CSS) - 使用 STATIC_CACHE
-    // 移除 ignoreSearch: true，确保带有 ?v=hash 的新请求能触发网络请求，而不是命中旧版本的缓存
+    // 由于 install 阶段已由裸路径改为存入带有 ?v=hash 的完整路径，此处可精准命中预缓存
     event.respondWith(cacheFirst(request, STATIC_CACHE));
 });
 

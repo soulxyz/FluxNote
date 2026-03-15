@@ -373,7 +373,8 @@ self.addEventListener('fetch', (event) => {
     }
 
     // 5. 业务静态资源 (JS/CSS) - 使用 STATIC_CACHE
-    event.respondWith(cacheFirst(request, STATIC_CACHE, { ignoreSearch: true }));
+    // 移除 ignoreSearch: true，确保带有 ?v=hash 的新请求能触发网络请求，而不是命中旧版本的缓存
+    event.respondWith(cacheFirst(request, STATIC_CACHE));
 });
 
 /**

@@ -37,11 +37,12 @@ const state = {
 // ─── DOM 引用（懒初始化）─────────────────────────────────────────────────
 
 let panel, overlay, canvas, ctx, textLayerDiv, pageInput, totalPagesEl,
-    scaleSelect, mdContentEl, toolbar, floatBar, annPanel, annList;
+    scaleSelect, mdContentEl, toolbar, floatBar, annPanel, annList, resizer;
 
 function initDom() {
     panel        = document.getElementById('readerPanel');
     overlay      = document.getElementById('readerOverlay');
+    resizer      = document.getElementById('readerResizer');
     canvas       = document.getElementById('readerCanvas');
     textLayerDiv = document.getElementById('readerTextLayer');
     pageInput    = document.getElementById('readerPageInput');
@@ -54,6 +55,36 @@ function initDom() {
     annList      = document.getElementById('readerAnnList');
 
     if (canvas) ctx = canvas.getContext('2d');
+
+    // 初始化无级拖拽逻辑
+    if (resizer && panel) {
+        let isResizing = false;
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.classList.add('reader-dragging');
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            // 右侧面板宽度 = 屏幕宽度 - 当前鼠标 X 坐标
+            let newWidth = window.innerWidth - e.clientX;
+            // 限制最大最小宽度 (360px ~ 屏幕的70%或900px取小值)
+            const minWidth = 360;
+            const maxWidth = Math.min(900, window.innerWidth * 0.7);
+            
+            if (newWidth < minWidth) newWidth = minWidth;
+            if (newWidth > maxWidth) newWidth = maxWidth;
+
+            document.documentElement.style.setProperty('--reader-width', newWidth + 'px');
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.classList.remove('reader-dragging');
+            }
+        });
+    }
 }
 
 // ─── PDF.js 获取 ─────────────────────────────────────────────────────────
@@ -299,6 +330,17 @@ function _bindPanelControls() {
         state.annPanelOpen = false;
         if (annPanel) annPanel.style.display = 'none';
     });
+
+    // 鼠标滚轮翻页（仅 PDF 模式）
+    let _wheelTimer = null;
+    panel?.addEventListener('wheel', (e) => {
+        if (!state.isOpen || state.fileType !== 'pdf') return;
+        e.preventDefault();
+        if (_wheelTimer) return;
+        _wheelTimer = setTimeout(() => { _wheelTimer = null; }, 300);
+        if (e.deltaY > 0) _changePage(1);
+        else if (e.deltaY < 0) _changePage(-1);
+    }, { passive: false });
 }
 
 function _bindKeyboard() {

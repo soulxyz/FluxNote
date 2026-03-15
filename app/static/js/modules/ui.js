@@ -14,7 +14,7 @@ export const ui = {
         if (!list) return;
         // Avoid re-rendering if already showing skeleton to prevent flicker
         if (list.querySelector('.skeleton-card')) return;
-        
+
         const skeletonItem = `
             <div class="note-card skeleton-card">
                 <div class="skeleton-header" style="width: 30%;"></div>
@@ -52,18 +52,18 @@ export const ui = {
 
         // Render Mermaid/Mindmap first to replace code blocks with divs
         this.renderMermaid(list);
-        
+
         // Highlight only the code blocks that aren't diagrams
         if (window.hljs) {
             list.querySelectorAll('pre code').forEach(block => {
-                const isMermaid = block.classList.contains('language-mermaid') || 
-                                 block.classList.contains('language-mindmap');
+                const isMermaid = block.classList.contains('language-mermaid') ||
+                    block.classList.contains('language-mindmap');
                 if (!isMermaid) {
                     hljs.highlightElement(block);
                 }
             });
         }
-        
+
         this.addCopyButtons();
         if (state.galleryViewer) state.galleryViewer.update();
     },
@@ -183,7 +183,7 @@ export const ui = {
                 // Use a temporary container to DOM-parse the HTML and only highlight text nodes
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = content;
-                
+
                 const highlightTextNodes = (node) => {
                     if (node.nodeType === 3) { // Text node
                         const text = node.nodeValue;
@@ -198,7 +198,7 @@ export const ui = {
                         Array.from(node.childNodes).forEach(highlightTextNodes);
                     }
                 };
-                
+
                 Array.from(tempDiv.childNodes).forEach(highlightTextNodes);
                 content = tempDiv.innerHTML;
             }
@@ -210,7 +210,7 @@ export const ui = {
         // Render Backlinks
         let backlinksHtml = '';
         if (note.backlinks && note.backlinks.length > 0 && !state.isTrashMode) {
-            const links = note.backlinks.map(l => 
+            const links = note.backlinks.map(l =>
                 `<a href="#note-${l.id}" class="backlink-item" style="margin-right:10px; color:var(--primary-color); text-decoration:none;">${escapeHtml(l.title)}</a>`
             ).join('');
             backlinksHtml = `
@@ -219,13 +219,13 @@ export const ui = {
                 </div>
             `;
         }
-        
+
         // Render Documents List
         let docsHtml = '';
         if (note.documents && note.documents.length > 0) {
             const docs = note.documents.map(doc => {
-                const icon = doc.file_type === 'pdf' 
-                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                const icon = doc.file_type === 'pdf'
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
                     : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
                 const escapedFilename = escapeHtml(doc.original_filename);
                 const escapedDocId = escapeHtml(String(doc.id));
@@ -237,9 +237,9 @@ export const ui = {
                     </div>
                 `;
             }).join('');
-            
+
             docsHtml = `
-                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; margin-bottom: 10px;">
+                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:0px; margin-top:2px; margin-bottom: 4px;">
                     ${docs}
                 </div>
             `;
@@ -258,25 +258,25 @@ export const ui = {
             
             ${docsHtml}
 
+            ${note.tags.length > 0 ? `
             <div class="note-footer">
                 <div class="note-tags">
                     ${note.tags.map(t => `<span class="note-tag" data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}
                 </div>
+            </div>` : ''}
 
-                ${isOwner ? (state.isTrashMode ? `
-                <div class="note-actions">
-                    <span class="note-action restore" data-action="restore" data-id="${note.id}" title="恢复"><i class="fas fa-undo"></i></span>
-                    <span class="note-action delete-forever" data-action="permanent-delete" data-id="${note.id}" title="彻底删除"><i class="fas fa-trash-alt"></i></span>
-                </div>
-                ` : `
-                <div class="note-actions">
-                    <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
-                    <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
-                    <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
-                    <span class="note-action open-doc" data-action="open-doc" data-id="${note.id}" title="文档阅读"><i class="fas fa-file-alt"></i></span>
-                    ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
-                </div>`) : ''}
+            ${isOwner ? (state.isTrashMode ? `
+            <div class="note-actions">
+                <span class="note-action restore" data-action="restore" data-id="${note.id}" title="恢复"><i class="fas fa-undo"></i></span>
+                <span class="note-action delete-forever" data-action="permanent-delete" data-id="${note.id}" title="彻底删除"><i class="fas fa-trash-alt"></i></span>
             </div>
+            ` : `
+            <div class="note-actions">
+                <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
+                <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
+                <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
+                ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
+            </div>`) : ''}
 
             ${backlinksHtml}
         `;
@@ -299,22 +299,22 @@ export const ui = {
         const oldCard = document.getElementById(`note-${note.id}`);
         if (!oldCard) return;
         const newCard = this.createNoteCard(note);
-        
+
         // Disable animation for in-place updates to prevent flashing
         newCard.style.animation = 'none';
-        
+
         oldCard.replaceWith(newCard);
-        
+
         if (window.hljs) {
             newCard.querySelectorAll('pre code').forEach(block => {
-                const isMermaid = block.classList.contains('language-mermaid') || 
-                                 block.classList.contains('language-mindmap');
+                const isMermaid = block.classList.contains('language-mermaid') ||
+                    block.classList.contains('language-mindmap');
                 if (!isMermaid) {
                     hljs.highlightElement(block);
                 }
             });
         }
-        
+
         this.renderMermaid(newCard);
         this.addCopyButtons();
         this._loadBilibiliCards(newCard);
@@ -329,18 +329,18 @@ export const ui = {
 
         return `<div class="bilibili-card" data-bvid="${bvid}" role="button" tabindex="0">` +
             `<div class="bili-card-thumb">` +
-                `<div class="bili-thumb-placeholder">${logoLg}</div>` +
-                `<div class="bili-play-btn"><i class="fas fa-play"></i></div>` +
+            `<div class="bili-thumb-placeholder">${logoLg}</div>` +
+            `<div class="bili-play-btn"><i class="fas fa-play"></i></div>` +
             `</div>` +
             `<div class="bili-card-content">` +
-                `<div class="bili-card-brand-row">${logoSm}<span class="bili-brand-name">bilibili</span></div>` +
-                `<div class="bili-card-title" data-loading="true">加载中…</div>` +
-                `<div class="bili-card-meta">` +
-                    `<span class="bili-card-bvid">${bvid}</span>` +
-                `</div>` +
+            `<div class="bili-card-brand-row">${logoSm}<span class="bili-brand-name">bilibili</span></div>` +
+            `<div class="bili-card-title" data-loading="true">加载中…</div>` +
+            `<div class="bili-card-meta">` +
+            `<span class="bili-card-bvid">${bvid}</span>` +
+            `</div>` +
             `</div>` +
             `<div class="bili-card-arrow"><i class="fas fa-chevron-right"></i></div>` +
-        `</div>`;
+            `</div>`;
     },
 
     _loadBilibiliCards(container) {
@@ -470,7 +470,7 @@ export const ui = {
         try {
             // Use local state if available to avoid delay
             let note = state.notes.find(n => n.id == id);
-            
+
             // Fallback to API if not found (e.g., direct link or partial load)
             if (!note) {
                 const res = await api.notes.get(id);
@@ -536,6 +536,34 @@ export const ui = {
                 fileInput.click();
             };
             toolsLeft.appendChild(imgBtn);
+
+            const docBtn = document.createElement('button');
+            docBtn.className = 'tool-btn tool-btn-doc';
+            docBtn.innerHTML = '<i class="fas fa-file-import"></i>';
+            docBtn.title = '上传文档';
+            docBtn.onclick = () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.pdf,.docx,.doc';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    showToast('正在上传文档...');
+                    const upRes = await api.documents?.upload(file, id);
+                    if (upRes && upRes.ok) {
+                        const doc = await upRes.json();
+                        window.__editPendingDocs = window.__editPendingDocs || {};
+                        window.__editPendingDocs[id] = window.__editPendingDocs[id] || [];
+                        window.__editPendingDocs[id].push(doc);
+                        window.dispatchEvent(new CustomEvent('document:edit-uploaded', { detail: { doc, noteId: id } }));
+                        showToast('文档上传成功');
+                    } else {
+                        showToast('上传失败');
+                    }
+                };
+                fileInput.click();
+            };
+            toolsLeft.appendChild(docBtn);
             toolsBar.appendChild(toolsLeft);
 
             // Tags Area
@@ -604,7 +632,7 @@ export const ui = {
                     capsule_date: capsuleDate,
                     capsule_hint: capsuleHint
                 };
-                
+
                 // 获取当前编辑的文档附件 ID 列表
                 if (window.__editPendingDocs && window.__editPendingDocs[id]) {
                     updateDetail.doc_ids = window.__editPendingDocs[id].map(d => d.id);
@@ -625,21 +653,21 @@ export const ui = {
             container.appendChild(toolsBar);
             container.appendChild(tagsArea);
             container.appendChild(footer);
-            
+
             // 渲染已有的文档附件
             if (note.documents && note.documents.length > 0) {
                 // 暂时将文档存入全局状态，以便编辑时可以删除或增加
                 window.__editPendingDocs = window.__editPendingDocs || {};
                 window.__editPendingDocs[id] = [...note.documents];
-                
+
                 // 渲染附件列表
                 const renderEditDocs = () => {
                     const docs = window.__editPendingDocs[id] || [];
                     if (docs.length > 0) {
                         docsList.style.display = 'flex';
                         docsList.innerHTML = docs.map(doc => {
-                            const icon = doc.file_type === 'pdf' 
-                                ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                            const icon = doc.file_type === 'pdf'
+                                ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
                                 : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
                             const escapedFilename = escapeHtml(doc.original_filename);
                             const escapedDocId = escapeHtml(String(doc.id));
@@ -651,7 +679,7 @@ export const ui = {
                                 </div>
                             `;
                         }).join('');
-                        
+
                         // 绑定事件
                         docsList.querySelectorAll('.editor-doc-card').forEach(card => {
                             // 点击卡片打开阅读器
@@ -662,7 +690,7 @@ export const ui = {
                                     window.readerModule.reader.open(docId, id);
                                 }
                             });
-                            
+
                             // 点击删除按钮
                             const removeBtn = card.querySelector('.doc-remove-btn');
                             removeBtn.addEventListener('click', (e) => {
@@ -677,10 +705,10 @@ export const ui = {
                         docsList.innerHTML = '';
                     }
                 };
-                
+
                 // 绑定到 DOM 元素上以便其他模块调用
                 docsList.__renderFunc = renderEditDocs;
-                
+
                 renderEditDocs();
             }
 
@@ -696,8 +724,8 @@ export const ui = {
                             if (docs.length > 0) {
                                 docsList.style.display = 'flex';
                                 docsList.innerHTML = docs.map(doc => {
-                                    const icon = doc.file_type === 'pdf' 
-                                        ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                                    const icon = doc.file_type === 'pdf'
+                                        ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
                                         : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
                                     const escapedFilename = escapeHtml(doc.original_filename);
                                     const escapedDocId = escapeHtml(String(doc.id));
@@ -709,7 +737,7 @@ export const ui = {
                                         </div>
                                     `;
                                 }).join('');
-                                
+
                                 docsList.querySelectorAll('.editor-doc-card').forEach(card => {
                                     card.addEventListener('click', (e) => {
                                         if (e.target.closest('.doc-remove-btn')) return;
@@ -718,7 +746,7 @@ export const ui = {
                                             window.readerModule.reader.open(docId, id);
                                         }
                                     });
-                                    
+
                                     const removeBtn = card.querySelector('.doc-remove-btn');
                                     removeBtn.addEventListener('click', (e) => {
                                         e.stopPropagation();
@@ -737,7 +765,7 @@ export const ui = {
                 }
             };
             window.addEventListener('document:edit-uploaded', uploadListener);
-            
+
             // 保存清理监听器的引用
             container.__uploadListener = uploadListener;
 
@@ -779,15 +807,15 @@ export const ui = {
         // Clear all except inputElement (which we append back)
         // But inputElement is passed in, so we can just clear innerHTML and rebuild
         container.innerHTML = '';
-        
+
         state.editTags.forEach((t, index) => {
             const tagSpan = document.createElement('span');
             tagSpan.className = 'note-tag'; // Use note-tag style
             // Inline styles are now handled by CSS class .note-tag, removing inline styles
             // But keep specific layout if needed. .note-tag has display:inline-flex.
-            
+
             tagSpan.innerHTML = `#${escapeHtml(t)} <span class="remove-btn" style="cursor:pointer; font-weight:bold; margin-left:4px;">&times;</span>`;
-            
+
             // Delete
             tagSpan.querySelector('.remove-btn').onclick = (e) => {
                 e.stopPropagation();
@@ -802,7 +830,7 @@ export const ui = {
                 input.type = 'text';
                 input.value = t;
                 input.className = 'tag-edit-input';
-                
+
                 const save = () => {
                     const val = input.value.trim();
                     if (val && val !== t) {
@@ -852,7 +880,7 @@ export const ui = {
                 input.type = 'text';
                 input.value = t;
                 input.className = 'tag-edit-input';
-                
+
                 const saveEdit = () => {
                     const newVal = input.value.trim();
                     if (newVal && newVal !== t) {
@@ -906,11 +934,11 @@ export const ui = {
                 btn.innerHTML = `<span># ${escapeHtml(t)}</span>`;
                 btn.dataset.tag = t;
                 btn.onclick = () => window.dispatchEvent(new CustomEvent('filter:tag', { detail: t }));
-                
+
                 // Stagger animation
                 const delay = Math.min(index * 0.03, 0.5); // Faster stagger for tags
                 btn.style.animationDelay = `${delay}s`;
-                
+
                 container.appendChild(btn);
             });
         }
@@ -1021,7 +1049,7 @@ export const ui = {
                 rect.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
 
                 rect.addEventListener('click', () => {
-                     window.dispatchEvent(new CustomEvent('filter:date', { detail: dateStr }));
+                    window.dispatchEvent(new CustomEvent('filter:date', { detail: dateStr }));
                 });
 
                 svg.appendChild(rect);
@@ -1062,7 +1090,7 @@ export const ui = {
             // Scroll to element
             setTimeout(() => {
                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
+
                 // Add highlight effect
                 element.classList.add('jump-highlight');
                 setTimeout(() => {

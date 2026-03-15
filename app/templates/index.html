@@ -690,6 +690,7 @@
     <!-- 文档阅读面板 -->
     <div id="readerOverlay" class="reader-overlay"></div>
     <div id="readerPanel" class="reader-panel">
+        <div class="reader-resizer" id="readerResizer" title="左右拖拽调整宽度"></div>
         <!-- 顶部工具栏 -->
         <div class="reader-header">
             <div class="reader-header-left">
@@ -784,7 +785,7 @@
     </div>
 
     <!-- 文档管理弹窗 -->
-    <div id="docMgrOverlay" class="doc-mgr-overlay" style="display:none;" onclick="if(event.target===this)closeDo​cMgr()"></div>
+    <div id="docMgrOverlay" class="doc-mgr-overlay" style="display:none;" onclick="if(event.target===this) closeDocMgr()"></div>
     <div id="docMgrModal" class="doc-mgr-modal" style="display:none;">
         <div class="doc-mgr-header">
             <h3><i class="fas fa-folder-open"></i> 我的文档</h3>

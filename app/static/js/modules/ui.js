@@ -296,6 +296,14 @@ export const ui = {
     },
 
     restoreCard(note) {
+        // Clear active edit session state when restoring the card (ending edit session)
+        if (window.__currentNoteId == note.id) {
+            window.__currentNoteId = null;
+            if (window.readerModule?.reader?.clearActiveNote) {
+                window.readerModule.reader.clearActiveNote();
+            }
+        }
+
         const oldCard = document.getElementById(`note-${note.id}`);
         if (!oldCard) return;
         const newCard = this.createNoteCard(note);

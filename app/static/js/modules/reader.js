@@ -248,6 +248,10 @@ export const reader = {
 
     setActiveNote(noteId) {
         state.activeNoteId = noteId;
+    },
+
+    clearActiveNote() {
+        state.activeNoteId = null;
     }
 };
 
@@ -1141,7 +1145,7 @@ export function triggerDocUpload(noteId) {
     input.onchange = async () => {
         const file = input.files[0];
         if (!file) return;
-        await uploadAndOpenDocument(file, noteId || window.__currentNoteId || null);
+        await uploadAndOpenDocument(file, noteId || null);
     };
     input.click();
 }

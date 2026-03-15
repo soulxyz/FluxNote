@@ -113,7 +113,12 @@ export const editor = {
             if (window.readerModule?.triggerDocUpload) {
                 // 如果是主编辑器，不传 noteId，让上传逻辑知道这是新建笔记
                 const isMainEditor = textarea.id === 'noteContent';
-                window.readerModule.triggerDocUpload(isMainEditor ? null : (window.__currentNoteId || null));
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+                window.readerModule.triggerDocUpload(argsNoteId);
             } else {
                 showToast('阅读面板未就绪，请刷新页面');
             }
@@ -509,10 +514,17 @@ export const editor = {
             input.multiple = true;
             input.accept = 'image/*,audio/*,video/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md';
             input.onchange = async () => {
+                const isMainEditor = textarea.id === 'noteContent';
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+
                 for (const file of Array.from(input.files)) {
                     if (/\.(pdf|docx|doc)$/i.test(file.name)) {
                         if (window.readerModule?.uploadAndOpenDocument) {
-                            await window.readerModule.uploadAndOpenDocument(file, window.__currentNoteId || null);
+                            await window.readerModule.uploadAndOpenDocument(file, argsNoteId);
                         } else { showToast('阅读面板未就绪'); }
                         continue;
                     }
@@ -550,7 +562,13 @@ export const editor = {
         if (cmd.action === 'doc') {
             replacement = '';
             if (window.readerModule?.triggerDocUpload) {
-                window.readerModule.triggerDocUpload(window.__currentNoteId || null);
+                const isMainEditor = textarea.id === 'noteContent';
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+                window.readerModule.triggerDocUpload(argsNoteId);
             } else {
                 showToast('阅读面板未就绪，请刷新页面后重试');
             }

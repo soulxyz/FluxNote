@@ -984,17 +984,7 @@ button {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
-/* 文档导入按钮：带一点绿色提示，区分于普通工具 */
-.tool-btn-doc {
-    color: var(--primary);
-    border-color: var(--primary-light);
-}
 
-.tool-btn-doc:hover {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    color: var(--primary-hover);
-}
 
 .editor-actions {
     display: flex;
@@ -5399,7 +5389,7 @@ input:checked+.slider:before {
 }
 
 /* 当面板打开时，侧边栏收起（桌面端） */
-@media (min-width: 900px) {
+@media (min-width: 901px) {
 
     /* 侧边栏收起 */
     body.reader-open .sidebar {
@@ -5699,10 +5689,11 @@ input:checked+.slider:before {
     top: 0;
     left: 0;
     overflow: hidden;
-    opacity: 0.2;
+    opacity: 0.25;
     line-height: 1;
     pointer-events: all;
     user-select: text;
+    z-index: 2;
 }
 
 .reader-text-layer span,
@@ -5736,7 +5727,214 @@ input:checked+.slider:before {
     background: var(--bg-card);
     font-size: 15px;
     line-height: 1.8;
+    user-select: text;
+    cursor: text;
 }
+
+/* Word 模式下隐藏 PDF 翻页控件 */
+.reader-toolbar.word-mode .reader-pdf-controls {
+    display: none;
+}
+
+/* ── 批注高亮颜色（需要足够饱和，叠加 text-layer opacity:0.25 后仍可见） */
+.ann-highlight {
+    border-radius: 2px;
+    padding: 1px 0;
+}
+
+.ann-yellow {
+    background: rgba(255, 213, 79, 0.8);
+}
+
+.ann-green {
+    background: rgba(72, 199, 142, 0.75);
+}
+
+.ann-pink {
+    background: rgba(240, 98, 146, 0.7);
+}
+
+.ann-blue {
+    background: rgba(66, 165, 245, 0.7);
+}
+
+/* Word 批注 mark 样式 */
+mark.ann-word-mark {
+    border-radius: 2px;
+    padding: 1px 0;
+    cursor: pointer;
+}
+
+/* 引用回溯高亮（临时） */
+.reader-nav-highlight {
+    background: rgba(255, 213, 79, 0.7) !important;
+    color: transparent;
+    border-radius: 2px;
+}
+
+mark.reader-nav-highlight-word {
+    background: rgba(255, 213, 79, 0.5);
+    border-radius: 2px;
+    padding: 1px 2px;
+}
+
+/* ── 高亮色块按钮 ────────────────────────────────────────────── */
+.reader-color-btn {
+    width: 22px;
+    height: 22px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    margin: 0 3px;
+    transition: transform 0.12s, border-color 0.12s;
+}
+
+.reader-color-btn:hover {
+    transform: scale(1.2);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.reader-color-btn.ann-yellow {
+    background: #FFD54F !important;
+}
+
+.reader-color-btn.ann-green {
+    background: #48C78E !important;
+}
+
+.reader-color-btn.ann-pink {
+    background: #F06292 !important;
+}
+
+.reader-color-btn.ann-blue {
+    background: #42A5F5 !important;
+}
+
+/* ── 批注列表面板 ────────────────────────────────────────────── */
+.reader-ann-panel {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    flex-direction: column;
+    z-index: 10;
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.08);
+}
+
+.reader-ann-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--slate-700);
+}
+
+.reader-ann-header i {
+    margin-right: 6px;
+    color: var(--primary);
+}
+
+.reader-ann-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.ann-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-bottom: 4px;
+}
+
+.ann-item:hover {
+    background: var(--slate-50);
+}
+
+.ann-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.ann-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.ann-dot.ann-yellow { background: #FFD54F; }
+.ann-dot.ann-green  { background: #48C78E; }
+.ann-dot.ann-pink   { background: #F06292; }
+.ann-dot.ann-blue   { background: #42A5F5; }
+
+.ann-item-page {
+    font-size: 11px;
+    color: var(--slate-400);
+    flex: 1;
+}
+
+.ann-item-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.ann-item:hover .ann-item-actions {
+    opacity: 1;
+}
+
+.ann-edit-btn,
+.ann-delete-btn {
+    border: none;
+    background: transparent;
+    color: var(--slate-400);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.ann-edit-btn:hover { color: var(--primary); background: var(--slate-100); }
+.ann-delete-btn:hover { color: #e74c3c; background: #fef2f2; }
+
+.ann-item-text {
+    font-size: 13px;
+    color: var(--slate-600);
+    line-height: 1.5;
+}
+
+.ann-item-note {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: var(--slate-50);
+    border-radius: 4px;
+}
+
+.ann-item-note i {
+    color: #FFD54F;
+    margin-right: 4px;
+}
+
+.ann-empty {
+    text-align: center;
+    color: var(--slate-400);
+    font-size: 13px;
+    padding: 30px 10px;
+}
+
 
 .reader-error {
     color: var(--slate-400);

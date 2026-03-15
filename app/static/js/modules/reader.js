@@ -291,9 +291,19 @@ function _setLoading(loading) {
     const loadingEl = document.getElementById('readerLoading');
     if (!loadingEl) return;
     loadingEl.style.display = loading ? 'flex' : 'none';
-    if (canvas) canvas.style.display = loading ? 'none' : 'block';
-    if (textLayerDiv) textLayerDiv.style.display = loading ? 'none' : 'block';
-    if (mdContentEl) mdContentEl.style.display = 'none';
+
+    if (loading) {
+        // 加载中：隐藏所有内容区域
+        if (canvas) canvas.style.display = 'none';
+        if (textLayerDiv) textLayerDiv.style.display = 'none';
+        if (mdContentEl) mdContentEl.style.display = 'none';
+    } else {
+        // 加载完成：根据文件类型决定显示哪个区域
+        const isPdf = state.fileType === 'pdf';
+        if (canvas) canvas.style.display = isPdf ? 'block' : 'none';
+        if (textLayerDiv) textLayerDiv.style.display = isPdf ? 'block' : 'none';
+        if (mdContentEl) mdContentEl.style.display = isPdf ? 'none' : 'block';
+    }
 }
 
 function _bindPanelControls() {
@@ -433,11 +443,19 @@ async function _renderPage(pageNum) {
         canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
 
+        // 清空文字层，设置原始尺寸
         textLayerDiv.innerHTML = '';
         textLayerDiv.style.width  = viewport.width  + 'px';
         textLayerDiv.style.height = viewport.height + 'px';
+        // 重置文字层缩放（稍后重新计算）
+        textLayerDiv.style.transform = '';
 
         const textContent = await page.getTextContent();
+        console.log('[Reader] 文字层渲染 — renderTextLayer:', !!pdfjsLib?.renderTextLayer,
+                    'TextLayer:', !!pdfjsLib?.TextLayer,
+                    '文本项数:', textContent?.items?.length);
+
+        // 兼容 PDF.js v4.x: 优先使用 renderTextLayer，回退到 TextLayer 类
         if (pdfjsLib && pdfjsLib.renderTextLayer) {
             const task = pdfjsLib.renderTextLayer({
                 textContentSource: textContent,
@@ -446,7 +464,24 @@ async function _renderPage(pageNum) {
             });
             if (task && task.promise) await task.promise;
             else if (task && typeof task.then === 'function') await task;
+        } else if (pdfjsLib && pdfjsLib.TextLayer) {
+            const textLayer = new pdfjsLib.TextLayer({
+                textContentSource: textContent,
+                container: textLayerDiv,
+                viewport,
+            });
+            await textLayer.render();
+        } else {
+            console.warn('[Reader] PDF.js 无可用的文字层渲染接口（renderTextLayer / TextLayer），文字选择不可用');
         }
+
+        console.log('[Reader] 文字层 span 数量:', textLayerDiv.querySelectorAll('span').length);
+
+        // canvas 被 CSS max-width:100% 缩放后，文字层也需同步缩放
+        // 使用 rAF 确保浏览器完成布局后再读取 clientWidth
+        requestAnimationFrame(() => {
+            _syncTextLayerScale(viewport);
+        });
 
         _applyPageAnnotations(pageNum);
     } finally {
@@ -456,6 +491,28 @@ async function _renderPage(pageNum) {
             state.renderPending = null;
             await _renderPage(pending);
         }
+    }
+}
+
+/**
+ * 同步文字层缩放：当 canvas 被 CSS max-width 缩放时，
+ * 文字层保持原始像素尺寸会导致文字定位偏移。
+ * 通过 CSS transform 让文字层与 canvas 视觉尺寸一致。
+ */
+function _syncTextLayerScale(viewport) {
+    if (!canvas || !textLayerDiv) return;
+    const renderedWidth = canvas.clientWidth;
+    if (renderedWidth <= 0 || viewport.width <= 0) return;
+
+    const scaleFactor = renderedWidth / viewport.width;
+    if (Math.abs(scaleFactor - 1) > 0.01) {
+        // canvas 被缩放了，文字层也需要同步缩放
+        textLayerDiv.style.transform = `scale(${scaleFactor})`;
+        textLayerDiv.style.transformOrigin = '0 0';
+        textLayerDiv.style.width  = viewport.width  + 'px';
+        textLayerDiv.style.height = viewport.height + 'px';
+    } else {
+        textLayerDiv.style.transform = '';
     }
 }
 
@@ -482,23 +539,51 @@ function _applyPageAnnotations(pageNum) {
     if (!pageAnnotations.length) return;
 
     const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+    
+    // 构建忽略空白字符的纯文本，以及字符到span的映射表
+    let cleanText = '';
+    const cleanToSpan = [];
+    
+    for (const span of spans) {
+        const text = span.textContent || '';
+        for (let i = 0; i < text.length; i++) {
+            if (!/\s/.test(text[i])) {
+                cleanText += text[i].toLowerCase();
+                cleanToSpan.push(span);
+            }
+        }
+    }
 
     for (const ann of pageAnnotations) {
-        const needle = (ann.selected_text || '').trim().toLowerCase();
+        // 去除用户选中文本的所有空白符进行匹配
+        const needle = (ann.selected_text || '').replace(/\s+/g, '').toLowerCase();
         if (!needle) continue;
 
-        const matchLen = Math.min(40, needle.length);
-        const searchStr = needle.slice(0, matchLen);
+        let matchIdx = cleanText.indexOf(needle);
+        let matchLen = needle.length;
 
-        for (const span of spans) {
-            const spanText = (span.textContent || '').toLowerCase();
-            const trimmedSpan = spanText.trim();
-            if (trimmedSpan.length >= Math.min(3, searchStr.length) && spanText.includes(searchStr)) {
+        // 如果长段落未能完全匹配，退而求其次取前20个字符匹配起止位置
+        if (matchIdx === -1 && needle.length > 20) {
+            const shortNeedle = needle.slice(0, 20);
+            matchIdx = cleanText.indexOf(shortNeedle);
+            matchLen = shortNeedle.length;
+        }
+
+        if (matchIdx !== -1) {
+            const matchedSpans = new Set();
+            for (let i = matchIdx; i < matchIdx + matchLen; i++) {
+                if (cleanToSpan[i]) {
+                    matchedSpans.add(cleanToSpan[i]);
+                }
+            }
+            
+            for (const span of matchedSpans) {
                 span.classList.add('ann-highlight', `ann-${ann.color}`);
                 span.dataset.annId = ann.id;
                 if (ann.ann_note) span.title = ann.ann_note;
-                break;
             }
+        } else {
+            console.warn('[Reader] PDF批注无法匹配块:', ann.selected_text);
         }
     }
 }
@@ -507,6 +592,19 @@ function _applyPageAnnotations(pageNum) {
 
 function _applyWordAnnotations() {
     if (!mdContentEl) return;
+
+    // 移除已有的批注标记，避免嵌套 mark
+    mdContentEl.querySelectorAll('mark[data-ann-id], mark.ann-word-mark').forEach(el => {
+        const parent = el.parentNode;
+        if (parent) {
+            while (el.firstChild) {
+                parent.insertBefore(el.firstChild, el);
+            }
+            parent.removeChild(el);
+            parent.normalize();
+        }
+    });
+
     const wordAnns = state.annotations.filter(a => !a.page);
     if (!wordAnns.length) return;
 
@@ -528,7 +626,12 @@ function _applyWordAnnotations() {
             const range = document.createRange();
             range.setStart(node, idx);
             range.setEnd(node, Math.min(node.textContent.length, idx + needle.length));
-            range.surroundContents(mark);
+            
+            try {
+                range.surroundContents(mark);
+            } catch (e) {
+                console.warn('[Reader] surroundContents failed for annotation:', ann.id, e);
+            }
             break;
         }
     }
@@ -541,15 +644,33 @@ async function _highlightText(searchText) {
     if (!searchText || !state.pdfDoc) return;
     textLayerDiv.querySelectorAll('.reader-nav-highlight').forEach(el => el.classList.remove('reader-nav-highlight'));
 
-    const needle = searchText.trim().slice(0, 60).toLowerCase();
-    const spans  = textLayerDiv.querySelectorAll('span');
-    const matchLen = Math.min(30, needle.length);
-
+    const spans = Array.from(textLayerDiv.querySelectorAll('span'));
+    let cleanText = '';
+    const cleanToSpan = [];
+    
     for (const span of spans) {
-        if (span.textContent && span.textContent.toLowerCase().includes(needle.slice(0, matchLen))) {
-            span.classList.add('reader-nav-highlight');
-            span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            break;
+        const text = span.textContent || '';
+        for (let i = 0; i < text.length; i++) {
+            if (!/\s/.test(text[i])) {
+                cleanText += text[i].toLowerCase();
+                cleanToSpan.push(span);
+            }
+        }
+    }
+
+    const needle = searchText.replace(/\s+/g, '').slice(0, 60).toLowerCase();
+    const matchIdx = cleanText.indexOf(needle);
+
+    if (matchIdx !== -1) {
+        let targetSpan = null;
+        for (let i = matchIdx; i < matchIdx + needle.length; i++) {
+            if (cleanToSpan[i]) {
+                cleanToSpan[i].classList.add('reader-nav-highlight');
+                if (!targetSpan) targetSpan = cleanToSpan[i];
+            }
+        }
+        if (targetSpan) {
+            targetSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
     }
 }
@@ -649,6 +770,20 @@ function _bindSelectionToolbar() {
 
     document.getElementById('readerBtnAddNote')?.addEventListener('click', () => {
         _addAnnotationNote();
+        _hideFloatBar();
+    });
+
+    document.getElementById('readerBtnCopy')?.addEventListener('click', async () => {
+        const text = floatBar?.dataset.selectedText || '';
+        if (text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('已复制到剪贴板');
+            } catch (err) {
+                console.error('[Reader] 复制失败:', err);
+                showToast('复制失败，请手动复制');
+            }
+        }
         _hideFloatBar();
     });
 }

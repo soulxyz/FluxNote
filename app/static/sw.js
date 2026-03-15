@@ -380,7 +380,7 @@ self.addEventListener('fetch', (event) => {
 
     // 5. 业务静态资源 (JS/CSS) - 使用 STATIC_CACHE
     // 由于 install 阶段已由裸路径改为存入带有 ?v=hash 的完整路径，此处可精准命中预缓存
-    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    event.respondWith(cacheFirst(request, STATIC_CACHE, { ignoreSearch: true }));
 });
 
 /**

@@ -143,11 +143,8 @@ class Note(db.Model):
             'capsule_status': self.capsule_status,
         }
         
-        if hasattr(self, 'documents'):
-            if include_documents:
-                result['documents'] = [doc.to_dict() for doc in self.documents]
-            else:
-                result['documents'] = [{'id': doc.id} for doc in self.documents]
+        if include_documents and hasattr(self, 'documents'):
+            result['documents'] = [doc.to_dict() for doc in self.documents]
         else:
             result['documents'] = []
             

@@ -304,6 +304,18 @@ export const ui = {
             }
         }
 
+        // 将 pending 文档列表同步到 note 对象，确保卡片能正确显示
+        if (window.__editPendingDocs?.[note.id]) {
+            note.documents = window.__editPendingDocs[note.id];
+        }
+        // 清理编辑相关的 pending 文档状态
+        if (window.__editPendingDocs) {
+            delete window.__editPendingDocs[note.id];
+        }
+        if (window.__editOriginalDocIds) {
+            delete window.__editOriginalDocIds[note.id];
+        }
+
         const oldCard = document.getElementById(`note-${note.id}`);
         if (!oldCard) return;
         const newCard = this.createNoteCard(note);
@@ -488,6 +500,10 @@ export const ui = {
 
             state.editTags = [...note.tags];
 
+            // 记录编辑开始时的原始文档 ID，用于取消时区分新上传的文档
+            window.__editOriginalDocIds = window.__editOriginalDocIds || {};
+            window.__editOriginalDocIds[id] = (note.documents || []).map(d => d.id);
+
             const container = document.createElement('div');
             container.className = 'inline-editor-container';
 
@@ -557,7 +573,7 @@ export const ui = {
                     const file = e.target.files[0];
                     if (!file) return;
                     showToast('正在上传文档...');
-                    const upRes = await api.documents?.upload(file, id);
+                    const upRes = await api.documents?.upload(file);
                     if (upRes && upRes.ok) {
                         const doc = await upRes.json();
                         window.__editPendingDocs = window.__editPendingDocs || {};
@@ -612,8 +628,19 @@ export const ui = {
             const cancelBtn = document.createElement('button');
             cancelBtn.textContent = '取消';
             cancelBtn.className = 'btn btn-secondary btn-sm';
-            cancelBtn.onclick = () => {
-                // Restore original card locally without refreshing list
+            cancelBtn.onclick = async () => {
+                // 清理本次编辑中新上传的 pending 文档（未绑定到笔记的孤立文件）
+                const pendingDocs = window.__editPendingDocs?.[id] || [];
+                const originalIds = window.__editOriginalDocIds?.[id] || [];
+                for (const doc of pendingDocs) {
+                    if (!originalIds.includes(doc.id)) {
+                        api.documents?.delete(doc.id).catch(() => {});
+                    }
+                }
+                // 恢复为仅包含原始文档，确保 restoreCard 时不包含已删除的新文档
+                if (window.__editPendingDocs) {
+                    window.__editPendingDocs[id] = pendingDocs.filter(d => originalIds.includes(d.id));
+                }
                 this.restoreCard(note);
             };
 

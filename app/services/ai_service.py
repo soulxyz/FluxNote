@@ -28,7 +28,7 @@ class AIService:
         return None
 
     @staticmethod
-    def chat_completion(messages, model=None):
+    def chat_completion(messages, model=None, timeout=None):
         """
         Call the AI API using the active provider.
         """
@@ -38,7 +38,8 @@ class AIService:
 
         client = openai.OpenAI(
             api_key=provider['api_key'],
-            base_url=provider['base_url']
+            base_url=provider['base_url'],
+            timeout=timeout
         )
 
         try:

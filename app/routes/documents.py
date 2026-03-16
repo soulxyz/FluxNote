@@ -2,7 +2,7 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_login import login_required, current_user
 from app.extensions import db
-from app.models import Document, Note, Annotation
+from app.models import Document, Note, Annotation, Config
 from app.services.ai_service import AIService
 from werkzeug.utils import secure_filename
 import os
@@ -73,27 +73,6 @@ def _extract_docx(filepath, trusted_root):
         return '', ''
 
 
-def _generate_ai_summary(text, filename):
-    """调用 AI 生成文档摘要（失败时静默降级）"""
-    if not text or len(text.strip()) < 50:
-        return None
-    try:
-        excerpt = text[:3000]
-        messages = [
-            {
-                'role': 'system',
-                'content': '你是一个文档摘要助手，请用 1-3 句话简洁地概括文档的核心内容，不要使用列表，直接输出摘要文字。'
-            },
-            {
-                'role': 'user',
-                'content': f'文档名：《{filename}》\n\n文档内容（节选）：\n{excerpt}'
-            }
-        ]
-        summary = AIService.chat_completion(messages)
-        return summary.strip() if summary else None
-    except Exception as e:
-        logger.info(f"AI 摘要生成跳过（未配置或失败）: {e}")
-        return None
 
 
 @documents_bp.route('/documents', methods=['GET'])
@@ -191,10 +170,7 @@ def upload_document():
     elif ext in ('docx', 'doc'):
         md_content, text_content = _extract_docx(filepath, upload_folder)
 
-    # AI 摘要（异步降级：失败不影响上传）
-    ai_summary = _generate_ai_summary(text_content, original_filename)
-
-    # 写入数据库
+    # 写入数据库，ai_summary 先置空，由后台线程生成
     doc = Document(
         id=doc_id,
         note_id=note_id,
@@ -206,7 +182,7 @@ def upload_document():
         file_size=file_size,
         text_content=text_content[:100000] if text_content else None,  # 限制存储大小
         md_content=md_content,
-        ai_summary=ai_summary,
+        ai_summary=None,
     )
     try:
         db.session.add(doc)
@@ -221,8 +197,8 @@ def upload_document():
                 logger.error(f"发生异常后，清理上传文档失败: {rm_e}")
         return jsonify({'error': '保存文档信息到数据库时发生异常，文档上传失败'}), 500
 
+
     result = doc.to_dict()
-    result['ai_summary'] = ai_summary
     return jsonify(result), 201
 
 

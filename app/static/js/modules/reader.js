@@ -1116,13 +1116,73 @@ export async function uploadAndOpenDocument(file, noteId) {
         return null;
     }
     const doc = await res.json();
-    showToast(doc.ai_summary ? `已上传：${doc.ai_summary.slice(0, 30)}…` : '文档上传成功');
+    showToast('文档上传成功，正在生成摘要...');
 
-    if (doc.ai_summary && noteId) {
-        const textarea = document.getElementById('noteContent');
-        if (textarea && !textarea.value.trim()) {
-            textarea.value = `**${doc.original_filename}**\n\n${doc.ai_summary}\n\n`;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    // 触发自定义事件，通知编辑器更新附件列表
+    window.dispatchEvent(new CustomEvent('document:uploaded', { 
+        detail: { doc, noteId } 
+    }));
+
+    await reader.open(doc.id, noteId);
+
+    // 获取对应的 textarea
+    let textarea = null;
+    if (!noteId) {
+        // 新建笔记（主编辑器）
+        textarea = document.getElementById('noteContent');
+    } else {
+        // 已有笔记，可能是主编辑器，也可能是行内编辑器
+        textarea = document.getElementById('noteContent');
+        if (window.__currentNoteId !== String(noteId)) {
+            // 如果主编辑器当前编辑的不是这个 noteId，则尝试找行内编辑器
+            const inlineContainer = document.querySelector(`.inline-editor-container[data-id="${noteId}"]`);
+            if (inlineContainer) {
+                textarea = inlineContainer.querySelector('textarea');
+            } else {
+                textarea = null;
+            }
+        }
+    }
+
+    if (textarea && !textarea.value.trim()) {
+        textarea.value = `**${doc.original_filename}**\n\n`;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        try {
+            const streamRes = await api.ai.stream({
+                action: 'document_summary',
+                doc_id: doc.id
+            });
+            
+            if (!streamRes.ok) {
+                console.error('[Reader] AI summary stream failed:', streamRes.status);
+                showToast('无法生成AI摘要：' + (await streamRes.json().catch(() => {}))?.error || '请求错误');
+                return doc;
+            }
+            
+            if (streamRes.body) {
+                const rdr = streamRes.body.getReader();
+                const decoder = new TextDecoder();
+                while (true) {
+                    const { done, value } = await rdr.read();
+                    if (done) break;
+                    let chunk = decoder.decode(value, { stream: true });
+                    // 去掉可能包含在开头的 Error: 信息
+                    if (chunk.startsWith('Error:')) {
+                        console.error('AI Summary stream error:', chunk);
+                        break;
+                    }
+                    if (chunk) {
+                        textarea.value += chunk;
+                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+                textarea.value += '\n\n';
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        } catch (e) {
+            console.error('[Reader] Failed to stream AI summary:', e);
+            showToast('AI摘要生成失败');
         }
     }
 

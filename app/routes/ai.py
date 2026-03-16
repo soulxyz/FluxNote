@@ -76,6 +76,23 @@ def stream_ai():
 {content[:3000]}"""
              system_prompt = "你是一个专业的笔记整理助手，擅长将口语化的内容转化为结构清晰的书面笔记。"
 
+        elif action == 'document_summary':
+             doc_id = data.get('doc_id')
+             if not doc_id:
+                  return jsonify({'error': 'doc_id is required for document summary'}), 400
+             from app.models import Document
+             doc = Document.query.filter_by(id=doc_id).first()
+             if not doc:
+                  return jsonify({'error': 'Document not found'}), 404
+             text_content = doc.text_content
+             original_filename = doc.original_filename
+             if not text_content or len(text_content.strip()) < 50:
+                  return jsonify({'error': 'Document content is too short for summary'}), 400
+             
+             excerpt = text_content[:3000]
+             prompt = f'文档名：《{original_filename}》\n\n文档内容（节选）：\n{excerpt}'
+             system_prompt = '你是一个文档摘要助手，请用 1-3 句话简洁地概括文档的核心内容，不要使用列表，直接输出摘要文字。'
+
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
 
@@ -84,9 +101,26 @@ def stream_ai():
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
+        full_response = ""
         try:
             for chunk in AIService.chat_completion_stream(messages):
+                full_response += chunk
                 yield chunk
+                
+            # Stream complete, update database if it's a document summary
+            if action == 'document_summary' and data.get('doc_id') and full_response:
+                try:
+                    from app.extensions import db
+                    from app.models import Document
+                    doc = Document.query.get(data.get('doc_id'))
+                    if doc:
+                        doc.ai_summary = full_response
+                        db.session.commit()
+                except Exception as db_e:
+                    from flask import current_app
+                    current_app.logger.error(f"Failed to save AI summary to database: {db_e}")
+                    db.session.rollback()
+                    
         except Exception as e:
             yield f"Error: {str(e)}"
 

@@ -6766,3 +6766,265 @@ mark.reader-nav-highlight-word {
         z-index: 1200;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   阅读器：自定义对话框（替代原生 prompt / confirm）
+   ══════════════════════════════════════════════════════════════════ */
+.reader-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: readerDialogFadeIn 0.15s ease;
+}
+
+.reader-dialog-overlay.reader-dialog-closing {
+    animation: readerDialogFadeOut 0.2s ease forwards;
+}
+
+@keyframes readerDialogFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes readerDialogFadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+.reader-dialog-box {
+    background: var(--bg-card, #fff);
+    border-radius: 14px;
+    padding: 24px 28px;
+    width: min(420px, 90vw);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    animation: readerDialogSlideIn 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@keyframes readerDialogSlideIn {
+    from { transform: translateY(-12px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+.reader-dialog-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--slate-800, #1e293b);
+    line-height: 1.4;
+}
+
+.reader-dialog-message {
+    font-size: 14px;
+    color: var(--slate-500, #64748b);
+    line-height: 1.6;
+}
+
+.reader-dialog-input {
+    width: 100%;
+    border: 1.5px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--slate-700, #334155);
+    background: var(--bg-primary, #f8fafc);
+    resize: vertical;
+    min-height: 72px;
+    transition: border-color 0.2s;
+    outline: none;
+}
+
+.reader-dialog-input:focus {
+    border-color: var(--primary, #10b981);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.reader-dialog-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.reader-dialog-cancel {
+    padding: 8px 18px;
+    border: 1.5px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--slate-600, #475569);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.reader-dialog-cancel:hover {
+    background: var(--slate-100, #f1f5f9);
+}
+
+.reader-dialog-confirm {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary, #10b981);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.reader-dialog-confirm:hover {
+    background: var(--primary-dark, #059669);
+}
+
+.reader-dialog-confirm.danger {
+    background: #e74c3c;
+}
+
+.reader-dialog-confirm.danger:hover {
+    background: #c0392b;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   阅读器：上传进度条
+   ══════════════════════════════════════════════════════════════════ */
+.reader-upload-progress {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1250;
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    padding: 16px 20px;
+    min-width: 280px;
+    max-width: 420px;
+    display: none;
+    animation: readerDialogSlideIn 0.2s ease;
+}
+
+.reader-upload-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.reader-upload-inner > .fas {
+    font-size: 20px;
+    color: var(--primary, #10b981);
+    flex-shrink: 0;
+}
+
+.reader-upload-label {
+    font-size: 13px;
+    color: var(--slate-700, #334155);
+    font-weight: 500;
+    flex: 1;
+    white-space: nowrap;
+}
+
+.reader-upload-bar-track {
+    width: 100%;
+    height: 4px;
+    background: var(--slate-100, #f1f5f9);
+    border-radius: 4px;
+    overflow: hidden;
+    flex: 1;
+}
+
+.reader-upload-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary, #10b981), #34d399);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+}
+
+.reader-upload-pct {
+    font-size: 12px;
+    color: var(--slate-400, #94a3b8);
+    min-width: 32px;
+    text-align: right;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   批注列表：颜色/页码筛选栏
+   ══════════════════════════════════════════════════════════════════ */
+.ann-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    flex-wrap: wrap;
+}
+
+.ann-filter-colors {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.ann-filter-color-btn {
+    border: 1.5px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    padding: 3px 6px;
+    font-size: 11px;
+    color: var(--slate-500, #64748b);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    min-width: 28px;
+}
+
+.ann-filter-color-btn:hover,
+.ann-filter-color-btn.active {
+    border-color: var(--primary, #10b981);
+    background: var(--primary-light, rgba(16, 185, 129, 0.08));
+    color: var(--primary, #10b981);
+}
+
+.ann-filter-page-select {
+    border: 1.5px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--slate-600, #475569);
+    background: var(--bg-card, #fff);
+    cursor: pointer;
+    outline: none;
+    margin-left: auto;
+}
+
+.ann-filter-page-select:focus {
+    border-color: var(--primary, #10b981);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   移动端：阅读器全屏模式
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .reader-panel {
+        width: 100vw !important;
+    }
+
+    .reader-panel.fullscreen {
+        width: 100vw !important;
+        --reader-width: 100vw;
+    }
+
+    .reader-resizer {
+        display: none !important;
+    }
+}

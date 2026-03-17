@@ -21,14 +21,22 @@ def _allowed_doc(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_DOC_EXTENSIONS
 
 
+def _validate_safe_path(filepath, trusted_root):
+    """验证路径在受信目录内，防止路径遍历攻击。返回规范化的绝对路径，失败时抛出 ValueError。"""
+    safe_filepath = os.path.abspath(filepath)
+    safe_root = os.path.abspath(trusted_root)
+    try:
+        if os.path.commonpath([safe_root, safe_filepath]) != safe_root:
+            raise ValueError(f"路径不在受信目录内: {safe_filepath}")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"路径验证失败: {e}")
+    return safe_filepath
+
+
 def _extract_pdf(filepath, trusted_root):
     """用 PyMuPDF 提取 PDF 全文和页数"""
     try:
-        safe_filepath = os.path.abspath(filepath)
-        if not safe_filepath.startswith(os.path.abspath(trusted_root) + os.sep):
-            logger.warning(f"PDF 路径不在受信目录内: {safe_filepath}")
-            return None, ''
-
+        safe_filepath = _validate_safe_path(filepath, trusted_root)
         import fitz  # PyMuPDF
         doc = fitz.open(safe_filepath)
         pages = doc.page_count
@@ -37,6 +45,9 @@ def _extract_pdf(filepath, trusted_root):
             texts.append(page.get_text())
         doc.close()
         return pages, '\n'.join(texts)
+    except ValueError as e:
+        logger.warning(f"PDF 路径验证失败: {e}")
+        return None, ''
     except Exception as e:
         logger.warning(f"PDF 文本提取失败: {e}")
         return None, ''
@@ -45,11 +56,7 @@ def _extract_pdf(filepath, trusted_root):
 def _extract_docx(filepath, trusted_root):
     """用 mammoth 提取 Word 文档内容（转为 Markdown 格式）"""
     try:
-        safe_filepath = os.path.abspath(filepath)
-        if not safe_filepath.startswith(os.path.abspath(trusted_root) + os.sep):
-            logger.warning(f"Word 路径不在受信目录内: {safe_filepath}")
-            return '', ''
-
+        safe_filepath = _validate_safe_path(filepath, trusted_root)
         import mammoth
         # mammoth 自定义样式映射，保留标题层级
         style_map = """
@@ -68,6 +75,9 @@ def _extract_docx(filepath, trusted_root):
         plain = re.sub(r'[#*_`\[\]()>!]', '', md)
         plain = re.sub(r'\s+', ' ', plain).strip()
         return md, plain
+    except ValueError as e:
+        logger.warning(f"Word 路径验证失败: {e}")
+        return '', ''
     except Exception as e:
         logger.warning(f"Word 文本提取失败: {e}")
         return '', ''
@@ -85,7 +95,9 @@ def list_documents():
 
     query = Document.query.filter_by(user_id=current_user.id)
     if keyword:
-        query = query.filter(Document.original_filename.ilike(f'%{keyword}%'))
+        # 转义 LIKE 通配符，防止用户输入 % _ 等字符造成非预期匹配
+        safe_keyword = keyword.replace('\\', '\\\\').replace('%', r'\%').replace('_', r'\_')
+        query = query.filter(Document.original_filename.ilike(f'%{safe_keyword}%', escape='\\'))
     query = query.order_by(Document.created_at.desc())
 
     total = query.count()
@@ -215,29 +227,17 @@ def get_document(doc_id):
 def delete_document(doc_id):
     """删除文档（同时删除文件）"""
     doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first_or_404()
-    
-    # 路径安全验证：规范化并确保在受信任的根目录内
-    upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
-    filepath = os.path.abspath(os.path.join(upload_folder, doc.stored_filename))
-    
-    # 验证 filepath 仍在 upload_folder 内（防止路径遍历攻击）
+
+    upload_folder = current_app.config['UPLOAD_FOLDER']
     try:
-        if os.path.commonpath([upload_folder, filepath]) != upload_folder:
-            logger.warning(f"尝试访问不安全的路径: {filepath}")
-            db.session.delete(doc)
-            db.session.commit()
-            return jsonify({'ok': True, 'warning': '文件路径验证失败，仅删除数据库记录'})
-    except (ValueError, TypeError):
-        logger.warning(f"路径验证失败: {filepath}")
-        db.session.delete(doc)
-        db.session.commit()
-        return jsonify({'ok': True, 'warning': '文件路径验证失败,仅删除数据库记录'})
-    
-    if os.path.exists(filepath):
-        try:
+        filepath = _validate_safe_path(os.path.join(upload_folder, doc.stored_filename), upload_folder)
+        if os.path.exists(filepath):
             os.remove(filepath)
-        except Exception as e:
-            logger.warning(f"删除文件失败: {e}")
+    except ValueError as e:
+        logger.warning(f"删除文档时路径验证失败，仅删除数据库记录: {e}")
+    except Exception as e:
+        logger.warning(f"删除文件失败: {e}")
+
     db.session.delete(doc)
     db.session.commit()
     return jsonify({'ok': True})

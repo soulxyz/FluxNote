@@ -2,17 +2,81 @@
  * reader.js — 文档阅读面板
  *
  * 功能：
- *   1. 右侧滑出式阅读面板
+ *   1. 右侧滑出式阅读面板（宽度 localStorage 持久化）
  *   2. PDF 阅读（PDF.js）：渲染、翻页、缩放、文字层（已配置 cMapUrl）
  *   3. Word 阅读：后端转 Markdown，渲染显示
  *   4. 文字选中 → 浮动工具栏 → 颜色高亮 / 引用 / AI 解释
  *   5. 高亮批注持久化（保存到数据库，重新打开时恢复）
- *   6. 批注列表面板（查看 / 跳转 / 编辑备注 / 删除）
+ *   6. 批注列表面板（按颜色/页码筛选、查看 / 跳转 / 编辑备注 / 删除）
  *   7. doc:navigate 事件 → 跳页 + 引用回溯高亮
+ *   8. 移动端自动全屏 + 左滑手势关闭
+ *   9. 上传进度条指示
  */
 
 import { api } from './api.js';
 import { showToast } from './utils.js';
+
+// ─── 自定义对话框（替代原生 prompt / confirm）──────────────────────────────
+
+function _showDialog({ title, message, placeholder = '', defaultValue = '', type = 'confirm' }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'reader-dialog-overlay';
+
+        const isPrompt = type === 'prompt';
+        overlay.innerHTML = `
+            <div class="reader-dialog-box">
+                <div class="reader-dialog-title">${_escHtml(title)}</div>
+                ${message ? `<div class="reader-dialog-message">${_escHtml(message)}</div>` : ''}
+                ${isPrompt ? `<textarea class="reader-dialog-input" placeholder="${_escHtml(placeholder)}" rows="3">${_escHtml(defaultValue)}</textarea>` : ''}
+                <div class="reader-dialog-actions">
+                    <button class="reader-dialog-cancel">取消</button>
+                    <button class="reader-dialog-confirm ${type === 'danger' ? 'danger' : ''}">${isPrompt ? '确定' : '确定'}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const inputEl = overlay.querySelector('.reader-dialog-input');
+        if (inputEl) {
+            inputEl.focus();
+            inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+        }
+
+        const close = (value) => {
+            overlay.classList.add('reader-dialog-closing');
+            setTimeout(() => overlay.remove(), 200);
+            resolve(value);
+        };
+
+        overlay.querySelector('.reader-dialog-cancel').onclick = () => close(null);
+        overlay.querySelector('.reader-dialog-confirm').onclick = () => {
+            close(isPrompt ? (inputEl?.value ?? '') : true);
+        };
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close(null);
+            if (e.key === 'Enter' && !isPrompt) close(true);
+        });
+    });
+}
+
+function _readerConfirm(message, title = '确认') {
+    return _showDialog({ title, message, type: 'danger' });
+}
+
+function _readerPrompt(title, defaultValue = '', placeholder = '') {
+    return _showDialog({ title, placeholder, defaultValue, type: 'prompt' });
+}
+
+function _escHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
 
 // ─── 状态 ─────────────────────────────────────────────────────────────────
 
@@ -56,35 +120,67 @@ function initDom() {
 
     if (canvas) ctx = canvas.getContext('2d');
 
-    // 初始化无级拖拽逻辑
+    // 从 localStorage 恢复上次拖拽的宽度
+    const savedWidth = localStorage.getItem('reader_panel_width');
+    if (savedWidth) {
+        document.documentElement.style.setProperty('--reader-width', savedWidth + 'px');
+    }
+
+    // 移动端：隐藏 resizer，使用全屏模式
+    if (window.innerWidth <= 768) {
+        if (resizer) resizer.style.display = 'none';
+    }
+
+    // 桌面端无级拖拽逻辑
     if (resizer && panel) {
         let isResizing = false;
-        resizer.addEventListener('mousedown', (e) => {
+        resizer.addEventListener('mousedown', () => {
             isResizing = true;
             document.body.classList.add('reader-dragging');
         });
 
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-            // 右侧面板宽度 = 屏幕宽度 - 当前鼠标 X 坐标
             let newWidth = window.innerWidth - e.clientX;
-            // 限制最大最小宽度 (360px ~ 屏幕的70%或900px取小值)
             const minWidth = 360;
             const maxWidth = Math.min(900, window.innerWidth * 0.7);
-            
-            if (newWidth < minWidth) newWidth = minWidth;
-            if (newWidth > maxWidth) newWidth = maxWidth;
-
+            newWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
             document.documentElement.style.setProperty('--reader-width', newWidth + 'px');
         });
 
         document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.classList.remove('reader-dragging');
-            }
+            if (!isResizing) return;
+            isResizing = false;
+            document.body.classList.remove('reader-dragging');
+            // 持久化宽度
+            const currentWidth = getComputedStyle(document.documentElement)
+                .getPropertyValue('--reader-width').trim().replace('px', '');
+            if (currentWidth) localStorage.setItem('reader_panel_width', currentWidth);
         });
     }
+
+    // 移动端左滑手势关闭
+    _initTouchClose();
+}
+
+function _initTouchClose() {
+    if (!panel) return;
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    panel.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    panel.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+        // 水平向右滑动超过 80px 且竖向偏移 < 40px 则关闭
+        if (dx > 80 && dy < 40) {
+            reader.close();
+        }
+    }, { passive: true });
 }
 
 // ─── PDF.js 获取 ─────────────────────────────────────────────────────────
@@ -273,6 +369,10 @@ async function _loadAllAnnotations(docId) {
 function _showPanel() {
     state.isOpen = true;
     panel.classList.add('open');
+    // 移动端自动全屏
+    if (window.innerWidth <= 768) {
+        panel.classList.add('fullscreen');
+    }
     document.body.classList.add('reader-open');
     if (overlay) overlay.style.display = 'block';
 }
@@ -396,33 +496,32 @@ async function _loadPdf(docId, opts = {}) {
         if (opts.text) await _highlightText(opts.text);
     } catch (e) {
         console.error('[Reader] PDF 加载失败:', e);
-        
-        // 显示详细的错误信息
-        let errorMsg = 'PDF 加载失败';
-        if (e.message.includes('PDF.js')) {
-            errorMsg = 'PDF.js 库加载失败，请检查网络连接或尝试刷新页面';
-        } else if (e.message.includes('网络')) {
-            errorMsg = '网络连接失败，请检查网络设置';
-        } else if (e.message.includes('文件')) {
-            errorMsg = 'PDF 文件损坏或格式不支持';
+
+        let errorMsg = '文档加载失败，请稍后重试或刷新页面';
+        let errorTip = '如持续失败，可尝试下载后在本地打开。';
+
+        if (e.message && e.message.includes('所有PDF.js加载方案')) {
+            errorMsg = '渲染组件加载失败，可能是网络不稳定';
+            errorTip = '请检查网络连接后刷新页面重试。';
+        } else if (e.message && (e.message.includes('InvalidPDFException') || e.message.includes('MissingPDFException'))) {
+            errorMsg = '文件格式有误或文件已损坏';
+            errorTip = '请确认上传的是有效的 PDF 文件。';
         }
-        
+
         showToast(errorMsg, 5000);
-        
-        // 在阅读器中显示错误信息
+
         if (mdContentEl) {
             mdContentEl.style.display = 'block';
             mdContentEl.innerHTML = `
                 <div class="reader-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <h3>PDF 加载失败</h3>
-                    <p>${errorMsg}</p>
-                    <p>请尝试以下解决方案：</p>
-                    <ul>
-                        <li>刷新页面重试</li>
-                        <li>检查网络连接</li>
-                        <li>如果问题持续存在，请联系管理员</li>
-                    </ul>
+                    <i class="fas fa-file-exclamation"></i>
+                    <h3>${_escHtml(errorMsg)}</h3>
+                    <p>${_escHtml(errorTip)}</p>
+                    <div style="margin-top:16px;">
+                        <button class="reader-btn" onclick="location.reload()" style="padding:8px 16px;border-radius:8px;background:var(--primary);color:#fff;border:none;cursor:pointer;">
+                            <i class="fas fa-redo"></i> 刷新重试
+                        </button>
+                    </div>
                 </div>
             `;
         }
@@ -864,7 +963,8 @@ async function _addAnnotationNote() {
     const text = floatBar?.dataset.selectedText || '';
     if (!text || !state.docId) return;
 
-    const noteText = prompt('为选中内容添加批注备注：');
+    const preview = text.length > 40 ? text.slice(0, 40) + '…' : text;
+    const noteText = await _readerPrompt(`为"${preview}"添加批注备注`, '', '输入批注内容…');
     if (noteText === null) return;
 
     const payload = {
@@ -905,7 +1005,8 @@ function _bindAnnotationListEvents() {
         if (deleteBtn) {
             e.stopPropagation();
             const annId = deleteBtn.dataset.annId;
-            if (!confirm('确定删除这条批注？')) return;
+            const ok = await _readerConfirm('确定删除这条批注？', '删除批注');
+            if (!ok) return;
             await _deleteAnnotation(annId);
             return;
         }
@@ -929,18 +1030,78 @@ function _bindAnnotationListEvents() {
     });
 }
 
+// 批注面板筛选状态
+const _annFilter = { color: 'all', pageRange: 'all' };
+
+function _renderAnnPanelFilter(container) {
+    const colors = ['all', 'yellow', 'green', 'pink', 'blue'];
+    const colorLabels = { all: '全部', yellow: '黄', green: '绿', pink: '粉', blue: '蓝' };
+
+    let filterEl = container.querySelector('.ann-filter-bar');
+    if (!filterEl) {
+        filterEl = document.createElement('div');
+        filterEl.className = 'ann-filter-bar';
+        container.insertBefore(filterEl, container.querySelector('#readerAnnList') || container.firstChild);
+    }
+
+    filterEl.innerHTML = `
+        <div class="ann-filter-colors">
+            ${colors.map(c => `
+                <button class="ann-filter-color-btn ${_annFilter.color === c ? 'active' : ''}" data-color="${c}" title="${colorLabels[c]}">
+                    ${c === 'all' ? '全部' : `<span class="ann-dot ann-${c}"></span>`}
+                </button>
+            `).join('')}
+        </div>
+        <select class="ann-filter-page-select" title="按页码范围筛选">
+            <option value="all" ${_annFilter.pageRange === 'all' ? 'selected' : ''}>全部页</option>
+            <option value="current" ${_annFilter.pageRange === 'current' ? 'selected' : ''}>当前页</option>
+            <option value="word" ${_annFilter.pageRange === 'word' ? 'selected' : ''}>Word 批注</option>
+        </select>
+    `;
+
+    filterEl.querySelectorAll('.ann-filter-color-btn').forEach(btn => {
+        btn.onclick = () => {
+            _annFilter.color = btn.dataset.color;
+            _refreshAnnotationPanel();
+        };
+    });
+    filterEl.querySelector('.ann-filter-page-select').onchange = (e) => {
+        _annFilter.pageRange = e.target.value;
+        _refreshAnnotationPanel();
+    };
+}
+
 function _refreshAnnotationPanel() {
-    if (!annList) return;
-    annList.innerHTML = '';
+    if (!annPanel || !annList) return;
+
+    _renderAnnPanelFilter(annPanel);
 
     if (!state.annotations.length) {
         annList.innerHTML = '<p class="ann-empty">暂无批注</p>';
         return;
     }
 
-    const sorted = [...state.annotations].sort((a, b) => (a.page || 0) - (b.page || 0));
+    // 应用筛选
+    let filtered = [...state.annotations];
 
-    for (const ann of sorted) {
+    if (_annFilter.color !== 'all') {
+        filtered = filtered.filter(a => a.color === _annFilter.color);
+    }
+    if (_annFilter.pageRange === 'current' && state.fileType === 'pdf') {
+        filtered = filtered.filter(a => a.page === state.currentPage);
+    } else if (_annFilter.pageRange === 'word') {
+        filtered = filtered.filter(a => !a.page);
+    }
+
+    filtered.sort((a, b) => (a.page || 0) - (b.page || 0));
+
+    if (!filtered.length) {
+        annList.innerHTML = '<p class="ann-empty">没有符合筛选条件的批注</p>';
+        return;
+    }
+
+    annList.innerHTML = '';
+    for (const ann of filtered) {
         const item = document.createElement('div');
         item.className = 'ann-item';
         item.dataset.annId = ann.id;
@@ -973,7 +1134,7 @@ async function _editAnnotationNote(annId) {
     const ann = state.annotations.find(a => String(a.id) === String(annId));
     if (!ann) return;
 
-    const newNote = prompt('编辑批注备注：', ann.ann_note || '');
+    const newNote = await _readerPrompt('编辑批注备注', ann.ann_note || '', '输入批注内容…');
     if (newNote === null) return;
 
     try {
@@ -1019,12 +1180,15 @@ async function _deleteAnnotation(annId) {
     }
 }
 
-function _escHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+// ─── 引用生成（公共工具）─────────────────────────────────────────────────
+
+function _buildCitation(text, page) {
+    const filename = state.docMeta?.original_filename || '文档';
+    const lines    = text.split('\n').map(l => '> ' + l).join('\n');
+    const pageStr  = page ? `第${page}页` : '';
+    const anchor   = `#doc:${state.docId}${page ? ':' + page : ''}`;
+    const citation = `>\n> *—— [《${filename}》${pageStr}](${anchor})*`;
+    return { lines, citation };
 }
 
 // ─── 引用插入 ─────────────────────────────────────────────────────────────
@@ -1033,16 +1197,9 @@ function _insertQuote() {
     const text = floatBar?.dataset.selectedText || '';
     if (!text) return;
 
-    const meta     = state.docMeta;
-    const page     = state.fileType === 'pdf' ? state.currentPage : null;
-    const filename = meta?.original_filename || '文档';
-    const lines    = text.split('\n').map(l => '> ' + l).join('\n');
-    const pageStr  = page ? `第${page}页` : '';
-    const anchor   = `#doc:${state.docId}${page ? ':' + page : ''}`;
-    const citation = `>\n> *—— [《${filename}》${pageStr}](${anchor})*`;
-    const markdown = `${lines}\n${citation}\n\n`;
-
-    _insertToEditor(markdown);
+    const page = state.fileType === 'pdf' ? state.currentPage : null;
+    const { lines, citation } = _buildCitation(text, page);
+    _insertToEditor(`${lines}\n${citation}\n\n`);
     showToast('已插入引用');
 }
 
@@ -1063,23 +1220,18 @@ async function _aiExplain() {
         if (!response || !response.body) { showToast('AI 服务暂不可用'); return; }
 
         let explanation = '';
-        const reader2  = response.body.getReader();
-        const decoder  = new TextDecoder();
+        const streamReader = response.body.getReader();
+        const decoder = new TextDecoder();
         while (true) {
-            const { done, value } = await reader2.read();
+            const { done, value } = await streamReader.read();
             if (done) break;
             explanation += decoder.decode(value, { stream: true });
         }
 
-        const page     = state.fileType === 'pdf' ? state.currentPage : null;
-        const lines    = text.split('\n').map(l => '> ' + l).join('\n');
-        const pageStr  = page ? `第${page}页` : '';
-        const anchor   = `#doc:${state.docId}${page ? ':' + page : ''}`;
-        const citation = `>\n> *—— [《${state.docMeta?.original_filename || '文档'}》${pageStr}](${anchor})*`;
-        const aiBlock  = `\n**AI 解读：** ${explanation.trim()}\n`;
-        const markdown = `${lines}\n${citation}\n${aiBlock}\n`;
-
-        _insertToEditor(markdown);
+        const page = state.fileType === 'pdf' ? state.currentPage : null;
+        const { lines, citation } = _buildCitation(text, page);
+        const aiBlock = `\n**AI 解读：** ${explanation.trim()}\n`;
+        _insertToEditor(`${lines}\n${citation}\n${aiBlock}\n`);
         showToast('已插入引用与 AI 解读');
     } catch (e) {
         console.error('[Reader] AI explain 失败:', e);
@@ -1107,16 +1259,89 @@ function _insertToEditor(text) {
     textarea.focus();
 }
 
+// ─── 上传进度条 UI ────────────────────────────────────────────────────────
+
+function _showUploadProgress() {
+    let bar = document.getElementById('readerUploadProgress');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'readerUploadProgress';
+        bar.className = 'reader-upload-progress';
+        bar.innerHTML = `
+            <div class="reader-upload-inner">
+                <i class="fas fa-file-upload"></i>
+                <span class="reader-upload-label">正在上传文档…</span>
+                <div class="reader-upload-bar-track"><div class="reader-upload-bar-fill" id="readerUploadFill"></div></div>
+                <span class="reader-upload-pct" id="readerUploadPct">0%</span>
+            </div>
+        `;
+        document.body.appendChild(bar);
+    }
+    bar.style.display = 'flex';
+    _updateUploadProgress(0);
+    return bar;
+}
+
+function _updateUploadProgress(pct) {
+    const fill = document.getElementById('readerUploadFill');
+    const pctEl = document.getElementById('readerUploadPct');
+    if (fill) fill.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+}
+
+function _hideUploadProgress() {
+    const bar = document.getElementById('readerUploadProgress');
+    if (bar) {
+        _updateUploadProgress(100);
+        setTimeout(() => { bar.style.display = 'none'; }, 600);
+    }
+}
+
+function _uploadWithProgress(file, noteId) {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        if (noteId) formData.append('note_id', noteId);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/documents/upload');
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                _updateUploadProgress(Math.round((e.loaded / e.total) * 90));
+            }
+        };
+
+        xhr.onload = () => {
+            _updateUploadProgress(100);
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch { reject(new Error('响应解析失败')); }
+            } else {
+                let msg = '上传失败';
+                try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+                reject(new Error(msg));
+            }
+        };
+
+        xhr.onerror = () => reject(new Error('网络错误，上传失败'));
+        xhr.send(formData);
+    });
+}
+
 // ─── 文档上传（供 editor.js 等模块调用）──────────────────────────────────
 
 export async function uploadAndOpenDocument(file, noteId) {
-    showToast('正在上传文档...', 3000);
-    const res = await api.documents.upload(file, noteId);
-    if (!res || !res.ok) {
-        showToast('上传失败');
+    _showUploadProgress();
+    let doc;
+    try {
+        doc = await _uploadWithProgress(file, noteId);
+    } catch (e) {
+        _hideUploadProgress();
+        showToast(e.message || '上传失败');
         return null;
     }
-    const doc = await res.json();
+    _hideUploadProgress();
     showToast('文档上传成功，正在生成摘要...');
 
     // 触发自定义事件，通知编辑器更新附件列表

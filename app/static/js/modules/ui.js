@@ -623,7 +623,7 @@ export const ui = {
             docBtn.onclick = () => {
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
-                fileInput.accept = '.pdf,.docx,.doc';
+                fileInput.accept = '.pdf,.docx';
                 fileInput.onchange = async (e) => {
                     const file = e.target.files[0];
                     if (!file) return;

@@ -1421,7 +1421,7 @@ export async function uploadAndOpenDocument(file, noteId) {
 export function triggerDocUpload(noteId) {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.pdf,.docx,.doc';
+    input.accept = '.pdf,.docx';
     input.onchange = async () => {
         const file = input.files[0];
         if (!file) return;

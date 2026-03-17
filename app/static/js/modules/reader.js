@@ -983,8 +983,9 @@ async function _editAnnotationNote(annId) {
         Object.assign(ann, updated);
 
         if (state.fileType === 'pdf' && textLayerDiv) {
-            const el = textLayerDiv.querySelector(`[data-ann-id="${annId}"]`);
-            if (el) el.title = newNote || '';
+            textLayerDiv.querySelectorAll(`[data-ann-id="${annId}"]`).forEach(el => {
+                el.title = newNote || '';
+            });
         }
 
         _refreshAnnotationPanel();
@@ -1186,12 +1187,6 @@ export async function uploadAndOpenDocument(file, noteId) {
         }
     }
 
-    // 触发自定义事件，通知编辑器更新附件列表
-    window.dispatchEvent(new CustomEvent('document:uploaded', { 
-        detail: { doc, noteId } 
-    }));
-
-    await reader.open(doc.id, noteId);
     return doc;
 }
 

@@ -1,12 +1,15 @@
 from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.services.ai_service import AIService
 from app.utils.error_handler import safe_error
+from app.extensions import db
+from app.models import Document
 import uuid
 import os
 import re
 import time
 import httpx
+from threading import Thread
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -80,8 +83,7 @@ def stream_ai():
              doc_id = data.get('doc_id')
              if not doc_id:
                   return jsonify({'error': 'doc_id is required for document summary'}), 400
-             from app.models import Document
-             doc = Document.query.filter_by(id=doc_id).first()
+             doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
              if not doc:
                   return jsonify({'error': 'Document not found'}), 404
              text_content = doc.text_content
@@ -96,6 +98,8 @@ def stream_ai():
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
 
+    user_id = current_user.id
+
     def generate():
         messages = [
             {"role": "system", "content": system_prompt},
@@ -106,23 +110,25 @@ def stream_ai():
             for chunk in AIService.chat_completion_stream(messages):
                 full_response += chunk
                 yield chunk
-                
-            # Stream complete, update database if it's a document summary
-            if action == 'document_summary' and data.get('doc_id') and full_response:
-                try:
-                    from app.extensions import db
-                    from app.models import Document
-                    doc = Document.query.get(data.get('doc_id'))
-                    if doc:
-                        doc.ai_summary = full_response
-                        db.session.commit()
-                except Exception as db_e:
-                    from flask import current_app
-                    current_app.logger.error(f"Failed to save AI summary to database: {db_e}")
-                    db.session.rollback()
-                    
         except Exception as e:
             yield f"Error: {str(e)}"
+        finally:
+            if action == 'document_summary' and data.get('doc_id') and full_response:
+                app = current_app._get_current_object()
+                doc_id = data.get('doc_id')
+                
+                def save_summary_bg(app_instance, did, uid, summary):
+                    with app_instance.app_context():
+                        try:
+                            save_doc = Document.query.filter_by(id=did, user_id=uid).first()
+                            if save_doc:
+                                save_doc.ai_summary = summary
+                                db.session.commit()
+                        except Exception as db_e:
+                            app_instance.logger.error(f"Failed to save AI summary to database: {db_e}")
+                            db.session.rollback()
+                            
+                Thread(target=save_summary_bg, args=(app, doc_id, user_id, full_response)).start()
 
     return Response(stream_with_context(generate()), mimetype='text/plain')
 

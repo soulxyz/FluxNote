@@ -12,6 +12,7 @@ from .routes.share import share_bp
 from .routes.blog import blog_bp
 from .routes.comment import comment_bp
 from .routes.update import update_bp, start_background_update_checker
+from .routes.documents import documents_bp
 from .utils.version import get_static_hash
 import os
 import logging
@@ -105,6 +106,7 @@ def create_app():
     app.register_blueprint(blog_bp)  # 博客功能
     app.register_blueprint(comment_bp, url_prefix='/api') # 评论功能
     app.register_blueprint(update_bp)  # 系统更新
+    app.register_blueprint(documents_bp, url_prefix='/api')  # 文档管理
 
     # Register Upload Route (Global)
     @app.route('/uploads/<filename>')

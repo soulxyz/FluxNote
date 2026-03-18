@@ -14,7 +14,7 @@ export const ui = {
         if (!list) return;
         // Avoid re-rendering if already showing skeleton to prevent flicker
         if (list.querySelector('.skeleton-card')) return;
-        
+
         const skeletonItem = `
             <div class="note-card skeleton-card">
                 <div class="skeleton-header" style="width: 30%;"></div>
@@ -52,18 +52,18 @@ export const ui = {
 
         // Render Mermaid/Mindmap first to replace code blocks with divs
         this.renderMermaid(list);
-        
+
         // Highlight only the code blocks that aren't diagrams
         if (window.hljs) {
             list.querySelectorAll('pre code').forEach(block => {
-                const isMermaid = block.classList.contains('language-mermaid') || 
-                                 block.classList.contains('language-mindmap');
+                const isMermaid = block.classList.contains('language-mermaid') ||
+                    block.classList.contains('language-mindmap');
                 if (!isMermaid) {
                     hljs.highlightElement(block);
                 }
             });
         }
-        
+
         this.addCopyButtons();
         if (state.galleryViewer) state.galleryViewer.update();
     },
@@ -183,7 +183,7 @@ export const ui = {
                 // Use a temporary container to DOM-parse the HTML and only highlight text nodes
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = content;
-                
+
                 const highlightTextNodes = (node) => {
                     if (node.nodeType === 3) { // Text node
                         const text = node.nodeValue;
@@ -198,7 +198,7 @@ export const ui = {
                         Array.from(node.childNodes).forEach(highlightTextNodes);
                     }
                 };
-                
+
                 Array.from(tempDiv.childNodes).forEach(highlightTextNodes);
                 content = tempDiv.innerHTML;
             }
@@ -210,12 +210,37 @@ export const ui = {
         // Render Backlinks
         let backlinksHtml = '';
         if (note.backlinks && note.backlinks.length > 0 && !state.isTrashMode) {
-            const links = note.backlinks.map(l => 
+            const links = note.backlinks.map(l =>
                 `<a href="#note-${l.id}" class="backlink-item" style="margin-right:10px; color:var(--primary-color); text-decoration:none;">${escapeHtml(l.title)}</a>`
             ).join('');
             backlinksHtml = `
                 <div class="backlinks-section" style="margin-top:10px; padding-top:10px; border-top:1px dashed #eee; font-size:0.8rem; color:#888;">
                     引用: ${links}
+                </div>
+            `;
+        }
+
+        // Render Documents List
+        let docsHtml = '';
+        if (note.documents && note.documents.length > 0) {
+            const docs = note.documents.map(doc => {
+                const icon = doc.file_type === 'pdf'
+                    ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
+                    : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                const escapedFilename = escapeHtml(doc.original_filename);
+                const escapedDocId = escapeHtml(String(doc.id));
+                const escapedNoteId = escapeHtml(String(note.id));
+                return `
+                    <div class="editor-doc-card" style="cursor:pointer;" onclick="if(window.readerModule?.reader) window.readerModule.reader.open('${escapedDocId}', '${escapedNoteId}')">
+                        ${icon}
+                        <span class="doc-name" title="${escapedFilename}">${escapedFilename}</span>
+                    </div>
+                `;
+            }).join('');
+
+            docsHtml = `
+                <div class="note-documents-list" style="display:flex; flex-wrap:wrap; gap:0px; margin-top:2px; margin-bottom: 4px;">
+                    ${docs}
                 </div>
             `;
         }
@@ -230,25 +255,28 @@ export const ui = {
                 </span>
             </div>
             <div class="note-content markdown-body" style="${isOwner ? 'cursor: pointer;' : ''}" ${isOwner && !note.is_offline_draft ? `ondblclick="window.dispatchEvent(new CustomEvent('note:edit', { detail: '${note.id}' }))"` : ''}>${content}</div>
+            
+            ${docsHtml}
 
+            ${note.tags.length > 0 ? `
             <div class="note-footer">
                 <div class="note-tags">
                     ${note.tags.map(t => `<span class="note-tag" data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join('')}
                 </div>
+            </div>` : ''}
 
-                ${isOwner ? (state.isTrashMode ? `
-                <div class="note-actions">
-                    <span class="note-action restore" data-action="restore" data-id="${note.id}" title="恢复"><i class="fas fa-undo"></i></span>
-                    <span class="note-action delete-forever" data-action="permanent-delete" data-id="${note.id}" title="彻底删除"><i class="fas fa-trash-alt"></i></span>
-                </div>
-                ` : `
-                <div class="note-actions">
-                    <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
-                    <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
-                    <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
-                    ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
-                </div>`) : ''}
+            ${isOwner ? (state.isTrashMode ? `
+            <div class="note-actions">
+                <span class="note-action restore" data-action="restore" data-id="${note.id}" title="恢复"><i class="fas fa-undo"></i></span>
+                <span class="note-action delete-forever" data-action="permanent-delete" data-id="${note.id}" title="彻底删除"><i class="fas fa-trash-alt"></i></span>
             </div>
+            ` : `
+            <div class="note-actions">
+                <span class="note-action share" data-action="share" data-id="${note.id}" title="分享"><i class="fas fa-share-alt"></i></span>
+                <span class="note-action edit" data-action="edit" data-id="${note.id}" title="编辑"><i class="fas fa-edit"></i></span>
+                <span class="note-action history" data-action="history" data-id="${note.id}" title="历史版本"><i class="fas fa-history"></i></span>
+                ${!isLockedCapsule ? `<span class="note-action delete" data-action="delete" data-id="${note.id}" title="删除"><i class="fas fa-trash"></i></span>` : ''}
+            </div>`) : ''}
 
             ${backlinksHtml}
         `;
@@ -268,25 +296,53 @@ export const ui = {
     },
 
     restoreCard(note) {
+        // Clear active edit session state when restoring the card (ending edit session)
+        if (window.__currentNoteId == note.id) {
+            window.__currentNoteId = null;
+            if (window.readerModule?.reader?.clearActiveNote) {
+                window.readerModule.reader.clearActiveNote();
+            }
+        }
+
+        // 将 pending 文档列表同步到 note 对象，确保卡片能正确显示
+        if (window.__editPendingDocs?.[note.id]) {
+            note.documents = window.__editPendingDocs[note.id];
+        }
+        // 清理编辑相关的 pending 文档状态
+        if (window.__editPendingDocs) {
+            delete window.__editPendingDocs[note.id];
+        }
+        if (window.__editOriginalDocIds) {
+            delete window.__editOriginalDocIds[note.id];
+        }
+
         const oldCard = document.getElementById(`note-${note.id}`);
         if (!oldCard) return;
+
+        // 清理编辑期间绑定的上传事件监听器，避免内存泄漏和 DOM 闭包
+        const container = oldCard.querySelector('.inline-editor-container');
+        if (container && container.__uploadListener) {
+            window.removeEventListener('document:edit-uploaded', container.__uploadListener);
+            delete container.__uploadListener;
+        }
+
         const newCard = this.createNoteCard(note);
-        
+
         // Disable animation for in-place updates to prevent flashing
         newCard.style.animation = 'none';
-        
+
         oldCard.replaceWith(newCard);
-        
+
         if (window.hljs) {
             newCard.querySelectorAll('pre code').forEach(block => {
-                const isMermaid = block.classList.contains('language-mermaid') || 
-                                 block.classList.contains('language-mindmap');
+                const isMermaid = block.classList.contains('language-mermaid') ||
+                    block.classList.contains('language-mindmap');
                 if (!isMermaid) {
                     hljs.highlightElement(block);
                 }
             });
         }
-        
+
         this.renderMermaid(newCard);
         this.addCopyButtons();
         this._loadBilibiliCards(newCard);
@@ -301,18 +357,18 @@ export const ui = {
 
         return `<div class="bilibili-card" data-bvid="${bvid}" role="button" tabindex="0">` +
             `<div class="bili-card-thumb">` +
-                `<div class="bili-thumb-placeholder">${logoLg}</div>` +
-                `<div class="bili-play-btn"><i class="fas fa-play"></i></div>` +
+            `<div class="bili-thumb-placeholder">${logoLg}</div>` +
+            `<div class="bili-play-btn"><i class="fas fa-play"></i></div>` +
             `</div>` +
             `<div class="bili-card-content">` +
-                `<div class="bili-card-brand-row">${logoSm}<span class="bili-brand-name">bilibili</span></div>` +
-                `<div class="bili-card-title" data-loading="true">加载中…</div>` +
-                `<div class="bili-card-meta">` +
-                    `<span class="bili-card-bvid">${bvid}</span>` +
-                `</div>` +
+            `<div class="bili-card-brand-row">${logoSm}<span class="bili-brand-name">bilibili</span></div>` +
+            `<div class="bili-card-title" data-loading="true">加载中…</div>` +
+            `<div class="bili-card-meta">` +
+            `<span class="bili-card-bvid">${bvid}</span>` +
+            `</div>` +
             `</div>` +
             `<div class="bili-card-arrow"><i class="fas fa-chevron-right"></i></div>` +
-        `</div>`;
+            `</div>`;
     },
 
     _loadBilibiliCards(container) {
@@ -427,6 +483,9 @@ export const ui = {
     async startInlineEdit(id) {
         const card = document.getElementById(`note-${id}`);
         if (!card) return;
+        // 记录当前编辑的笔记 ID，供文档上传等功能使用
+        window.__currentNoteId = id;
+        if (window.readerModule?.reader) window.readerModule.reader.setActiveNote(id);
 
         const contentDiv = card.querySelector('.note-content');
         const tagsDiv = card.querySelector('.note-tags');
@@ -439,7 +498,7 @@ export const ui = {
         try {
             // Use local state if available to avoid delay
             let note = state.notes.find(n => n.id == id);
-            
+
             // Fallback to API if not found (e.g., direct link or partial load)
             if (!note) {
                 const res = await api.notes.get(id);
@@ -449,6 +508,10 @@ export const ui = {
 
             state.editTags = [...note.tags];
 
+            // 记录编辑开始时的原始文档 ID，用于取消时区分新上传的文档
+            window.__editOriginalDocIds = window.__editOriginalDocIds || {};
+            window.__editOriginalDocIds[id] = (note.documents || []).map(d => d.id);
+
             const container = document.createElement('div');
             container.className = 'inline-editor-container';
 
@@ -456,6 +519,59 @@ export const ui = {
             textarea.value = note.content;
             textarea.id = `edit-textarea-${id}`;
             textarea.className = 'inline-editor-textarea';
+
+            // 文档附件列表
+            const docsList = document.createElement('div');
+            docsList.className = 'editor-documents-list inline-editor-documents';
+            docsList.id = `edit-docs-list-${id}`;
+            docsList.style.display = 'none';
+
+            // 统一提取文档渲染逻辑，挂载给 docsList 以消除下方重复定义
+            const renderEditDocs = () => {
+                const docs = window.__editPendingDocs[id] || [];
+                if (docs.length > 0) {
+                    docsList.style.display = 'flex';
+                    docsList.innerHTML = docs.map(doc => {
+                        const icon = doc.file_type === 'pdf'
+                            ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>'
+                            : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+                        const escapedFilename = escapeHtml(doc.original_filename);
+                        const escapedDocId = escapeHtml(String(doc.id));
+                        return `
+                            <div class="editor-doc-card" data-doc-id="${escapedDocId}">
+                                ${icon}
+                                <span class="doc-name" title="${escapedFilename}">${escapedFilename}</span>
+                                <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // 绑定事件
+                    docsList.querySelectorAll('.editor-doc-card').forEach(card => {
+                        // 点击卡片打开阅读器
+                        card.addEventListener('click', (e) => {
+                            if (e.target.closest('.doc-remove-btn')) return;
+                            const docId = card.dataset.docId;
+                            if (window.readerModule?.reader) {
+                                window.readerModule.reader.open(docId, id);
+                            }
+                        });
+
+                        // 点击删除按钮
+                        const removeBtn = card.querySelector('.doc-remove-btn');
+                        removeBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const docId = card.dataset.docId;
+                            window.__editPendingDocs[id] = window.__editPendingDocs[id].filter(d => d.id !== Number(docId));
+                            renderEditDocs();
+                        });
+                    });
+                } else {
+                    docsList.style.display = 'none';
+                    docsList.innerHTML = '';
+                }
+            };
+            docsList.__renderFunc = renderEditDocs;
 
             // Auto-resize
             const autoResize = () => {
@@ -499,6 +615,34 @@ export const ui = {
                 fileInput.click();
             };
             toolsLeft.appendChild(imgBtn);
+
+            const docBtn = document.createElement('button');
+            docBtn.className = 'tool-btn tool-btn-doc';
+            docBtn.innerHTML = '<i class="fas fa-file-import"></i>';
+            docBtn.title = '上传文档';
+            docBtn.onclick = () => {
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = '.pdf,.docx';
+                fileInput.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    showToast('正在上传文档...');
+                    const upRes = await api.documents?.upload(file);
+                    if (upRes && upRes.ok) {
+                        const doc = await upRes.json();
+                        window.__editPendingDocs = window.__editPendingDocs || {};
+                        window.__editPendingDocs[id] = window.__editPendingDocs[id] || [];
+                        window.__editPendingDocs[id].push(doc);
+                        window.dispatchEvent(new CustomEvent('document:edit-uploaded', { detail: { doc, noteId: id } }));
+                        showToast('文档上传成功');
+                    } else {
+                        showToast('上传失败');
+                    }
+                };
+                fileInput.click();
+            };
+            toolsLeft.appendChild(docBtn);
             toolsBar.appendChild(toolsLeft);
 
             // Tags Area
@@ -539,8 +683,19 @@ export const ui = {
             const cancelBtn = document.createElement('button');
             cancelBtn.textContent = '取消';
             cancelBtn.className = 'btn btn-secondary btn-sm';
-            cancelBtn.onclick = () => {
-                // Restore original card locally without refreshing list
+            cancelBtn.onclick = async () => {
+                // 清理本次编辑中新上传的 pending 文档（未绑定到笔记的孤立文件）
+                const pendingDocs = window.__editPendingDocs?.[id] || [];
+                const originalIds = window.__editOriginalDocIds?.[id] || [];
+                for (const doc of pendingDocs) {
+                    if (!originalIds.includes(doc.id)) {
+                        api.documents?.delete(doc.id).catch(() => {});
+                    }
+                }
+                // 恢复为仅包含原始文档，确保 restoreCard 时不包含已删除的新文档
+                if (window.__editPendingDocs) {
+                    window.__editPendingDocs[id] = pendingDocs.filter(d => originalIds.includes(d.id));
+                }
                 this.restoreCard(note);
             };
 
@@ -558,16 +713,23 @@ export const ui = {
                 const capsuleHint = textarea.dataset.capsuleHint || '';
 
                 // Dispatch event to main.js for handling (offline support)
+                const updateDetail = {
+                    id: id,
+                    content: textarea.value,
+                    tags: state.editTags,
+                    is_public: isPublic,
+                    is_capsule: isCapsule,
+                    capsule_date: capsuleDate,
+                    capsule_hint: capsuleHint
+                };
+
+                // 获取当前编辑的文档附件 ID 列表
+                if (window.__editPendingDocs && window.__editPendingDocs[id]) {
+                    updateDetail.doc_ids = window.__editPendingDocs[id].map(d => d.id);
+                }
+
                 window.dispatchEvent(new CustomEvent('note:request-update', {
-                    detail: {
-                        id: id,
-                        content: textarea.value,
-                        tags: state.editTags,
-                        is_public: isPublic,
-                        is_capsule: isCapsule,
-                        capsule_date: capsuleDate,
-                        capsule_hint: capsuleHint
-                    }
+                    detail: updateDetail
                 }));
             };
 
@@ -577,9 +739,30 @@ export const ui = {
             footer.appendChild(btnsDiv);
 
             container.appendChild(textarea);
+            container.appendChild(docsList);
             container.appendChild(toolsBar);
             container.appendChild(tagsArea);
             container.appendChild(footer);
+
+            // 渲染已有的文档附件
+            if (note.documents && note.documents.length > 0) {
+                // 暂时将文档存入全局状态，以便编辑时可以删除或增加
+                window.__editPendingDocs = window.__editPendingDocs || {};
+                window.__editPendingDocs[id] = [...note.documents];
+
+                renderEditDocs();
+            }
+
+            // 监听新上传的文档
+            const uploadListener = (e) => {
+                if (e.detail.noteId == id) {
+                    docsList.__renderFunc();
+                }
+            };
+            window.addEventListener('document:edit-uploaded', uploadListener);
+
+            // 保存清理监听器的引用
+            container.__uploadListener = uploadListener;
 
             contentDiv.innerHTML = '';
             contentDiv.appendChild(container);
@@ -619,15 +802,15 @@ export const ui = {
         // Clear all except inputElement (which we append back)
         // But inputElement is passed in, so we can just clear innerHTML and rebuild
         container.innerHTML = '';
-        
+
         state.editTags.forEach((t, index) => {
             const tagSpan = document.createElement('span');
             tagSpan.className = 'note-tag'; // Use note-tag style
             // Inline styles are now handled by CSS class .note-tag, removing inline styles
             // But keep specific layout if needed. .note-tag has display:inline-flex.
-            
+
             tagSpan.innerHTML = `#${escapeHtml(t)} <span class="remove-btn" style="cursor:pointer; font-weight:bold; margin-left:4px;">&times;</span>`;
-            
+
             // Delete
             tagSpan.querySelector('.remove-btn').onclick = (e) => {
                 e.stopPropagation();
@@ -642,7 +825,7 @@ export const ui = {
                 input.type = 'text';
                 input.value = t;
                 input.className = 'tag-edit-input';
-                
+
                 const save = () => {
                     const val = input.value.trim();
                     if (val && val !== t) {
@@ -692,7 +875,7 @@ export const ui = {
                 input.type = 'text';
                 input.value = t;
                 input.className = 'tag-edit-input';
-                
+
                 const saveEdit = () => {
                     const newVal = input.value.trim();
                     if (newVal && newVal !== t) {
@@ -746,11 +929,11 @@ export const ui = {
                 btn.innerHTML = `<span># ${escapeHtml(t)}</span>`;
                 btn.dataset.tag = t;
                 btn.onclick = () => window.dispatchEvent(new CustomEvent('filter:tag', { detail: t }));
-                
+
                 // Stagger animation
                 const delay = Math.min(index * 0.03, 0.5); // Faster stagger for tags
                 btn.style.animationDelay = `${delay}s`;
-                
+
                 container.appendChild(btn);
             });
         }
@@ -861,7 +1044,7 @@ export const ui = {
                 rect.addEventListener('mouseleave', () => tooltip.style.opacity = '0');
 
                 rect.addEventListener('click', () => {
-                     window.dispatchEvent(new CustomEvent('filter:date', { detail: dateStr }));
+                    window.dispatchEvent(new CustomEvent('filter:date', { detail: dateStr }));
                 });
 
                 svg.appendChild(rect);
@@ -902,7 +1085,7 @@ export const ui = {
             // Scroll to element
             setTimeout(() => {
                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
+
                 // Add highlight effect
                 element.classList.add('jump-highlight');
                 setTimeout(() => {

@@ -117,7 +117,7 @@ def daily_review():
         ).order_by(func.random()).limit(5)
 
         notes = query.all()
-        return jsonify([note.to_dict() for note in notes])
+        return jsonify([note.to_dict(include_documents=True) for note in notes])
     except Exception as e:
         return jsonify(safe_error(e, '获取回顾笔记失败')), 500
 
@@ -152,8 +152,14 @@ def get_notes():
             page=page, per_page=per_page, error_out=False
         )
 
+        # Include full document details only for owner's notes
+        notes_data = []
+        for note in pagination.items:
+            is_owner = current_user.is_authenticated and note.user_id == current_user.id
+            notes_data.append(note.to_dict(include_documents=is_owner))
+
         return jsonify({
-            'notes': [note.to_dict() for note in pagination.items],
+            'notes': notes_data,
             'total': pagination.total,
             'pages': pagination.pages,
             'current_page': page,
@@ -288,6 +294,17 @@ def create_note():
         db.session.add(new_note)
         db.session.flush()  # 确保 new_note.id 已生成，供 _sync_note_references 使用
 
+        # 关联上传的文档
+        doc_ids = data.get('doc_ids', [])
+        if not isinstance(doc_ids, list) or not all(isinstance(x, str) for x in doc_ids):
+            return jsonify({'error': 'doc_ids 参数格式错误，必须是一个包含字符串的列表'}), 400
+        if doc_ids:
+            from app.models import Document
+            for doc_id in doc_ids:
+                doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
+                if doc:
+                    doc.note_id = new_note.id
+
         # Update Tags Relation
         update_note_tags(new_note, tags)
         
@@ -297,7 +314,7 @@ def create_note():
         db.session.commit()
         invalidate_stats_cache()
 
-        return jsonify(new_note.to_dict()), 201
+        return jsonify(new_note.to_dict(include_documents=True)), 201
     except Exception as e:
         db.session.rollback()
         return jsonify(safe_error(e, '创建笔记失败')), 500
@@ -318,7 +335,7 @@ def get_capsules():
         now = datetime.now()
         
         for c in capsules:
-            d = c.to_dict()
+            d = c.to_dict(include_documents=True)
             
             # 自动更新状态逻辑：如果锁定中且时间已到，标记为 ready（但不修改数据库，只在返回时计算）
             if c.capsule_status == 'locked' and c.capsule_date and c.capsule_date <= now:
@@ -366,7 +383,7 @@ def open_capsule(note_id):
         note.updated_at = datetime.now()
         db.session.commit()
         
-        return jsonify({'success': True, 'note': note.to_dict()})
+        return jsonify({'success': True, 'note': note.to_dict(include_documents=True)})
     except Exception as e:
         db.session.rollback()
         return jsonify(safe_error(e, '拆开胶囊失败')), 500
@@ -388,7 +405,7 @@ def get_note(note_id):
         if not note.is_viewable_by_owner():
             return jsonify(note.to_obfuscated_dict())
 
-        return jsonify(note.to_dict())
+        return jsonify(note.to_dict(include_documents=is_owner))
     except Exception as e:
         return jsonify(safe_error(e, '获取笔记失败')), 500
 
@@ -414,6 +431,21 @@ def update_note(note_id):
 
         if note.user_id != current_user.id:
             return jsonify({'error': '无权修改此笔记'}), 403
+
+        # 更新关联的文档
+        doc_ids = data.get('doc_ids')
+        if doc_ids is not None:
+            if not isinstance(doc_ids, list) or not all(isinstance(x, str) for x in doc_ids):
+                return jsonify({'error': 'doc_ids 参数格式错误，必须是一个包含字符串的列表'}), 400
+            from app.models import Document
+            # 先解除当前笔记的所有文档关联
+            Document.query.filter_by(note_id=note.id, user_id=current_user.id).update({'note_id': None})
+            # 重新关联传入的文档
+            if doc_ids:
+                for doc_id in doc_ids:
+                    doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
+                    if doc:
+                        doc.note_id = note.id
 
         # Update capsule fields if provided
         note.is_capsule = is_capsule
@@ -608,7 +640,7 @@ def get_trash_notes():
         )
 
         return jsonify({
-            'notes': [note.to_dict() for note in pagination.items],
+            'notes': [note.to_dict(include_documents=True) for note in pagination.items],
             'total': pagination.total,
             'pages': pagination.pages,
             'current_page': page,
@@ -696,8 +728,14 @@ def search_notes():
             paginated_notes = filtered_notes[start:end]
             has_next = end < total_items
             
+            # Include full document details only for owner's notes
+            notes_data = []
+            for note in paginated_notes:
+                is_owner = current_user.is_authenticated and note.user_id == current_user.id
+                notes_data.append(note.to_dict(include_documents=is_owner))
+            
             return jsonify({
-                'notes': [note.to_dict() for note in paginated_notes],
+                'notes': notes_data,
                 'total': total_items,
                 'pages': total_pages,
                 'current_page': page,
@@ -709,8 +747,15 @@ def search_notes():
             pagination = query.options(selectinload(Note.outgoing_references), selectinload(Note.incoming_references)).order_by(Note.created_at.desc()).paginate(
                 page=page, per_page=per_page, error_out=False
             )
+            
+            # Include full document details only for owner's notes
+            notes_data = []
+            for note in pagination.items:
+                is_owner = current_user.is_authenticated and note.user_id == current_user.id
+                notes_data.append(note.to_dict(include_documents=is_owner))
+            
             return jsonify({
-                'notes': [note.to_dict() for note in pagination.items],
+                'notes': notes_data,
                 'total': pagination.total,
                 'pages': pagination.pages,
                 'current_page': page,

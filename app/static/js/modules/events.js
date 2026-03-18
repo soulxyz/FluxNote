@@ -260,6 +260,29 @@ export function initGlobalEvents(context) {
         }
     });
 
+    // 文档引用链接点击 → 触发阅读面板跳转（事件委托）
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('.doc-citation-link');
+        if (!link) return;
+        e.preventDefault();
+        const docId = link.dataset.docId;
+        const page = link.dataset.page ? parseInt(link.dataset.page) : null;
+        // 从父级 blockquote 中提取引用文字（用于高亮定位）
+        const blockquote = link.closest('blockquote');
+        let text = '';
+        if (blockquote) {
+            const clone = blockquote.cloneNode(true);
+            // 移除来源行
+            clone.querySelectorAll('em').forEach(el => el.remove());
+            text = clone.textContent.trim().slice(0, 80);
+        }
+        if (docId) {
+            window.dispatchEvent(new CustomEvent('doc:navigate', {
+                detail: { docId, page, text }
+            }));
+        }
+    });
+
     eventsInitialized = true;
     console.log('Global events initialized');
 }
@@ -534,11 +557,24 @@ function initSidebarLogic() {
         floatBtn.style.display = 'block';
     });
 
+    // 保存滚动位置
+    let scrollPosition = 0;
+    
     const toggleMobileSidebar = (e) => {
         e.preventDefault();
         e.stopPropagation();
         const isOpen = sidebar.classList.toggle('mobile-open');
         document.body.classList.toggle('sidebar-open', isOpen);
+        
+        if (isOpen) {
+            // 打开时保存当前滚动位置
+            scrollPosition = window.pageYOffset;
+            document.body.style.top = `-${scrollPosition}px`;
+        } else {
+            // 关闭时恢复滚动位置
+            document.body.style.top = '';
+            window.scrollTo(0, scrollPosition);
+        }
     };
 
     mobileBtn?.addEventListener('click', toggleMobileSidebar);
@@ -550,6 +586,11 @@ function initSidebarLogic() {
         sidebar.classList.remove('mobile-open');
         document.body.classList.add('sidebar-closing');
         document.body.classList.remove('sidebar-open');
+        
+        // 恢复滚动位置
+        document.body.style.top = '';
+        window.scrollTo(0, scrollPosition);
+        
         setTimeout(() => {
             sidebar.classList.remove('mobile-closing');
             document.body.classList.remove('sidebar-closing');
@@ -561,9 +602,20 @@ function initSidebarLogic() {
         window.closeMobileSidebar();
     });
 
+    // 蒙版点击关闭侧边栏
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    sidebarOverlay?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (sidebar.classList.contains('mobile-open')) {
+            window.closeMobileSidebar();
+        }
+    });
+
     document.addEventListener('click', (e) => {
         const isBrandOrBtn = (mobileBtn && mobileBtn.contains(e.target)) || (brandLink && brandLink.contains(e.target));
-        if (window.innerWidth <= 900 && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !isBrandOrBtn) {
+        const isOverlay = e.target.id === 'sidebarOverlay';
+        if (window.innerWidth <= 900 && sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && !isBrandOrBtn && !isOverlay) {
             window.closeMobileSidebar();
         }
     });
@@ -789,6 +841,11 @@ function initEditorLogic(loadNotes) {
             capsule_date: capsuleDate,
             capsule_hint: capsuleHint
         };
+        
+        // 获取当前主编辑器待关联的文档 ID 列表
+        if (window.__mainPendingDocs && window.__mainPendingDocs.length > 0) {
+            payload.doc_ids = window.__mainPendingDocs.map(d => d.id);
+        }
 
         if (!navigator.onLine || state.sessionRevoked) {
             const draftId = Date.now();
@@ -847,6 +904,18 @@ function initEditorLogic(loadNotes) {
                 localStorage.removeItem('note_draft_content');
                 setState('currentTags', []);
                 ui.renderTags('input');
+                
+                // 清空主编辑器待关联文档列表
+                window.__mainPendingDocs = [];
+                if (typeof renderMainDocsList === 'function') renderMainDocsList();
+                else {
+                    const list = document.getElementById('editorDocumentsList');
+                    if (list) {
+                        list.style.display = 'none';
+                        list.innerHTML = '';
+                    }
+                }
+                
                 loadNotes(true);
                 showToast(isCapsule ? '已封存' : '已记录');
             } else if (res === null) {
@@ -1116,9 +1185,9 @@ function initCustomEvents(loadNotes, loadTags) {
     });
 
     window.addEventListener('note:request-update', async (e) => {
-        const { id, content, tags, is_public, is_capsule, capsule_date, capsule_hint } = e.detail;
+        const { id, content, tags, is_public, is_capsule, capsule_date, capsule_hint, doc_ids } = e.detail;
         const note = state.notes.find(n => n.id == id);
-        const updatePayload = { content, tags, is_public, is_capsule, capsule_date, capsule_hint };
+        const updatePayload = { content, tags, is_public, is_capsule, capsule_date, capsule_hint, doc_ids };
 
         const syncNoteState = (note) => {
             if (!note) return;
@@ -1221,7 +1290,82 @@ function initCustomEvents(loadNotes, loadTags) {
         }
     });
 
-    // 分享功能
+    // 文档阅读面板：打开关联到本笔记的文档（或上传新文档）
+    window.addEventListener('note:open-doc', async (e) => {
+        const noteId = e.detail;
+        window.__currentNoteId = noteId;
+        if (!window.readerModule) return showToast('阅读面板未就绪，请刷新页面');
+
+        const { reader, uploadAndOpenDocument, triggerDocUpload } = window.readerModule;
+
+        try {
+            const res = await api.documents?.listByNote(noteId);
+            if (res && res.ok) {
+                const docs = await res.json();
+                if (docs.length === 1) {
+                    reader.open(docs[0].id, noteId);
+                    reader.setActiveNote(noteId);
+                } else if (docs.length > 1) {
+                    _showDocPicker(docs, noteId);
+                } else {
+                    triggerDocUpload(noteId);
+                }
+            } else {
+                showToast('查询关联文档失败');
+            }
+        } catch (err) {
+            console.error('[Events] note:open-doc 失败', err);
+            showToast('操作失败，请重试');
+        }
+    });
+
+    function _showDocPicker(docs, noteId) {
+        const existing = document.querySelector('.doc-picker-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'doc-picker-modal';
+        modal.innerHTML = `
+            <div class="doc-picker-box">
+                <div class="doc-picker-header">
+                    <span>选择文档</span>
+                    <button class="doc-picker-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="doc-picker-list">
+                    ${docs.map(d => `
+                        <div class="doc-picker-item" data-doc-id="${d.id}">
+                            <i class="fas fa-${d.file_type === 'pdf' ? 'file-pdf' : 'file-word'}"></i>
+                            <span class="doc-picker-name">${d.original_filename}</span>
+                            <span class="doc-picker-meta">${d.page_count ? d.page_count + '页' : ''}</span>
+                        </div>
+                    `).join('')}
+                    <div class="doc-picker-item doc-picker-upload" id="docPickerUpload">
+                        <i class="fas fa-plus"></i>
+                        <span>上传新文档</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.querySelector('.doc-picker-close').onclick = () => modal.remove();
+        modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.remove(); });
+
+        modal.querySelectorAll('.doc-picker-item:not(.doc-picker-upload)').forEach(item => {
+            item.onclick = () => {
+                modal.remove();
+                const { reader } = window.readerModule;
+                reader.open(item.dataset.docId, noteId);
+                reader.setActiveNote(noteId);
+            };
+        });
+
+        document.getElementById('docPickerUpload')?.addEventListener('click', () => {
+            modal.remove();
+            window.readerModule?.triggerDocUpload(noteId);
+        });
+    }
+
     window.addEventListener('note:share', async (e) => {
         if (!navigator.onLine || state.sessionRevoked) return showToast('离线模式暂不支持分享');
         const noteId = e.detail;

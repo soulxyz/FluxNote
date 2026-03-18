@@ -174,7 +174,7 @@ def verify_share(share_id):
 
     return jsonify({
         'success': True,
-        'note': note.to_dict(),
+        'note': note.to_dict(include_documents=False),
         'author_name': author_name
     })
 

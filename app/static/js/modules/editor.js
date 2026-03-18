@@ -3,6 +3,84 @@ import { state } from './state.js';
 import { ui } from './ui.js';
 import { showToast, getCaretCoordinates, debounce, sanitizeHtml } from './utils.js';
 
+// ─── 附件列表管理（主编辑器） ──────────────────────────────────────────
+
+window.__mainPendingDocs = [];
+
+function renderMainDocsList() {
+    const list = document.getElementById('editorDocumentsList');
+    if (!list) return;
+    
+    if (window.__mainPendingDocs.length > 0) {
+        list.style.display = 'flex';
+        list.innerHTML = window.__mainPendingDocs.map(doc => {
+            const icon = doc.file_type === 'pdf' 
+                ? '<i class="fas fa-file-pdf" style="color:#e74c3c"></i>' 
+                : '<i class="fas fa-file-word" style="color:#2980b9"></i>';
+            return `
+                <div class="editor-doc-card" data-doc-id="${doc.id}">
+                    ${icon}
+                    <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                    <button type="button" class="doc-remove-btn" title="移除附件"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+        }).join('');
+        
+        list.querySelectorAll('.editor-doc-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('.doc-remove-btn')) return;
+                const docId = card.dataset.docId;
+                if (window.readerModule?.reader) {
+                    window.readerModule.reader.open(docId, null);
+                }
+            });
+            
+            const removeBtn = card.querySelector('.doc-remove-btn');
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const docId = card.dataset.docId;
+                window.__mainPendingDocs = window.__mainPendingDocs.filter(d => d.id !== docId);
+                renderMainDocsList();
+            });
+        });
+    } else {
+        list.style.display = 'none';
+        list.innerHTML = '';
+    }
+}
+
+window.addEventListener('document:uploaded', (e) => {
+    const { doc, noteId } = e.detail;
+    if (!noteId) {
+        // 主编辑器上传
+        window.__mainPendingDocs.push(doc);
+        renderMainDocsList();
+    } else {
+        // 行内编辑器上传
+        window.__editPendingDocs = window.__editPendingDocs || {};
+        if (!window.__editPendingDocs[noteId]) {
+            window.__editPendingDocs[noteId] = [];
+        }
+        // 避免重复添加
+        if (!window.__editPendingDocs[noteId].find(d => d.id === doc.id)) {
+            window.__editPendingDocs[noteId].push(doc);
+        }
+        
+        // 触发重新渲染
+        const list = document.getElementById(`edit-docs-list-${noteId}`);
+        if (list && list.__renderFunc) {
+            list.__renderFunc();
+        } else {
+            // 如果没有绑定渲染函数，尝试重新触发一次整体渲染逻辑
+            // 这里依赖于 ui.js 中的逻辑，通常在 ui.js 中处理
+            const event = new CustomEvent('document:edit-uploaded', { detail: { noteId } });
+            window.dispatchEvent(event);
+        }
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+
 export const editor = {
     init(textareaId) {
         const textarea = document.getElementById(textareaId);
@@ -18,6 +96,33 @@ export const editor = {
         this.setupCapsuleTool(textarea);
         this.setupVoiceInput(textarea);
         this.setupAutoHeight(textarea);
+        this.setupDocButton(textarea);
+    },
+
+    setupDocButton(textarea) {
+        const btn = document.getElementById('editorDocBtn');
+        if (!btn) return;
+
+        const showBtn = () => { btn.style.display = ''; };
+        window.addEventListener('auth:login', showBtn);
+        setTimeout(() => {
+            if (document.getElementById('userProfile')?.style.display !== 'none') showBtn();
+        }, 1000);
+
+        btn.addEventListener('click', () => {
+            if (window.readerModule?.triggerDocUpload) {
+                // 如果是主编辑器，不传 noteId，让上传逻辑知道这是新建笔记
+                const isMainEditor = textarea.id === 'noteContent';
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+                window.readerModule.triggerDocUpload(argsNoteId);
+            } else {
+                showToast('阅读面板未就绪，请刷新页面');
+            }
+        });
     },
 
     setupAutoSave(textarea) {
@@ -186,7 +291,8 @@ export const editor = {
             { label: '上传文件', action: 'upload', icon: 'fas fa-upload', match: 'upload' },
             { label: 'B站视频', action: 'bilibili', icon: 'fas fa-video', match: 'bilibili' },
             { label: 'AI 助手', action: 'ai', icon: 'fas fa-magic', match: 'ai' },
-            { label: '语音输入', action: 'voice', icon: 'fas fa-microphone', match: 'voice' }
+            { label: '语音输入', action: 'voice', icon: 'fas fa-microphone', match: 'voice' },
+            { label: '导入文档', action: 'doc', icon: 'fas fa-file-pdf', match: 'doc' }
         ];
 
         textarea.addEventListener('input', debounce((e) => {
@@ -408,7 +514,21 @@ export const editor = {
             input.multiple = true;
             input.accept = 'image/*,audio/*,video/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.md';
             input.onchange = async () => {
+                const isMainEditor = textarea.id === 'noteContent';
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+
                 for (const file of Array.from(input.files)) {
+                    if (/\.(pdf|docx|doc)$/i.test(file.name)) {
+                        if (window.readerModule?.uploadAndOpenDocument) {
+                            await window.readerModule.uploadAndOpenDocument(file, argsNoteId);
+                        } else { showToast('阅读面板未就绪'); }
+                        continue;
+                    }
+                    // 其他文件 → 普通上传
                     const fd = new FormData();
                     fd.append('file', file);
                     showToast('正在上传...');
@@ -437,6 +557,21 @@ export const editor = {
             replacement = '';
             this._showBilibiliDialog(textarea);
             return;
+        }
+
+        if (cmd.action === 'doc') {
+            replacement = '';
+            if (window.readerModule?.triggerDocUpload) {
+                const isMainEditor = textarea.id === 'noteContent';
+                let argsNoteId = null;
+                if (!isMainEditor) {
+                    const match = textarea.id.match(/^edit-textarea-(\d+)$/);
+                    if (match) argsNoteId = match[1];
+                }
+                window.readerModule.triggerDocUpload(argsNoteId);
+            } else {
+                showToast('阅读面板未就绪，请刷新页面后重试');
+            }
         }
 
         const text = textarea.value;
@@ -981,7 +1116,7 @@ export const editor = {
             if (!dragOverlay) {
                 dragOverlay = document.createElement('div');
                 dragOverlay.className = 'drag-drop-overlay';
-                dragOverlay.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>释放以上传文件</span>';
+                dragOverlay.innerHTML = '<i class="fas fa-cloud-upload-alt"></i><span>释放以上传文件（PDF/Word 自动打开阅读面板）</span>';
                 memoEditor.appendChild(dragOverlay);
             }
             dragOverlay.classList.add('active');
@@ -1003,6 +1138,13 @@ export const editor = {
             e.preventDefault();
 
             for (const file of Array.from(files)) {
+                if (/\.(pdf|docx|doc)$/i.test(file.name)) {
+                    if (window.readerModule?.uploadAndOpenDocument) {
+                        await window.readerModule.uploadAndOpenDocument(file, window.__currentNoteId || null);
+                    } else { showToast('阅读面板未就绪'); }
+                    continue;
+                }
+
                 const formData = new FormData();
                 formData.append('file', file);
                 showToast('正在上传...');

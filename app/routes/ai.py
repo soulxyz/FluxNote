@@ -1,12 +1,15 @@
 from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app
-from flask_login import login_required
+from flask_login import login_required, current_user
 from app.services.ai_service import AIService
 from app.utils.error_handler import safe_error
+from app.extensions import db
+from app.models import Document
 import uuid
 import os
 import re
 import time
 import httpx
+from threading import Thread
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -76,19 +79,56 @@ def stream_ai():
 {content[:3000]}"""
              system_prompt = "你是一个专业的笔记整理助手，擅长将口语化的内容转化为结构清晰的书面笔记。"
 
+        elif action == 'document_summary':
+             doc_id = data.get('doc_id')
+             if not doc_id:
+                  return jsonify({'error': 'doc_id is required for document summary'}), 400
+             doc = Document.query.filter_by(id=doc_id, user_id=current_user.id).first()
+             if not doc:
+                  return jsonify({'error': 'Document not found'}), 404
+             text_content = doc.text_content
+             original_filename = doc.original_filename
+             if not text_content or len(text_content.strip()) < 50:
+                  return jsonify({'error': 'Document content is too short for summary'}), 400
+             
+             excerpt = text_content[:3000]
+             prompt = f'文档名：《{original_filename}》\n\n文档内容（节选）：\n{excerpt}'
+             system_prompt = '你是一个文档摘要助手，请用 1-3 句话简洁地概括文档的核心内容，不要使用列表，直接输出摘要文字。'
+
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
+
+    user_id = current_user.id
 
     def generate():
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
+        full_response = ""
         try:
             for chunk in AIService.chat_completion_stream(messages):
+                full_response += chunk
                 yield chunk
         except Exception as e:
             yield f"Error: {str(e)}"
+        finally:
+            if action == 'document_summary' and data.get('doc_id') and full_response:
+                app = current_app._get_current_object()
+                doc_id = data.get('doc_id')
+                
+                def save_summary_bg(app_instance, did, uid, summary):
+                    with app_instance.app_context():
+                        try:
+                            save_doc = Document.query.filter_by(id=did, user_id=uid).first()
+                            if save_doc:
+                                save_doc.ai_summary = summary
+                                db.session.commit()
+                        except Exception as db_e:
+                            app_instance.logger.error(f"Failed to save AI summary to database: {db_e}")
+                            db.session.rollback()
+                            
+                Thread(target=save_summary_bg, args=(app, doc_id, user_id, full_response)).start()
 
     return Response(stream_with_context(generate()), mimetype='text/plain')
 

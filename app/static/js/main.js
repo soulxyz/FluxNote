@@ -67,6 +67,10 @@ async function syncOfflineData() {
             }
             try {
                 const data = updates[id];
+                if (!data.content || !data.content.trim()) {
+                    delete remainingUpdates[id];
+                    continue;
+                }
                 const res = await api.notes.update(id, data);
                 if (res && res.ok) {
                     successCount++;
@@ -196,8 +200,15 @@ async function loadData() {
     ui.updateHeaderDate();
     ui.handleHashJump();
     
+    // 处理文档导入按钮的显示/隐藏
+    const docBtn = document.getElementById('editorDocBtn');
     if (state.currentUser) {
         checkAndNotifyCapsules();
+        // 登录后显示文档导入按钮
+        if (docBtn) docBtn.style.display = '';
+    } else {
+        // 注销后隐藏文档导入按钮
+        if (docBtn) docBtn.style.display = 'none';
     }
 }
 

@@ -11,3 +11,5 @@ webauthn
 markdown
 bleach
 packaging
+pymupdf
+mammoth
